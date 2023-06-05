@@ -135,7 +135,6 @@ static const struct MACRODEF {
 {"bytes","mode",{"bytes",NULL}},
 {"xarray","mode",{"zarr", NULL}},
 {"noxarray","mode",{"nczarr", "noxarray", NULL}},
-{"zarr","mode",{"nczarr","zarr", NULL}},
 {NULL,NULL,{NULL}}
 };
 
