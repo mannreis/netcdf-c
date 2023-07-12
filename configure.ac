@@ -707,6 +707,14 @@ if test "x$enable_nczarr" = xyes; then
 fi
 AM_CONDITIONAL(ENABLE_NCZARR, [test x$enable_nczarr = xyes])
 
+enable_nczarr_v3=no
+if test "x$enable_nczarr" = xyes; then
+   enable_nczarr_v3=yes
+   # V3 is enabled if NCzarr is enabled
+   AC_DEFINE([ENABLE_NCZARR_V3], [1], [if true, build NCZarr V3 client])
+fi
+AM_CONDITIONAL(ENABLE_NCZARR_S3, [test x$enable_nczarr_V3 = xyes])
+
 ##########
 # Look for Standardized libraries
 ##########

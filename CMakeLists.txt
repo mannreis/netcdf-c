@@ -499,6 +499,13 @@ if(ENABLE_HDF5 OR ENABLE_HDF4 OR ENABLE_NCZARR)
   SET(ENABLE_NETCDF4 ON CACHE BOOL "Enable netCDF4 Alias" FORCE)
 endif()
 
+IF(ENABLE_NCZARR)
+  SET(ENABLE_NCZARR_V3 ON CACHE BOOL "Enable Zarr V3" FORCE)
+  # V3 is enabled if NCzarr is enabled
+ELSE()
+  SET(ENABLE_NCZARR_V3 OFF CACHE BOOL "Enable Zarr V3" FORCE)
+fi
+
 # enable|disable all forms of network access
 OPTION(ENABLE_REMOTE_FUNCTIONALITY "Enable|disable all forms remote data access (DAP, S3, etc)" ON)
 MESSAGE(">>> ENABLE_REMOTE_FUNCTIONALITY=${ENABLE_REMOTE_FUNCTIONALITY}")
