@@ -10,7 +10,7 @@ The NetCDF NCZarr Implementation
 
 Beginning with netCDF version 4.8.0, the Unidata NetCDF group has extended the netcdf-c library to provide access to cloud storage (e.g. Amazon S3 <a href="#ref_aws">[1]</a> ).
 
-The goal of this project is to provide maximum interoperability between the netCDF Enhanced (netcdf-4) data model and the Zarr version 2 <a href="#ref_zarrv2">[4]</a> data model. This is embodied in the netcdf-c library so that it is possible to use the netcdf API to read and write Zarr formatted datasets.
+The goal of this project is to provide maximum interoperability between the netCDF Enhanced (netcdf-4) data model and the Zarr version 2 <a href="#ref_zarr">[4]</a> or Version 3 <a href="#ref_zarrv3">[13]</a> data model. This is embodied in the netcdf-c library so that it is possible to use the netcdf API to read and write Zarr formatted datasets.
 
 In order to better support the netcdf-4 data model, the netcdf-c library implements a limited set of extensions to the Zarr data model. 
 This extended model is referred to as *NCZarr*.
@@ -29,12 +29,12 @@ Notes on terminology in this document.
 
 # The NCZarr Data Model {#nczarr_data_model}
 
-NCZarr uses a data model <a href="#ref_nczarr">[4]</a> that, by design, extends the Zarr Version 2 Specification <a href="#ref_zarrv2">[6]</a> to add support for the NetCDF-4 data model.
+NCZarr uses a data model that, by design, extends the Zarr Version 2 Specification or Version 3 Specification.
 
 __Note Carefully__: a legal _NCZarr_ dataset is also a legal _Zarr_ dataset under a specific assumption. This assumption is that within Zarr meta-data objects, like ''.zarray'', unrecognized dictionary keys are ignored.
 If this assumption is true of an implementation, then the _NCZarr_ dataset is a legal _Zarr_ dataset and should be readable by that _Zarr_ implementation.
 The inverse is true also. A legal _Zarr_ dataset is also a legal _NCZarr_
-dataset, where "legal" means it conforms to the Zarr version 2 specification.
+dataset, where "legal" means it conforms to the Zarr version 2 or 3 specification.
 In addition, certain non-Zarr features are allowed and used.
 Specifically the XArray ''\_ARRAY\_DIMENSIONS'' attribute is one such.
 
@@ -108,32 +108,45 @@ using URLs.
 
 There are, however, some details that are important.
 - Protocol: this should be _https_ or _s3_,or _file_.
-  The _s3_ scheme is equivalent to "https" plus setting "mode=nczarr,s3" (see below). Specifying "file" is mostly used for testing, but is used to support directory tree or zipfile format storage.
+  The _s3_ scheme is equivalent to "https" plus setting "mode=s3".
+  Specifying "file" is mostly used for testing, but also for directory tree or zipfile format storage.
 
 ## Client Parameters
 
 The fragment part of a URL is used to specify information that is interpreted to specify what data format is to be used, as well as additional controls for that data format.
-For NCZarr support, the following _key=value_ pairs are allowed.
 
-- mode=nczarr|zarr|noxarray|file|zip|s3
+For reading, _key=value_ pairs are provided for specifying the storage format.
+- mode=nczarr|zarr
+
+Additional pairs are provided to specify the storage medium: Amazon S3 vs File tree vs Zip file.
+- mode=file|zip|s3
+
+Additional pairs are provided to specify the Zarr version.
+- mode=v2|v3
 
 Typically one will specify two mode flags: one to indicate what format
 to use and one to specify the way the dataset is to be stored.
 For example, a common one is "mode=zarr,file"
+The version will be the default specified when the netcdf-c library was built.
 
+When reading an existing store, it is necessary to specify the storage medium (e.g. s3),
+but it is only necessary to indicate that the store is formatted as some form of Zarr (e.g. zarr or nczarr).
+The library will automatically detect whether the file is actually Zarr vs NCZarr and whether it is Version 2 vs Version 3.
+
+When writing, both the storage medium and the exact storage format must be specified.
 Using _mode=nczarr_ causes the URL to be interpreted as a
 reference to a dataset that is stored in NCZarr format.
-The _zarr_ mode tells the library to
-use NCZarr, but to restrict its operation to operate on pure
-Zarr Version 2 datasets.
+The _zarr_ mode tells the library to use NCZarr, but to restrict its operation to operate on pure Zarr
+the _v2_ mode specifies Version 2 and _v3_mode specifies Version 3.
+If the version is not specified, it will default to the value specified when the netcdf-c library was built.
 
-The modes _s3_, _file_, and _zip_ tell the library what storage
+The modes _s3_, _file_, and _zip_ tell the library what storage medium
 driver to use.
-* The _s3_ driver is the default and indicates using Amazon S3 or some equivalent.
-* The _file_ format stores data in a directory tree.
-* The _zip_ format stores data in a local zip file.
+* The _s3_ driver stores data using Amazon S3 or some equivalent.
+* The _file_ driver stores data in a directory tree.
+* The _zip_ driver stores data in a local zip file.
 
-Note that It should be the case that zipping a _file_
+As an aside, it should be the case that zipping a _file_
 format directory tree will produce a file readable by the
 _zip_ storage format, and vice-versa.
 
@@ -143,19 +156,6 @@ means that every variable in the root group whose named dimensions
 are also in the root group will have an attribute called
 *\_ARRAY\_DIMENSIONS* that stores those dimension names.
 The _noxarray_ mode tells the library to disable the XArray support.
-
-The netcdf-c library is capable of inferring additional mode flags based on the flags it finds. Currently we have the following inferences.
-- _zarr_ => _nczarr_
-
-So for example: ````...#mode=zarr,zip```` is equivalent to this.
-````...#mode=nczarr,zarr,zip
-````
-<!--
-- log=&lt;output-stream&gt;: this control turns on logging output,
-  which is useful for debugging and testing.
-If just _log_ is used
-  then it is equivalent to _log=stderr_.
--->
 
 # NCZarr Map Implementation {#nczarr_mapimpl}
 
@@ -277,7 +277,7 @@ As with other URLS (e.g. DAP), these kind of URLS can be passed as the path argu
 
 # NCZarr versus Pure Zarr. {#nczarr_purezarr}
 
-The NCZARR format extends the pure Zarr format by adding extra keys such as ''\_NCZARR\_ARRAY'' inside the ''.zarray'' object.
+The NCZARR format extends the pure Zarr format by adding extra keys such as ''\_nczarr\_array'' inside the ''.zarray'' object.
 It is possible to suppress the use of these extensions so that the netcdf library can read and write a pure zarr formatted file.
 This is controlled by using ''mode=zarr'', which is an alias for the
 ''mode=nczarr,zarr'' combination.
@@ -333,13 +333,14 @@ The reason for this is that the bucket name forms the initial segment in the key
 
 ## Data Model
 
-The NCZarr storage format is almost identical to that of the the standard Zarr version 2 format.
+The NCZarr storage format is almost identical to that of the the standard Zarr format.
 The data model differs as follows.
 
 1. Zarr only supports anonymous dimensions -- NCZarr supports only shared (named) dimensions.
 2. Zarr attributes are untyped -- or perhaps more correctly characterized as of type string.
+3. Zarr does not explicitly support unlimited dimensions -- NCZarr does support them.
 
-## Storage Format
+## Storage Medium
 
 Consider both NCZarr and Zarr, and assume S3 notions of bucket and object.
 In both systems, Groups and Variables (Array in Zarr) map to S3 objects.
@@ -369,8 +370,9 @@ _\_nczarr_superblock\__ -- this is in the top level group -- key _/.zarr_.
 It is in effect the "superblock" for the dataset and contains
 any netcdf specific dataset level information.
 It is also used to verify that a given key is the root of a dataset.
-Currently it contains the following key(s):
-* "version" -- the NCZarr version defining the format of the dataset.
+Currently it contains one key that is ignored and is only to ensure that
+older netcdf library versions do not crash.
+* "version" -- the NCZarr version defining the format of the dataset (deprecated).
 
 _\_nczarr_group\__ -- this key appears in every _.zgroup_ object.
 It contains any netcdf specific group information.
@@ -453,11 +455,11 @@ Here are a couple of examples using the _ncgen_ and _ncdump_ utilities.
     ```
 5. Create an nczarr file using the s3 protocol with a specific profile
     ```
-    ncgen -4 -lb -o "s3://datasetbucket/rootkey#mode=nczarr,awsprofile=unidata" dataset.cdl
+    ncgen -4 -lb -o "s3://datasetbucket/rootkey#mode=nczarr&awsprofile=unidata" dataset.cdl
     ```
     Note that the URL is internally translated to this
     ````
-    https://s2.&lt;region&gt.amazonaws.com/datasetbucket/rootkey#mode=nczarr,awsprofile=unidata" dataset.cdl
+    https://s2.&lt;region&gt.amazonaws.com/datasetbucket/rootkey#mode=nczarr&awsprofile=unidata" dataset.cdl
     ````
 
 # References {#nczarr_bib}
@@ -475,8 +477,10 @@ collections — High-performance dataset datatypes](https://docs.python.org/2/li
 <a name="blosc-c-impl">[10]</a> [C-Blosc Compressor Implementation](https://github.com/Blosc/c-blosc)<br>
 <a name="ref_awssdk_conda">[11]</a> [Conda-forge / packages / aws-sdk-cpp](https://anaconda.org/conda-forge/aws-sdk-cpp)<br>
 <a name="ref_gdal">[12]</a> [GDAL Zarr](https://gdal.org/drivers/raster/zarr.html)<br>
+<a name="ref_nczarrv3">[13]</a> [NetCDF ZARR Data Model Specification Version 3](https://zarr-specs.readthedocs.io/en/latest/specs.html)
 
 # Appendix A. Building NCZarr Support {#nczarr_build}
+
 
 Currently the following build cases are known to work.
 Note that this does not include S3 support.

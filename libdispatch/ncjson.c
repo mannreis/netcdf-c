@@ -128,7 +128,8 @@ static int NCJnewstring(int sort, const char* value, NCjson** jsonp);
 static int NCJnewstringn(int sort, size_t len, const char* value, NCjson** jsonp);
 static int NCJclone(const NCjson* json, NCjson** clonep);
 static int NCJaddstring(NCjson* json, int sort, const char* s);
-static int NCJinsert(NCjson* object, char* key, NCjson* jvalue);
+static int NCJinsert(NCjson* object, const char* key, NCjson* jvalue);
+static int NCJinsertstring(NCjson* object, const char* key, const char* value);
 static int NCJappend(NCjson* object, NCjson* value);
 static int NCJunparse(const NCjson* json, unsigned flags, char** textp);
 #else /*!NETCDF_JSON_H*/
@@ -901,7 +902,7 @@ done:
 
 /* Insert key-value pair into a dict object. key will be strdup'd */
 OPTSTATIC int
-NCJinsert(NCjson* object, char* key, NCjson* jvalue)
+NCJinsert(NCjson* object, const char* key, NCjson* jvalue)
 {
     int stat = NCJ_OK;
     NCjson* jkey = NULL;
@@ -910,6 +911,18 @@ NCJinsert(NCjson* object, char* key, NCjson* jvalue)
     if((stat = NCJnewstring(NCJ_STRING,key,&jkey))==NCJ_ERR) goto done;
     if((stat = NCJappend(object,jkey))==NCJ_ERR) goto done;
     if((stat = NCJappend(object,jvalue))==NCJ_ERR) goto done;
+done:
+    return NCJTHROW(stat);
+}
+
+/* Insert key-value pair into a dict object. key and value will be strdup'd */
+OPTSTATIC int
+NCJinsert(NCjson* object, char* key, NCjson* jvalue)
+{
+    int stat = NCJ_OK;
+    NCjson* jvalue = NULL;
+    if((stat = NCJnewstring(NCJ_STRING,value,&jvalue))==NCJ_ERR) goto done;
+    if((stat = NCJinsert(object,key,jvalue))==NCJ_ERR) goto done;
 done:
     return NCJTHROW(stat);
 }

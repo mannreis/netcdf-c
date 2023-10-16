@@ -118,8 +118,7 @@ static struct FORMATMODES {
 {"udf1",NC_FORMATX_UDF1,0},
 {"nczarr",NC_FORMATX_NCZARR,NC_FORMAT_NETCDF4},
 {"zarr",NC_FORMATX_NCZARR,NC_FORMAT_NETCDF4},
-{"zarrv3",NC_FORMATX_NCZARR,NC_FORMAT_NETCDF4},
-{"bytes",NC_FORMATX_NC4,NC_FORMAT_NETCDF4}, /* temporary until 3 vs 4 is determined */
+{"bytes",NC_FORMATX_NC4,NC_FORMAT_NETCDF4}, /* temporary until netcdf-3 vs netcdf-4 is determined */
 {NULL,0},
 };
 
@@ -129,14 +128,12 @@ static const struct MACRODEF {
     char* defkey;
     char* defvalues[4];
 } macrodefs[] = {
-{"zarr","mode",{"nczarr","zarr",NULL}},
-{"zarrv3","mode",{"nczarr","zarrv3",NULL}},
+{"zarr","mode",{"zarr",NULL}},
+{"nczarr","mode",{"nczarr",NULL}},
 {"dap2","mode",{"dap2",NULL}},
 {"dap4","mode",{"dap4",NULL}},
-{"s3","mode",{"s3","nczarr",NULL}},
+{"s3","mode",{"s3",NULL}},
 {"bytes","mode",{"bytes",NULL}},
-{"xarray","mode",{"zarr", NULL}},
-{"noxarray","mode",{"nczarr", "noxarray", NULL}},
 {NULL,NULL,{NULL}}
 };
 
@@ -153,11 +150,8 @@ static const struct MODEINFER {
     char* key;
     char* inference;
 } modeinferences[] = {
-{"zarr","nczarr"},
-{"zarrv3","nczarr"},
 {"xarray","zarr"},
 {"noxarray","nczarr"},
-{"noxarray","zarr"},
 {NULL,NULL}
 };
 
@@ -165,7 +159,6 @@ static const struct MODEINFER {
 static const struct MODEINFER modenegations[] = {
 {"bytes","nczarr"}, /* bytes negates (nc)zarr */
 {"bytes","zarr"},
-{"bytes","zarrv3"},
 {"noxarray","xarray"},
 {NULL,NULL}
 };

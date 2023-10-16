@@ -215,6 +215,16 @@ AC_ARG_ENABLE([nczarr],
 test "x$enable_nczarr" = xno || enable_nczarr=yes
 AC_MSG_RESULT($enable_nczarr)
 
+# Decide default Zarr Format for creation
+AC_MSG_CHECKING([which Zarr format is the default])
+AC_ARG_WITH([default-zarr-format],
+              [AS_HELP_STRING([--with-default-zarr-format=2|3],
+                              [Specify the default Zarr format.])],
+            [DFALTZARRFORMAT=$with_default_zarr_format], [DFALTZARRFORMAT=2])
+AC_MSG_RESULT([${DFALTZARRFORMAT}])
+AC_SUBST([DFALTZARRFORMAT],[${DFALTZARRFORMAT}])
+AC_DEFINE_UNQUOTED([DFALTZARRFORMAT], [$DFALTZARRFORMAT], [the default Zarr format.])
+
 # HDF5 | HDF4 | NCZarr => netcdf-4
 if test "x$enable_hdf5" = xyes || test "x$enable_hdf4" = xyes || test "x$enable_nczarr" = xyes ; then
 enable_netcdf_4=yes
@@ -717,7 +727,6 @@ if test "x$enable_nczarr" = xyes; then
 fi
 AM_CONDITIONAL(ENABLE_NCZARR, [test x$enable_nczarr = xyes])
 
-enable_nczarr_v3=no
 if test "x$enable_nczarr" = xyes; then
    enable_nczarr_v3=yes
    # V3 is enabled if NCzarr is enabled

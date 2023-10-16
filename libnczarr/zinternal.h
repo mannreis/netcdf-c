@@ -12,11 +12,9 @@
 #ifndef ZINTERNAL_H
 #define ZINTERNAL_H
 
-#define ZARRVERSION "2"
-
-/* NCZARRVERSION is independent of Zarr version,
-   but NCZARRVERSION => ZARRVERSION */
-#define NCZARRVERSION "2.0.0"
+/* Allowed Zarr Formats */
+#define ZARRFORMAT2 2
+#define ZARRFORMAT3 3
 
 /* These have to do with creating chunked datasets in ZARR. */
 #define NCZ_CHUNKSIZE_FACTOR (10)
@@ -59,7 +57,7 @@
 /* V2 Reserved Attributes */
 /*
 Inserted into /.zgroup
-_nczarr_superblock: {"version": "2.0.0"}
+_nczarr_superblock: {"version": "2.0.0"} -- Deprecated
 Inserted into any .zgroup
 "_nczarr_group": "{
 \"dimensions\": {\"d1\": \"1\", \"d2\": \"1\",...}
@@ -81,6 +79,7 @@ Inserted into any .zattrs ? or should it go into the container?
 */
 
 #define NCZ_V2_SUPERBLOCK "_nczarr_superblock"
+#define NCZ_V3_SUPERBLOCK NCZ_V2_SUPERBLOCK 
 #define NCZ_V2_GROUP   "_nczarr_group"
 #define NCZ_V2_ARRAY   "_nczarr_array"
 #define NCZ_V2_ATTR    NC_NCZARR_ATTR
@@ -95,6 +94,8 @@ Inserted into any .zattrs ? or should it go into the container?
 #define XARRAYCONTROL "xarray"
 #define NOXARRAYCONTROL "noxarray"
 #define XARRAYSCALAR "_scalar_"
+#define FORMAT2CONTROL "v2"
+#define FORMAT3CONTROL "v3"
 
 #define LEGAL_DIM_SEPARATORS "./"
 #define DFALT_DIM_SEPARATOR '.'
@@ -134,13 +135,8 @@ typedef struct NCZ_FILE_INFO {
     NCZcommon common;
     struct NCZMAP* map; /* implementation */
     struct NCauth* auth;
-    struct nczarr {
-	int zarr_version;
-	struct {
-	    unsigned long major;
-	    unsigned long minor;
-	    unsigned long release;
-	} nczarr_version;
+    struct Zarr {
+	int zarr_format;
     } zarr;
     int creating; /* 1=> created 0=>open */
     int native_endianness; /* NC_ENDIAN_LITTLE | NC_ENDIAN_BIG */

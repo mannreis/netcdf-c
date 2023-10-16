@@ -267,9 +267,9 @@ const char *nc_strerror(int ncerr1)
       case NC_EMPI: return "NetCDF: MPI operation failed.";
       case NC_ERCFILE:
 	return "NetCDF: RC File Failure.";
-     case NC_ENULLPAD:
+      case NC_ENULLPAD:
        return "NetCDF: File fails strict Null-Byte Header check.";
-     case NC_EINMEMORY:
+      case NC_EINMEMORY:
        return "NetCDF: In-memory File operation failed.";
       case NC_ENCZARR:
 	 return "NetCDF: NCZarr error";
@@ -283,6 +283,8 @@ const char *nc_strerror(int ncerr1)
 	 return "NetCDF: Some object not found";
       case NC_EPLUGIN:
 	 return "NetCDF: Unclassified failure in accessing a dynamically loaded plugin";
+      case NC_ENOTZArR:
+	 return "Malformed (NC)Zarr file";
      default:
 #ifdef USE_PNETCDF
         /* The behavior of ncmpi_strerror here is to return

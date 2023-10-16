@@ -104,7 +104,10 @@ OPTEXPORT int NCJaddstring(NCjson* json, int sort, const char* s);
 OPTEXPORT int NCJappend(NCjson* object, NCjson* value);
 
 /* Insert key-value pair into a dict object. key will be copied */
-OPTEXPORT int NCJinsert(NCjson* object, char* key, NCjson* value);
+OPTEXPORT int NCJinsert(NCjson* object, const char* key, NCjson* jvalue);
+
+/* Insert key-value pair into a dict object. key and value will be copied */
+OPTEXPORT int NCJinsertstring(NCjson* object, const char* key, const char* value);
 
 /* Unparser to convert NCjson object to text in buffer */
 OPTEXPORT int NCJunparse(const NCjson* json, unsigned flags, char** textp);

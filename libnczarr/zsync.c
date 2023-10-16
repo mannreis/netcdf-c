@@ -145,7 +145,7 @@ ncz_sync_grp(NC_FILE_INFO_T* file, NC_GRP_INFO_T* grp, int isclose)
 {
     int i,stat = NC_NOERR;
     NCZ_FILE_INFO_T* zinfo = NULL;
-    char version[1024];
+    char format[1024];
     int purezarr = 0;
     NCZMAP* map = NULL;
     char* fullpath = NULL;
@@ -204,26 +204,31 @@ ncz_sync_grp(NC_FILE_INFO_T* file, NC_GRP_INFO_T* grp, int isclose)
     /* build ZGROUP contents */
     if((stat = NCJnew(NCJ_DICT,&jgroup)))
 	goto done;
-    snprintf(version,sizeof(version),"%d",zinfo->zarr.zarr_version);
-    if((stat = NCJaddstring(jgroup,NCJ_STRING,"zarr_format"))) goto done;
-    if((stat = NCJaddstring(jgroup,NCJ_INT,version))) goto done;
-    if(!purezarr && grp->parent == NULL) { /* Root group */
-        snprintf(version,sizeof(version),"%lu.%lu.%lu",
-		 zinfo->zarr.nczarr_version.major,
-		 zinfo->zarr.nczarr_version.minor,
-		 zinfo->zarr.nczarr_version.release);
-	if((stat = NCJnew(NCJ_DICT,&jsuper))) goto done;
-	if((stat-NCJnewstring(NCJ_STRING,version,&jtmp))) goto done;
-	if((stat = NCJinsert(jsuper,"version",jtmp))) goto done;
-	jtmp = NULL;
-	if((stat = NCJinsert(jgroup,NCZ_V2_SUPERBLOCK,jsuper))) goto done;
-	jsuper = NULL;
-    }
-
+    snprintf(format,sizeof(format),"%d",zinfo->zarr.zarr_format);
+    if((stat = NCJinsertstring(jgroup,"zarr_format",format))) goto done;
     if(!purezarr) {
         /* Insert the "_NCZARR_GROUP" dict */
         if((stat = NCJinsert(jgroup,NCZ_V2_GROUP,json))) goto done;
         json = NULL;
+	if((stat=NCJinsertstring(jgroup,"must-understand","false"))) goto done; /* Since we have added extra stuff */
+        if(grp->parent == NULL) { /* Root group */
+            snprintf(format,sizeof(format),"2.0.0"); /* Obsolete */
+	    if((stat = NCJnew(NCJ_DICT,&jsuper))) goto done;
+	    if((stat = NCJinsertstring(jsuper,"version",format))) goto done;
+	    jtmp = NULL;
+	    switch(zinfo->zarr.zarr_format) {
+	    case ZARRFORMAT2:
+     	        if((stat = NCJinsert(jgroup,NCZ_V2_SUPERBLOCK,jsuper))) goto done;
+		break;
+	    case ZARRFORMAT3:
+   	        if((stat = NCJinsert(jgroup,NCZ_V3_SUPERBLOCK,jsuper))) goto done;
+		break;
+	    default:
+	        stat = NC_ENOTZARR;
+		break;
+	    }
+	    jsuper = NULL;
+	}
     }
 
     /* build ZGROUP path */
@@ -328,9 +333,8 @@ ncz_sync_var_meta(NC_FILE_INFO_T* file, NC_VAR_INFO_T* var, int isclose)
 	goto done;
 
     /* zarr_format key */
-    snprintf(number,sizeof(number),"%d",zinfo->zarr.zarr_version);
-    if((stat = NCJaddstring(jvar,NCJ_STRING,"zarr_format"))) goto done;
-    if((stat = NCJaddstring(jvar,NCJ_INT,number))) goto done;
+    snprintf(number,sizeof(number),"%d",zinfo->zarr.zarr_format);
+    if((stat = NCJinsertstring(jvar,"zarr_format",number))) goto done;
 
     /* Collect the shape vector */
     for(i=0;i<var->ndims;i++) {
@@ -346,12 +350,11 @@ ncz_sync_var_meta(NC_FILE_INFO_T* file, NC_VAR_INFO_T* var, int isclose)
     /* Create the list */
     if((stat = NCJnew(NCJ_ARRAY,&jtmp))) goto done;
     if(zvar->scalar) {
-	NCJaddstring(jtmp,NCJ_INT,"1");
+	strncpy(number,"1",sizeof(number));
     } else for(i=0;i<var->ndims;i++) {
 	snprintf(number,sizeof(number),"%llu",shape[i]);
-	NCJaddstring(jtmp,NCJ_INT,number);
     }
-    if((stat = NCJinsert(jvar,"shape",jtmp))) goto done;
+    if((stat = NCJinsertstring(jvar,"shape",number))) goto done;
     jtmp = NULL;
 
     /* dtype key */
@@ -458,8 +461,7 @@ ncz_sync_var_meta(NC_FILE_INFO_T* file, NC_VAR_INFO_T* var, int isclose)
 	char sep[2];
 	sep[0] = zvar->dimension_separator;/* make separator a string*/
 	sep[1] = '\0';
-        if((stat = NCJnewstring(NCJ_STRING,sep,&jtmp))) goto done;
-        if((stat = NCJinsert(jvar,"dimension_separator",jtmp))) goto done;
+        if((stat = NCJinsertstring(jvar,"dimension_separator",sep))) goto done;
         jtmp = NULL;
     }
 
@@ -494,13 +496,11 @@ ncz_sync_var_meta(NC_FILE_INFO_T* file, NC_VAR_INFO_T* var, int isclose)
 	/* Add the _Storage flag */
 	/* Record if this is a scalar */
 	if(var->ndims == 0) {
-	    if((stat = NCJnewstring(NCJ_INT,"1",&jtmp)))goto done;
-	    if((stat = NCJinsert(jncvar,"scalar",jtmp))) goto done;
+	    if((stat = NCJinsertstring(jncvar,"scalar","1"))) goto done;
 	    jtmp = NULL;
 	}
 	/* everything looks like it is chunked */
-	if((stat = NCJnewstring(NCJ_STRING,"chunked",&jtmp)))goto done;
-	if((stat = NCJinsert(jncvar,"storage",jtmp))) goto done;
+	if((stat = NCJinsertstring(jncvar,"storage","chunked"))) goto done;
 	jtmp = NULL;
 
 	if(!(zinfo->controls.flags & FLAG_PUREZARR)) {
@@ -783,20 +783,18 @@ ncz_sync_atts(NC_FILE_INFO_T* file, NC_OBJ* container, NCindex* attlist, int isc
     if(container->sort == NCVAR && var && var->quantize_mode > 0) {    
 	char mode[64];
 	snprintf(mode,sizeof(mode),"%d",var->nsd);
-        if((stat = NCJnewstring(NCJ_INT,mode,&jint)))
-	        goto done;
 	/* Insert the quantize attribute */
 	switch (var->quantize_mode) {
 	case NC_QUANTIZE_BITGROOM:
-	    if((stat = NCJinsert(jatts,NC_QUANTIZE_BITGROOM_ATT_NAME,jint))) goto done;	
+	    if((stat = NCJinsertstring(jatts,NC_QUANTIZE_BITGROOM_ATT_NAME,mode))) goto done;	
 	    jint = NULL;
 	    break;
 	case NC_QUANTIZE_GRANULARBR:
-	    if((stat = NCJinsert(jatts,NC_QUANTIZE_GRANULARBR_ATT_NAME,jint))) goto done;	
+	    if((stat = NCJinsertstring(jatts,NC_QUANTIZE_GRANULARBR_ATT_NAME,mode))) goto done;	
 	    jint = NULL;
 	    break;
 	case NC_QUANTIZE_BITROUND:
-	    if((stat = NCJinsert(jatts,NC_QUANTIZE_BITROUND_ATT_NAME,jint))) goto done;	
+	    if((stat = NCJinsertstring(jatts,NC_QUANTIZE_BITROUND_ATT_NAME,mode))) goto done;	
 	    jint = NULL;
 	    break;
 	default: break;
@@ -1516,11 +1514,18 @@ define_vars(NC_FILE_INFO_T* file, NC_GRP_INFO_T* grp, NClist* varnames)
 
 	/* Verify the format */
 	{
-	    int version;
+	    int format;
 	    if((stat = NCJdictget(jvar,"zarr_format",&jvalue))) goto done;
-	    sscanf(NCJstring(jvalue),"%d",&version);
-	    if(version != zinfo->zarr.zarr_version)
-		{stat = (THROW(NC_ENCZARR)); goto done;}
+	    sscanf(NCJstring(jvalue),"%d",&format);
+	    switch(format) {
+	    case ZARRFORMAT2: break;
+    	    case ZARRFORMAT3: break;
+	    default: stat = NC_ENOTZARR; goto done;
+	    }
+	    if(zinfo->zarr.zarr_format == 0) /* Not yet defined */
+	        zinfo->zarr.zarr_format = format;
+    	    if(zinfo->zarr.zarr_format != format)
+		{stat = (THROW(NC_ENOTZARR)); goto done;}
 	}
 	/* Set the type and endianness of the variable */
 	{
@@ -1824,15 +1829,14 @@ done:
 }
 
 int
-ncz_read_superblock(NC_FILE_INFO_T* file, char** nczarrvp, char** zarrfp)
+ncz_read_superblock(NC_FILE_INFO_T* file, int* zarrformatp)
 {
     int stat = NC_NOERR;
     NCjson* jnczgroup = NULL;
     NCjson* jzgroup = NULL;
     NCjson* jsuper = NULL;
     NCjson* jtmp = NULL;
-    char* nczarr_version = NULL;
-    char* zarr_format = NULL;
+    int zarr_format = 0;
     NCZ_FILE_INFO_T* zinfo = (NCZ_FILE_INFO_T*)file->format_file_info;
 
     ZTRACE(3,"file=%s",file->controller->path);
@@ -1844,7 +1848,7 @@ ncz_read_superblock(NC_FILE_INFO_T* file, char** nczarrvp, char** zarrfp)
 	break;
     case NC_NOERR:
 	if((stat = NCJdictget(jnczgroup,"nczarr_version",&jtmp))) goto done;
-	nczarr_version = strdup(NCJstring(jtmp));
+	/* otherwise ignore */
 	break;
     default: goto done;
     }
@@ -1864,17 +1868,20 @@ ncz_read_superblock(NC_FILE_INFO_T* file, char** nczarrvp, char** zarrfp)
 	if(!stat && jsuper == NULL) { /* try uppercase name */
             if((stat = NCJdictget(jzgroup,NCZ_V2_SUPERBLOCK_UC,&jsuper))) goto done;
 	}
- 	if(jsuper != NULL) {
-	    /* Extract the equivalent attribute */
-	    if(jsuper->sort != NCJ_DICT)
-	        {stat = NC_ENCZARR; goto done;}
-	    if((stat = NCJdictget(jsuper,"version",&jtmp))) goto done;
-	    nczarr_version = nulldup(NCJstring(jtmp));
+	{/* In any case, extract and verify the zarr format */
+            if((stat = NCJdictget(jzgroup,"zarr_format",&jtmp))) goto done;
+            assert(jtmp == NULL);
+            sscanf(NCJstring(jtmp),"%d",&zarr_format);
+            switch(zarr_format) {
+            case ZARRFORMAT2: break;
+            case ZARRFORMAT3: break;
+            default: stat = NC_ENOTZARR; goto done;
+            }
+            if(zinfo->zarr.zarr_format == 0) /* Not yet defined */
+                zinfo->zarr.zarr_format = zarr_format;
+            if(zinfo->zarr.zarr_format != zarr_format)
+                {stat = (THROW(NC_ENOTZARR)); goto done;}
 	}
-        /* In any case, extract the zarr format */
-        if((stat = NCJdictget(jzgroup,"zarr_format",&jtmp))) goto done;
-	assert(zarr_format == NULL);
-        zarr_format = nulldup(NCJstring(jtmp));
     }
     /* Set the format flags */
     if(jnczgroup == NULL && jsuper == NULL) {
@@ -1884,7 +1891,6 @@ ncz_read_superblock(NC_FILE_INFO_T* file, char** nczarrvp, char** zarrfp)
 	/* ok, assume pure zarr with no groups */
 	zinfo->controls.flags |= FLAG_PUREZARR;	
 	zinfo->controls.flags &= ~(FLAG_NCZARR_V1);
-	if(zarr_format == NULL) zarr_format = strdup("2");
     } else if(jnczgroup != NULL) {
 	zinfo->controls.flags |= FLAG_NCZARR_V1;
 	/* Also means file is read only */
@@ -1892,11 +1898,8 @@ ncz_read_superblock(NC_FILE_INFO_T* file, char** nczarrvp, char** zarrfp)
     } else if(jsuper != NULL) {
 	/* ! FLAG_NCZARR_V1 && ! FLAG_PUREZARR */
     }
-    if(nczarrvp) {*nczarrvp = nczarr_version; nczarr_version = NULL;}
-    if(zarrfp) {*zarrfp = zarr_format; zarr_format = NULL;}
+    if(zarrformatp) *zarrformatp = zarr_format;
 done:
-    nullfree(zarr_format);
-    nullfree(nczarr_version);
     NCJreclaim(jzgroup);
     NCJreclaim(jnczgroup);
     return ZUNTRACE(THROW(stat));
