@@ -56,7 +56,12 @@ ncz_create_dataset(NC_FILE_INFO_T* file, NC_GRP_INFO_T* root, const char** contr
 	{stat = NC_ENOMEM; goto done;}
 
     /* fill in some of the zinfo and zroot fields */
-    zinfo->zarr.zarr_format = DFALTZARRFORMAT; /* Start with this */
+    zinfo->zarr.zarr_version = atoi(ZARRVERSION);
+    sscanf(NCZARRVERSION,"%lu.%lu.%lu",
+	   &zinfo->zarr.nczarr_version.major,
+	   &zinfo->zarr.nczarr_version.minor,
+	   &zinfo->zarr.nczarr_version.release);
+
     zinfo->default_maxstrlen = NCZ_MAXSTR_DEFAULT;
 
     /* Apply client controls */
@@ -100,7 +105,8 @@ ncz_open_dataset(NC_FILE_INFO_T* file, const char** controls)
     NCZ_FILE_INFO_T* zinfo = NULL;
     int mode;
     NClist* modeargs = NULL;
-    int zarr_format = 0;
+    char* nczarr_version = NULL;
+    char* zarr_format = NULL;
 
     ZTRACE(3,"file=%s controls=%s",file->hdr.name,(controls?nczprint_envv(controls):"null"));
 
@@ -122,7 +128,6 @@ ncz_open_dataset(NC_FILE_INFO_T* file, const char** controls)
     zinfo->native_endianness = (NCZ_isLittleEndian() ? NC_ENDIAN_LITTLE : NC_ENDIAN_BIG);
     if((zinfo->envv_controls = NCZ_clonestringvec(0,controls))==NULL) /*0=>envv style*/
 	{stat = NC_ENOMEM; goto done;}
-    zinfo->zarr.zarr_format = 0; /* Overridden later */
     zinfo->default_maxstrlen = NCZ_MAXSTR_DEFAULT;
 
     /* Add struct to hold NCZ-specific group info. */
@@ -137,14 +142,21 @@ ncz_open_dataset(NC_FILE_INFO_T* file, const char** controls)
     if((stat = nczmap_open(zinfo->controls.mapimpl,nc->path,mode,zinfo->controls.flags,NULL,&zinfo->map)))
 	goto done;
 
-    /* Ok, try to read superblock */
-    zarr_format = 0;
-    if((stat = ncz_read_superblock(file,&zarr_format))) goto done;
+    /* Infer the NCZarr+Zarr versions */
+    if((stat = ncz_read_superblock(file,&nczarr_version,&zarr_format))) goto done;
 
-    if(zarr_format == 0) /* default */
-       zinfo->zarr.zarr_format = DFALTZARRFORMAT;
-    else 
-       zinfo->zarr.zarr_format = zarr_format;
+    if(nczarr_version == NULL) /* default */
+        nczarr_version = strdup(NCZARRVERSION);
+    if(zarr_format == NULL) /* default */
+       zarr_format = strdup(ZARRVERSION);
+    /* Extract the information from it */
+    if(sscanf(zarr_format,"%d",&zinfo->zarr.zarr_version)!=1)
+	{stat = NC_ENCZARR; goto done;}		
+    if(sscanf(nczarr_version,"%lu.%lu.%lu",
+		    &zinfo->zarr.nczarr_version.major,
+		    &zinfo->zarr.nczarr_version.minor,
+		    &zinfo->zarr.nczarr_version.release) == 0)
+	{stat = NC_ENCZARR; goto done;}
 
     /* Load auth info from rc file */
     if((stat = ncuriparse(nc->path,&uri))) goto done;
@@ -154,6 +166,8 @@ ncz_open_dataset(NC_FILE_INFO_T* file, const char** controls)
     }
 
 done:
+    nullfree(zarr_format);
+    nullfree(nczarr_version);
     ncurifree(uri);
     nclistfreeall(modeargs);
     if(json) NCJreclaim(json);
@@ -179,7 +193,6 @@ NCZ_isnetcdf4(struct NC_FILE_INFO* h5)
     return isnc4;
 }
 
-#if 0
 /**
  * @internal Determine version info
  *
@@ -206,7 +219,7 @@ NCZ_get_libversion(unsigned long* majorp, unsigned long* minorp,unsigned long* r
 /**
  * @internal Determine "superblock" number.
  *
- * For libzarr, use the value of the zarr format
+ * For libzarr, use the value of the major part of the nczarr version.
  *
  * @param superblocp Pointer to place to return superblock.
  * use the nczarr format version major as the superblock number.
@@ -218,10 +231,9 @@ int
 NCZ_get_superblock(NC_FILE_INFO_T* file, int* superblockp)
 {
     NCZ_FILE_INFO_T* zinfo = file->format_file_info;
-    if(superblockp) *superblockp = zinfo->zarr.nczarr_format.major;
+    if(superblockp) *superblockp = zinfo->zarr.nczarr_version.major;
     return NC_NOERR;
 }
-#endif
 
 /**************************************************/
 /* Utilities */
@@ -316,10 +328,6 @@ applycontrols(NCZ_FILE_INFO_T* zinfo)
 	    zinfo->controls.flags |= FLAG_PUREZARR;
 	else if(strcasecmp(p,NOXARRAYCONTROL)==0)
 	    noflags |= FLAG_XARRAYDIMS;
-	else if(strcasecmp(p,FORMAT2CONTROL)==0)
-	    zinfo->zarr.zarr_format = ZARRFORMAT2;
-	else if(strcasecmp(p,FORMAT3CONTROL)==0)
-	    zinfo->zarr.zarr_format = ZARRFORMAT3;
 	else if(strcasecmp(p,"zip")==0) zinfo->controls.mapimpl = NCZM_ZIP;
 	else if(strcasecmp(p,"file")==0) zinfo->controls.mapimpl = NCZM_FILE;
 	else if(strcasecmp(p,"s3")==0) zinfo->controls.mapimpl = NCZM_S3;

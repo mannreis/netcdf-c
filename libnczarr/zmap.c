@@ -544,3 +544,89 @@ NCZ_freeenvv(int n, char** envv)
     }
     free(envv);    
 }
+
+const char*
+NCZ_mapkind(NCZM_IMPL impl)
+{
+    switch (impl) {
+    case NCZM_UNDEF: return "NCZM_UNDEF";
+    case NCZM_FILE: return "NCZM_FILE";
+    case NCZM_ZIP: return "NCZM_ZIP";
+    case NCZM_S3: return "NCZM_S3";
+    default: break;
+    }
+    return "Unknown";
+}
+
+/**
+Walk a subtree of paths and invoke a function on each path.
+The walk is breadth-first.
+
+The function signature is:
+int (*fcn)(NCZMAP* map, const char* path, void* param);
+
+If the function returns NC_NOERR, then the walk continues.
+If the function returns an error, then the walk terminates and returns the error.
+
+@param map -- the containing map
+@param prefix -- the key into the tree where the search is to occur
+@param fcn -- the function to invoke
+@param param -- passed as extra argument to fcn
+@return NC_NOERR if the operation succeeded
+@return NC_EXXX if the operation failed for one of several possible reasons
+*/
+int
+nczmap_walk(NCZMAP* map, const char* prefix, int (*fcn)(NCZMAP*,const char*,const char*, void*), void* param)
+{
+    int stat = NC_NOERR;
+    NClist* queue = nclistnew();
+    NClist* nextlevel = nclistnew();
+    char* path = NULL;
+    NCbytes* path = ncbytesnew();
+    size_t prefixlen; /* |path| without the last segment */
+
+    assert(prefix != NULL && strlen(prefix) > 0);
+    if(prefix[0] != '/') ncbytescat(path,"/");
+    ncbytescat(path,prefix);
+
+    stat = nczmap_walkR(map, path, fcn, param);
+    return THROW(stat);
+}
+
+static int
+nczmap_walkR(NCZMAP* map, NCbytes* prefix, int (*fcn)(NCZMAP*,const char*,void*), void* param)
+{
+    int i,stat = NC_NOERR;
+    NClist* nextlevel = nclistnew();
+    size_t prefixlen = ncbyteslen(prefix);
+
+    /* get list of next level segments (partial keys) */
+    if((stat=nczmap_search(map,ncbytescontents(prefix),nextlevel))) goto done;
+    if(nclistlength(nexlevel) == 0) goto done; /* max depth reached */
+
+    /* Apply fcn to all paths at nextlevel */
+    for(i=0;i<nclistlength(nextlevel);i++) {
+        segment = nclistget(nextlevel,i);
+	if(segment == NULL) continue;
+	/* invoke function */
+	stat = fcn(map,ncbytescontents(prefix),segment,param);
+	if(stat != NC_NOERR) goto done;
+    }
+
+    /* Recurse on each segment */
+    for(i=0;i<nclistlength(nextlevel);i++) {
+        segment = nclistget(nextlevel,i);
+	if(segment == NULL) continue;
+	/* recurse */
+	ncbytescat(prefix,segment);
+	stat = nczmap_walkR(map,prefix,fcn,param);
+	ncbytessetlength(prefix,prefixlen); /* pop path "stack" */
+	if(stat != NC_NOERR) goto done;
+    }
+
+done:
+    /* Cleanup */
+    ncbytessetlength(prefix,prefixlen); /* restore path "stack" */
+    ncbytesfreeall(nextlevel);
+    return THROW(stat);
+}

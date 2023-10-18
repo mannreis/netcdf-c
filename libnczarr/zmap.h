@@ -370,7 +370,28 @@ EXTERNL int nczm_lastsegment(const char* path, char** lastp);
 /* bubble sorts (note arguments) */
 EXTERNL void nczm_sortlist(struct NClist* l);
 EXTERNL void nczm_sortenvv(int n, char** envv);
+
 EXTERNL void NCZ_freeenvv(int n, char** envv);
+EXTERNL const char* NCZ_mapkind(NCZM_IMPL impl);
+
+/**
+Walk a subtree of paths and invoke a function on each path.
+The walk is breadth-first.
+
+The function signature is:
+int (*fcn)(NCZMAP* map, const char* path, void* param);
+
+If the function returns NC_NOERR, then the walk continues.
+If the function returns an error, then the walk terminates and returns the error.
+
+@param map -- the containing map
+@param prefix -- the prefix key the tree where the search is to occur
+@param fcn -- the function to invoke
+@param param -- passed as extra argument to fcn
+@return NC_NOERR if the operation succeeded
+@return NC_EXXX if the operation failed for one of several possible reasons
+*/
+EXTERNL int nczmap_walk(NCZMAP* map, const char* prefix, int (*fcn)(NCZMAP*,const char*,const char*,void*), void* param);
 
 #ifdef __cplusplus
 }

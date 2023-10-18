@@ -12,9 +12,17 @@
 #ifndef ZINTERNAL_H
 #define ZINTERNAL_H
 
+#define NCZVERSIONTEMPLATE "%s.0.0"
+
 /* Allowed Zarr Formats */
 #define ZARRFORMAT2 2
 #define ZARRFORMAT3 3
+
+/* NCZARRVERSION is independent of Zarr version,
+   but NCZARRVERSION => ZARRVERSION */
+#define NCZARRVERSION1 "1.0.0"
+#define NCZARRVERSION2 "2.0.0"
+#define NCZARRVERSION3 "3.0.0"
 
 /* These have to do with creating chunked datasets in ZARR. */
 #define NCZ_CHUNKSIZE_FACTOR (10)
@@ -46,10 +54,15 @@
 #define NCZVARDEP ".nczvar"
 #define NCZATTRDEP ".nczattr"
 
-#define ZMETAROOT "/.zgroup"
-#define ZGROUP ".zgroup"
-#define ZATTRS ".zattrs"
-#define ZARRAY ".zarray"
+/* V2 Reserved Objects */
+#define Z2METAROOT "/.zgroup"
+#define Z2GROUP ".zgroup"
+#define Z2ATTRS ".zattrs"
+#define Z2ARRAY ".zarray"
+
+/* V3 Reserved Objects */
+#define Z3METAROOT "/zarr.json"
+#define Z2TAG "zarr.info"
 
 /* Pure Zarr pseudo names */
 #define ZDIMANON "_zdim"
@@ -57,7 +70,7 @@
 /* V2 Reserved Attributes */
 /*
 Inserted into /.zgroup
-_nczarr_superblock: {"version": "2.0.0"} -- Deprecated
+_nczarr_superblock: {"version": "2.0.0"}
 Inserted into any .zgroup
 "_nczarr_group": "{
 \"dimensions\": {\"d1\": \"1\", \"d2\": \"1\",...}
@@ -73,21 +86,42 @@ Inserted into any .zattrs ? or should it go into the container?
 "_nczarr_attrs": "{
 \"types\": {\"attr1\": \"<i4\", \"attr2\": \"<i1\",...}
 }
-+
-+Note: _nczarr_attrs type include non-standard use of a zarr type "|U1" => NC_CHAR.
-+
+*/
+
+/* V3 Reserved Attributes */
+/*
+Inserted into group zarr.json:
+_nczarr_superblock: {"version": "[23].0.0"}
+Inserted into any group zarr.json:
+"_nczarr_group": "{
+\"dimensions\": {\"d1\": \"1\", \"d2\": \"1\",...}
+\"variables\": [\"v1\", \"v2\", ...]
+\"groups\": [\"g1\", \"g2\", ...]
+}"
+Inserted into any array zarr.json:
+"_nczarr_array": "{
+\"dimensions\": [\"/g1/g2/d1\", \"/d2\",...]
+\"storage\": \"scalar\"|\"contiguous\"|\"compact\"|\"chunked\"
+\"attributetypes\": {\"attr1\": \"<i4\", \"attr2\": \"<i1\",...}
+}"
+In v3, the attributes are in a dictionary under the key name "attributes",
+}
 */
 
 #define NCZ_V2_SUPERBLOCK "_nczarr_superblock"
-#define NCZ_V3_SUPERBLOCK NCZ_V2_SUPERBLOCK 
 #define NCZ_V2_GROUP   "_nczarr_group"
 #define NCZ_V2_ARRAY   "_nczarr_array"
 #define NCZ_V2_ATTR    NC_NCZARR_ATTR
 
+/* Deprecated */
 #define NCZ_V2_SUPERBLOCK_UC "_NCZARR_SUPERBLOCK"
 #define NCZ_V2_GROUP_UC   "_NCZARR_GROUP"
 #define NCZ_V2_ARRAY_UC   "_NCZARR_ARRAY"
 #define NCZ_V2_ATTR_UC    NC_NCZARR_ATTR_UC
+
+#define NCZ_V3_SUPERBLOCK "_nczarr_superblock"
+#define NCZ_V3_GROUP   "_nczarr_group"
+#define NCZ_V3_ARRAY   "_nczarr_array"
 
 #define NCZARRCONTROL "nczarr"
 #define PUREZARRCONTROL "zarr"
@@ -135,8 +169,13 @@ typedef struct NCZ_FILE_INFO {
     NCZcommon common;
     struct NCZMAP* map; /* implementation */
     struct NCauth* auth;
-    struct Zarr {
+    struct Zarrformat {
 	int zarr_format;
+	struct {
+	    unsigned long major; /* Must match the zarr_format or be zero*/
+	    unsigned long minor; /* optional */
+	    unsigned long release; /* unused */
+	} nczarr_version;
     } zarr;
     int creating; /* 1=> created 0=>open */
     int native_endianness; /* NC_ENDIAN_LITTLE | NC_ENDIAN_BIG */
