@@ -437,7 +437,9 @@ rccompile(const char* filepath)
     NCURI* uri = NULL;
     char* nextline = NULL;
     NCglobalstate* globalstate = NC_getglobalstate();
-    char* bucket = NULL;
+    NCS3INFO s3;
+
+    memset(&s3,0,sizeof(s3));
 
     if((ret=NC_readfile(filepath,tmp))) {
         nclog(NCLOGWARN, "Could not open configuration file: %s",filepath);
@@ -481,12 +483,11 @@ rccompile(const char* filepath)
                 nclog(NCLOGERR, "Malformed [url] in %s entry: %s",filepath,line);
 		continue;
             }
-	    if(NC_iss3(uri)) {
+	    if(NC_iss3(uri,NULL)) {
 	         NCURI* newuri = NULL;
 	        /* Rebuild the url to S3 "path" format */
-	        nullfree(bucket);
-		bucket = NULL;
-	        if((ret = NC_s3urlrebuild(uri,&bucket,NULL,&newuri))) goto done;
+		NC_s3clear(&s3);
+	        if((ret = NC_s3urlrebuild(uri,&s3,&newuri))) goto done;
 		ncurifree(uri);
 		uri = newuri;
 		newuri = NULL;
@@ -546,6 +547,7 @@ rccompile(const char* filepath)
     rcorder(rc);
 
 done:
+    NC_s3clear(&s3);
     if(contents) free(contents);
     ncurifree(uri);
     ncbytesfree(tmp);

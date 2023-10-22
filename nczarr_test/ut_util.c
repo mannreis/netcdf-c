@@ -372,6 +372,7 @@ impl2kind(NCZM_IMPL impl)
 {
     switch (impl) {
     case NCZM_S3: return "s3";
+    case NCZM_GS3: return "gs3";
     case NCZM_FILE: return "file";
     case NCZM_ZIP: return "zip";
     case NCZM_UNDEF: break;

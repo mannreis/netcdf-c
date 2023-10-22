@@ -523,10 +523,6 @@ ncz_find_grp_file_var(int ncid, int varid, NC_FILE_INFO_T **h5,
     /* Delegate to libsrc4 */
     if((retval = nc4_find_grp_h5_var(ncid,varid,&my_h5,grp,&my_var))) return retval;
 
-    /* Do we need to read var metadata? */
-    if (!my_var->meta_read && my_var->created)
-        if ((retval = ncz_get_var_meta(my_h5, my_var)))
-            return retval;
     if (var) *var = my_var;
     if (h5) *h5 = my_h5;
     return NC_NOERR;

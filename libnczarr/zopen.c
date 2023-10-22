@@ -99,16 +99,9 @@ ncz_open_file(const char *path, int mode, const char** controls, int ncid)
     if((stat = ncz_open_dataset(h5,controls)))
 	goto exit;
 
-    /* Now read in all the metadata. Some types
-     * information may be difficult to resolve here, if, for example, a
-     * dataset of user-defined type is encountered before the
-     * definition of that type. */
-    if((stat = ncz_read_file(h5)))
-       goto exit;
-
     /* We must read in the attributes of the root group to get
        e.g. provenance and classic model attribute */
-    if((stat = ncz_read_atts(h5,(NC_OBJ*)h5->root_grp))) goto exit;
+    if((stat = NCZF_readattrs(h5,(NC_OBJ*)h5->root_grp))) goto exit;
 
     /* Check for classic model attribute. */
     if ((stat = check_for_classic_model(h5->root_grp, &is_classic)))

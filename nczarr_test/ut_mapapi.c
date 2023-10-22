@@ -185,7 +185,7 @@ simplemeta(void)
     report(PASS,".nczarr: exists",map);
     free(truekey); truekey = NULL;
 
-    if((stat=nczm_concat(META1,ZARRAY,&key)))
+    if((stat=nczm_concat(META1,Z2ARRAY,&key)))
 	goto done;
     truekey = makekey(key);
     nullfree(key); key = NULL;
@@ -200,7 +200,7 @@ simplemeta(void)
     report(PASS,".nczarr: writemetadata",map);
     free(truekey); truekey = NULL;
     
-    if((stat=nczm_concat(META1,ZARRAY,&key)))
+    if((stat=nczm_concat(META1,Z2ARRAY,&key)))
 	goto done;
     truekey = makekey(key);
     free(key); key = NULL;    
@@ -240,7 +240,7 @@ simplemeta(void)
     else report(PASS,".nczarr: content verify",map);
     nullfree(content); content = NULL;
 
-    if((stat=nczm_concat(META1,ZARRAY,&key)))
+    if((stat=nczm_concat(META1,Z2ARRAY,&key)))
 	goto done;
     truekey = makekey(key);
     nullfree(key); key = NULL;

@@ -29,9 +29,11 @@ noinst_LTLIBRARIES = libnczarr.la
 
 # The source files.
 libnczarr_la_SOURCES = \
+zinfer.c \
 zformat.c \
-zformat1.c \
+zformat3.c \
 zformat2.c \
+zformat1.c \
 zarr.c \
 zattr.c \
 zxcache.c \
@@ -49,7 +51,6 @@ zmap_file.c \
 zodom.c \
 zopen.c \
 zprov.c \
-zsync.c \
 ztype.c \
 zutil.c \
 zvar.c \

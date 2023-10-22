@@ -1295,11 +1295,6 @@ NCZ_rename_var(int ncid, int varid, const char *name)
 	char *ncz_name; /* Dataset will be renamed to this. */
 	ncz_name = use_secret_name ? var->ncz_name: (char *)name;
 
-	/* Do we need to read var metadata? */
-	if (!var->meta_read)
-	    if ((retval = ncz_get_var_meta(var)))
-		return THROW(retval);
-
 	if (var->ndims)
 	{
 	    NCZ_DIM_INFO_T *ncz_d0;
@@ -2314,3 +2309,79 @@ NCZ_update_dim_extents(NC_VAR_INFO_T* var, size64_t* start, size64_t* count, siz
     return NC_NOERR;
 }
 #endif
+
+/*Flush all chunks to disk. Create any that are missing
+and fill as needed.
+*/
+int
+NCZ_write_var_data(NC_FILE_INFO_T* file, NC_VAR_INFO_T* var)
+{
+    int stat = NC_NOERR;
+    NCZ_VAR_INFO_T* zvar = (NCZ_VAR_INFO_T*)var->format_var_info;
+
+    NC_UNUSED(file);
+    ZTRACE(3,"var=%s",var->hdr.name);
+
+    /* Flush the cache */
+    if(zvar->cache) {
+        if((stat = NCZ_flush_chunk_cache(zvar->cache))) goto done;
+    }
+
+#ifdef FILLONCLOSE
+    /* If fill is enabled, then create missing chunks */
+    if(!var->no_fill) {
+        int i;
+    NCZOdometer* chunkodom =  NULL;
+    NCZ_FILE_INFO_T* zfile = (NCZ_FILE_INFO_T*)file->format_file_info;
+    NCZMAP* map = zfile->map;
+    size64_t start[NC_MAX_VAR_DIMS];
+    size64_t stop[NC_MAX_VAR_DIMS];
+    size64_t stride[NC_MAX_VAR_DIMS];
+    char* key = NULL;
+
+    if(var->ndims == 0) { /* scalar */
+	start[i] = 0;
+	stop[i] = 1;
+        stride[i] = 1;
+    } else {
+        for(i=0;i<var->ndims;i++) {
+	    size64_t nchunks = ceildiv(var->dim[i]->len,var->chunksizes[i]);
+	    start[i] = 0;
+	    stop[i] = nchunks;
+	    stride[i] = 1;
+        }
+    }
+
+    {
+	if(zvar->scalar) {
+	    if((chunkodom = nczodom_new(1,start,stop,stride,stop))==NULL)
+	} else {
+	    /* Iterate over all the chunks to create missing ones */
+	    if((chunkodom = nczodom_new(var->ndims,start,stop,stride,stop))==NULL)
+	        {stat = NC_ENOMEM; goto done;}
+	}
+	for(;nczodom_more(chunkodom);nczodom_next(chunkodom)) {
+	    size64_t* indices = nczodom_indices(chunkodom);
+	    /* Convert to key */
+	    if((stat = NCZ_buildchunkpath(zvar->cache,indices,&key))) goto done;
+	    switch (stat = nczmap_exists(map,key)) {
+	    case NC_NOERR: goto next; /* already exists */
+	    case NC_EEMPTY: break; /* does not exist, create it with fill */
+	    default: goto done; /* some other error */
+	    }
+            /* If we reach here, then chunk does not exist, create it with fill */
+	    assert(zvar->cache->fillchunk != NULL);
+	    if((stat=nczmap_write(map,key,0,zvar->cache->chunksize,zvar->cache->fillchunk))) goto done;
+next:
+	    nullfree(key);
+	    key = NULL;
+	}
+    }
+    nczodom_free(chunkodom);
+    nullfree(key);
+    }
+#endif /*FILLONCLOSE*/
+
+done:
+    return ZUNTRACE(THROW(stat));
+}

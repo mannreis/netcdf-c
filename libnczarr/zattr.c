@@ -40,7 +40,7 @@ ncz_getattlist(NC_GRP_INFO_T *grp, int varid, NC_VAR_INFO_T **varp, NCindex **at
     {
         /* Do we need to read the atts? */
         if (!grp->atts_read)
-            if ((retval = ncz_read_atts(file, (NC_OBJ*)grp)))
+            if ((retval = NCZF_readattrs(file, (NC_OBJ*)grp)))
                 return retval;
 
         if (varp)
@@ -57,7 +57,7 @@ ncz_getattlist(NC_GRP_INFO_T *grp, int varid, NC_VAR_INFO_T **varp, NCindex **at
 
         /* Do we need to read the atts? */
         if (!var->atts_read)
-            if ((retval = ncz_read_atts(file, (NC_OBJ*)var)))
+            if ((retval = NCZF_readattrs(file, (NC_OBJ*)var)))
                 return retval;
 
         if (varp)

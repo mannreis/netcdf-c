@@ -12,17 +12,27 @@
 #ifndef ZINTERNAL_H
 #define ZINTERNAL_H
 
-#define NCZVERSIONTEMPLATE "%s.0.0"
+/* This is the version of this NCZarr package */
+/* This completely independent of the Zarr specification version */
+#define NCZARR_PACKAGE_VERSION "3.0.0"
 
 /* Allowed Zarr Formats */
 #define ZARRFORMAT2 2
 #define ZARRFORMAT3 3
 
-/* NCZARRVERSION is independent of Zarr version,
-   but NCZARRVERSION => ZARRVERSION */
-#define NCZARRVERSION1 "1.0.0"
-#define NCZARRVERSION2 "2.0.0"
-#define NCZARRVERSION3 "3.0.0"
+/* Convenience */
+#define ZARRFORMAT2_STRING "2"
+#define ZARRFORMAT3_STRING "3"
+
+/* Define the possible NCZarr format versions */
+/* These are independent of the Zarr specification version */
+#define NCZARRFORMAT0 0 /* if this is a pure zarr dataset */
+#define NCZARRFORMAT1 1 
+#define NCZARRFORMAT2 2
+#define NCZARRFORMAT3 3
+
+/* Map the NCZarr Format version to a string */
+#define NCZARR_FORMAT_VERSION_TEMPLATE "%d.0.0"
 
 /* These have to do with creating chunked datasets in ZARR. */
 #define NCZ_CHUNKSIZE_FACTOR (10)
@@ -70,11 +80,11 @@
 /* V2 Reserved Attributes */
 /*
 Inserted into /.zgroup
-_nczarr_superblock: {"version": "2.0.0"}
+_nczarr_superblock: {"version": "2.0.0", "format=2"}
 Inserted into any .zgroup
 "_nczarr_group": "{
-\"dimensions\": {\"d1\": \"1\", \"d2\": \"1\",...}
-\"variables\": [\"v1\", \"v2\", ...]
+\"dims\": {\"d1\": \"1\", \"d2\": \"1\",...}
+\"vars\": [\"v1\", \"v2\", ...]
 \"groups\": [\"g1\", \"g2\", ...]
 }"
 Inserted into any .zarray
@@ -155,6 +165,7 @@ struct NCjson;
 struct NCauth;
 struct NCZMAP;
 struct NCZChunkCache;
+struct NCZ_Formatter;
 
 /**************************************************/
 /* Define annotation data for NCZ objects */
@@ -171,14 +182,11 @@ typedef struct NCZ_FILE_INFO {
     struct NCauth* auth;
     struct Zarrformat {
 	int zarr_format;
-	struct {
-	    unsigned long major; /* Must match the zarr_format or be zero*/
-	    unsigned long minor; /* optional */
-	    unsigned long release; /* unused */
-	} nczarr_version;
+	int nczarr_format;
     } zarr;
     int creating; /* 1=> created 0=>open */
     int native_endianness; /* NC_ENDIAN_LITTLE | NC_ENDIAN_BIG */
+    int default_maxstrlen; /* default max str size for variables of type string */
     char** envv_controls; /* Envv format */
     struct Controls {
         size64_t flags;
@@ -189,7 +197,7 @@ typedef struct NCZ_FILE_INFO {
 #		define FLAG_NCZARR_V1   16
 	NCZM_IMPL mapimpl;
     } controls;
-    int default_maxstrlen; /* default max str size for variables of type string */
+    struct NCZ_Formatter* dispatcher;
 } NCZ_FILE_INFO_T;
 
 /* This is a struct to handle the dim metadata. */
@@ -299,6 +307,7 @@ int ncz_makeattr(NC_OBJ*, NCindex* attlist, const char* name, nc_type typid, siz
 int ncz_gettype(NC_FILE_INFO_T*, NC_GRP_INFO_T*, int xtype, NC_TYPE_INFO_T** typep);
 int ncz_find_default_chunksizes2(NC_GRP_INFO_T *grp, NC_VAR_INFO_T *var);
 int NCZ_ensure_quantizer(int ncid, NC_VAR_INFO_T* var);
+int NCZ_write_var_data(NC_FILE_INFO_T* file, NC_VAR_INFO_T* var);
 
 /* Undefined */
 /* Find var, doing lazy var metadata read if needed. */

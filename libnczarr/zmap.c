@@ -8,8 +8,12 @@
 #include "ncpathmgr.h"
 
 /**************************************************/
-/* Import the current implementations */
+typedef int (*NCZWALKFCN)(NCZMAP*,const char*,const char*,void*);
 
+/**************************************************/
+/*Forward*/
+
+static int nczmap_walkR(NCZMAP* map, NCbytes* prefix, NCZWALKFCN, void* param);
 
 /**************************************************/
 
@@ -22,7 +26,8 @@ nczmap_features(NCZM_IMPL impl)
     case NCZM_ZIP: return zmap_zip.features;
 #endif
 #ifdef ENABLE_S3
-    case NCZM_S3: return zmap_s3sdk.features;
+    case NCZM_S3: case NCZM_GS3:
+        return zmap_s3sdk.features;
 #endif
     default: break;
     }
@@ -59,6 +64,7 @@ nczmap_create(NCZM_IMPL impl, const char *path, int mode, size64_t flags, void* 
 #endif
 #ifdef ENABLE_S3
     case NCZM_S3:
+    case NCZM_GS3:
         stat = zmap_s3sdk.create(path, mode, flags, parameters, &map);
 	if(stat) goto done;
 	break;
@@ -97,6 +103,7 @@ nczmap_open(NCZM_IMPL impl, const char *path, int mode, size64_t flags, void* pa
 #endif
 #ifdef ENABLE_S3
     case NCZM_S3:
+    case NCZM_GS3:
         stat = zmap_s3sdk.open(path, mode, flags, parameters, &map);
 	if(stat) goto done;
 	break;
@@ -128,6 +135,7 @@ nczmap_truncate(NCZM_IMPL impl, const char *path)
 #endif
 #ifdef ENABLE_S3
     case NCZM_S3:
+    case NCZM_GS3:
         if((stat = zmap_s3sdk.truncate(path))) goto done;
 	break;
 #endif
@@ -553,6 +561,7 @@ NCZ_mapkind(NCZM_IMPL impl)
     case NCZM_FILE: return "NCZM_FILE";
     case NCZM_ZIP: return "NCZM_ZIP";
     case NCZM_S3: return "NCZM_S3";
+    case NCZM_GS3: return "NCZM_GS3";
     default: break;
     }
     return "Unknown";
@@ -576,14 +585,10 @@ If the function returns an error, then the walk terminates and returns the error
 @return NC_EXXX if the operation failed for one of several possible reasons
 */
 int
-nczmap_walk(NCZMAP* map, const char* prefix, int (*fcn)(NCZMAP*,const char*,const char*, void*), void* param)
+nczmap_walk(NCZMAP* map, const char* prefix, NCZWALKFCN fcn, void* param)
 {
     int stat = NC_NOERR;
-    NClist* queue = nclistnew();
-    NClist* nextlevel = nclistnew();
-    char* path = NULL;
     NCbytes* path = ncbytesnew();
-    size_t prefixlen; /* |path| without the last segment */
 
     assert(prefix != NULL && strlen(prefix) > 0);
     if(prefix[0] != '/') ncbytescat(path,"/");
@@ -594,19 +599,19 @@ nczmap_walk(NCZMAP* map, const char* prefix, int (*fcn)(NCZMAP*,const char*,cons
 }
 
 static int
-nczmap_walkR(NCZMAP* map, NCbytes* prefix, int (*fcn)(NCZMAP*,const char*,void*), void* param)
+nczmap_walkR(NCZMAP* map, NCbytes* prefix, NCZWALKFCN fcn, void* param)
 {
     int i,stat = NC_NOERR;
     NClist* nextlevel = nclistnew();
-    size_t prefixlen = ncbyteslen(prefix);
+    size_t prefixlen = ncbyteslength(prefix);
 
     /* get list of next level segments (partial keys) */
     if((stat=nczmap_search(map,ncbytescontents(prefix),nextlevel))) goto done;
-    if(nclistlength(nexlevel) == 0) goto done; /* max depth reached */
+    if(nclistlength(nextlevel) == 0) goto done; /* max depth reached */
 
     /* Apply fcn to all paths at nextlevel */
     for(i=0;i<nclistlength(nextlevel);i++) {
-        segment = nclistget(nextlevel,i);
+        const char* segment = nclistget(nextlevel,i);
 	if(segment == NULL) continue;
 	/* invoke function */
 	stat = fcn(map,ncbytescontents(prefix),segment,param);
@@ -615,7 +620,7 @@ nczmap_walkR(NCZMAP* map, NCbytes* prefix, int (*fcn)(NCZMAP*,const char*,void*)
 
     /* Recurse on each segment */
     for(i=0;i<nclistlength(nextlevel);i++) {
-        segment = nclistget(nextlevel,i);
+        const char* segment = nclistget(nextlevel,i);
 	if(segment == NULL) continue;
 	/* recurse */
 	ncbytescat(prefix,segment);
@@ -627,6 +632,6 @@ nczmap_walkR(NCZMAP* map, NCbytes* prefix, int (*fcn)(NCZMAP*,const char*,void*)
 done:
     /* Cleanup */
     ncbytessetlength(prefix,prefixlen); /* restore path "stack" */
-    ncbytesfreeall(nextlevel);
+    nclistfreeall(nextlevel);
     return THROW(stat);
 }

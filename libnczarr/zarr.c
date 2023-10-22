@@ -25,7 +25,7 @@ int
 ncz_create_dataset(NC_FILE_INFO_T* file, NC_GRP_INFO_T* root, const char** controls)
 {
     int stat = NC_NOERR;
-    NCZ_FILE_INFO_T* zinfo = NULL;
+    NCZ_FILE_INFO_T* zfile = NULL;
     NCZ_GRP_INFO_T* zgrp = NULL;
     NCURI* uri = NULL;
     NC* nc = NULL;
@@ -37,10 +37,10 @@ ncz_create_dataset(NC_FILE_INFO_T* file, NC_GRP_INFO_T* root, const char** contr
     nc = (NC*)file->controller;
 
     /* Add struct to hold NCZ-specific file metadata. */
-    if (!(zinfo = calloc(1, sizeof(NCZ_FILE_INFO_T))))
+    if (!(zfile = calloc(1, sizeof(NCZ_FILE_INFO_T))))
         {stat = NC_ENOMEM; goto done;}
-    file->format_file_info = zinfo;
-    zinfo->common.file = file;
+    file->format_file_info = zfile;
+    zfile->common.file = file;
 
     /* Add struct to hold NCZ-specific group info. */
     if (!(zgrp = calloc(1, sizeof(NCZ_GRP_INFO_T))))
@@ -49,34 +49,32 @@ ncz_create_dataset(NC_FILE_INFO_T* file, NC_GRP_INFO_T* root, const char** contr
     zgrp->common.file = file;
 
     /* Fill in NCZ_FILE_INFO_T */
-    zinfo->creating = 1;
-    zinfo->common.file = file;
-    zinfo->native_endianness = (NCZ_isLittleEndian() ? NC_ENDIAN_LITTLE : NC_ENDIAN_BIG);
-    if((zinfo->envv_controls=NCZ_clonestringvec(0,controls)) == NULL)
+    zfile->creating = 1;
+    zfile->common.file = file;
+    zfile->native_endianness = (NCZ_isLittleEndian() ? NC_ENDIAN_LITTLE : NC_ENDIAN_BIG);
+    if((zfile->envv_controls=NCZ_clonestringvec(0,controls)) == NULL)
 	{stat = NC_ENOMEM; goto done;}
-
-    /* fill in some of the zinfo and zroot fields */
-    zinfo->zarr.zarr_version = atoi(ZARRVERSION);
-    sscanf(NCZARRVERSION,"%lu.%lu.%lu",
-	   &zinfo->zarr.nczarr_version.major,
-	   &zinfo->zarr.nczarr_version.minor,
-	   &zinfo->zarr.nczarr_version.release);
-
-    zinfo->default_maxstrlen = NCZ_MAXSTR_DEFAULT;
+    zfile->default_maxstrlen = NCZ_MAXSTR_DEFAULT;
 
     /* Apply client controls */
-    if((stat = applycontrols(zinfo))) goto done;
+    if((stat = applycontrols(zfile))) goto done;
 
     /* Load auth info from rc file */
     if((stat = ncuriparse(nc->path,&uri))) goto done;
     if(uri) {
-	if((stat = NC_authsetup(&zinfo->auth, uri)))
+	if((stat = NC_authsetup(&zfile->auth, uri)))
 	    goto done;
     }
 
+    /* default the zarr format */
+    if(zfile->zarr.zarr_format == 0)
+        zfile->zarr.zarr_format = DFALTZARRFORMAT;
+
     /* initialize map handle*/
-    if((stat = nczmap_create(zinfo->controls.mapimpl,nc->path,nc->mode,zinfo->controls.flags,NULL,&zinfo->map)))
-	goto done;
+    if((stat = NCZ_get_map(file,uri,nc->mode,zfile->controls.flags,NULL,&zfile->map))) goto done;
+
+    /* And get the format dispatcher */
+    if((stat = NCZ_get_formatter(file, (const NCZ_Formatter**)&zfile->dispatcher))) goto done;
 
 done:
     ncurifree(uri);
@@ -102,17 +100,14 @@ ncz_open_dataset(NC_FILE_INFO_T* file, const char** controls)
     NCURI* uri = NULL;
     void* content = NULL;
     NCjson* json = NULL;
-    NCZ_FILE_INFO_T* zinfo = NULL;
-    int mode;
+    NCZ_FILE_INFO_T* zfile = NULL;
     NClist* modeargs = NULL;
     char* nczarr_version = NULL;
-    char* zarr_format = NULL;
 
     ZTRACE(3,"file=%s controls=%s",file->hdr.name,(controls?nczprint_envv(controls):"null"));
 
     /* Extract info reachable via file */
     nc = (NC*)file->controller;
-    mode = nc->mode;
 
     root = file->root_grp;
     assert(root != NULL && root->hdr.sort == NCGRP);
@@ -120,15 +115,15 @@ ncz_open_dataset(NC_FILE_INFO_T* file, const char** controls)
     /* Add struct to hold NCZ-specific file metadata. */
     if (!(file->format_file_info = calloc(1, sizeof(NCZ_FILE_INFO_T))))
         {stat = NC_ENOMEM; goto done;}
-    zinfo = file->format_file_info;
+    zfile = file->format_file_info;
 
     /* Fill in NCZ_FILE_INFO_T */
-    zinfo->creating = 0;
-    zinfo->common.file = file;
-    zinfo->native_endianness = (NCZ_isLittleEndian() ? NC_ENDIAN_LITTLE : NC_ENDIAN_BIG);
-    if((zinfo->envv_controls = NCZ_clonestringvec(0,controls))==NULL) /*0=>envv style*/
+    zfile->creating = 0;
+    zfile->common.file = file;
+    zfile->native_endianness = (NCZ_isLittleEndian() ? NC_ENDIAN_LITTLE : NC_ENDIAN_BIG);
+    if((zfile->envv_controls = NCZ_clonestringvec(0,controls))==NULL) /*0=>envv style*/
 	{stat = NC_ENOMEM; goto done;}
-    zinfo->default_maxstrlen = NCZ_MAXSTR_DEFAULT;
+    zfile->default_maxstrlen = NCZ_MAXSTR_DEFAULT;
 
     /* Add struct to hold NCZ-specific group info. */
     if (!(root->format_grp_info = calloc(1, sizeof(NCZ_GRP_INFO_T))))
@@ -136,37 +131,29 @@ ncz_open_dataset(NC_FILE_INFO_T* file, const char** controls)
     ((NCZ_GRP_INFO_T*)root->format_grp_info)->common.file = file;
 
     /* Apply client controls */
-    if((stat = applycontrols(zinfo))) goto done;
-
-    /* initialize map handle*/
-    if((stat = nczmap_open(zinfo->controls.mapimpl,nc->path,mode,zinfo->controls.flags,NULL,&zinfo->map)))
-	goto done;
-
-    /* Infer the NCZarr+Zarr versions */
-    if((stat = ncz_read_superblock(file,&nczarr_version,&zarr_format))) goto done;
-
-    if(nczarr_version == NULL) /* default */
-        nczarr_version = strdup(NCZARRVERSION);
-    if(zarr_format == NULL) /* default */
-       zarr_format = strdup(ZARRVERSION);
-    /* Extract the information from it */
-    if(sscanf(zarr_format,"%d",&zinfo->zarr.zarr_version)!=1)
-	{stat = NC_ENCZARR; goto done;}		
-    if(sscanf(nczarr_version,"%lu.%lu.%lu",
-		    &zinfo->zarr.nczarr_version.major,
-		    &zinfo->zarr.nczarr_version.minor,
-		    &zinfo->zarr.nczarr_version.release) == 0)
-	{stat = NC_ENCZARR; goto done;}
+    if((stat = applycontrols(zfile))) goto done;
 
     /* Load auth info from rc file */
     if((stat = ncuriparse(nc->path,&uri))) goto done;
     if(uri) {
-	if((stat = NC_authsetup(&zinfo->auth, uri)))
+	if((stat = NC_authsetup(&zfile->auth, uri)))
 	    goto done;
     }
 
+    /* initialize map handle*/
+    if((stat = NCZ_get_map(file,uri,nc->mode,zfile->controls.flags,NULL,&zfile->map))) goto done;
+
+    /* And get the format dispatcher */
+    if((stat = NCZ_get_formatter(file, (const NCZ_Formatter**)&zfile->dispatcher))) goto done;
+
+    /* Now read in all the metadata. Some types
+     * information may be difficult to resolve here, if, for example, a
+     * dataset of user-defined type is encountered before the
+     * definition of that type. */
+    if((stat = NCZF_readmeta(file)))
+       goto done;
+
 done:
-    nullfree(zarr_format);
     nullfree(nczarr_version);
     ncurifree(uri);
     nclistfreeall(modeargs);
@@ -209,7 +196,7 @@ int
 NCZ_get_libversion(unsigned long* majorp, unsigned long* minorp,unsigned long* releasep)
 {
     unsigned long m0,m1,m2;
-    sscanf(NCZARRVERSION,"%lu.%lu.%lu",&m0,&m1,&m2);
+    sscanf(NCZARR_PACKAGE_VERSION,"%lu.%lu.%lu",&m0,&m1,&m2);
     if(majorp) *majorp = m0;
     if(minorp) *minorp = m1;
     if(releasep) *releasep = m2;
@@ -230,8 +217,8 @@ NCZ_get_libversion(unsigned long* majorp, unsigned long* minorp,unsigned long* r
 int
 NCZ_get_superblock(NC_FILE_INFO_T* file, int* superblockp)
 {
-    NCZ_FILE_INFO_T* zinfo = file->format_file_info;
-    if(superblockp) *superblockp = zinfo->zarr.nczarr_version.major;
+    NCZ_FILE_INFO_T* zfile = file->format_file_info;
+    if(superblockp) *superblockp = zfile->zarr.nczarr_format;
     return NC_NOERR;
 }
 
@@ -305,7 +292,6 @@ controllookup(const char** envv_controls, const char* key)
     return NULL;
 }
 
-
 static int
 applycontrols(NCZ_FILE_INFO_T* zinfo)
 {
@@ -317,7 +303,8 @@ applycontrols(NCZ_FILE_INFO_T* zinfo)
     if((value = controllookup((const char**)zinfo->envv_controls,"mode")) != NULL) {
 	if((stat = NCZ_comma_parse(value,modelist))) goto done;
     }
-    /* Process the modelist first */
+
+    /* Process the modelist */
     zinfo->controls.mapimpl = NCZM_DEFAULT;
     zinfo->controls.flags |= FLAG_XARRAYDIMS; /* Always support XArray convention where possible */
     for(i=0;i<nclistlength(modelist);i++) {
@@ -328,10 +315,12 @@ applycontrols(NCZ_FILE_INFO_T* zinfo)
 	    zinfo->controls.flags |= FLAG_PUREZARR;
 	else if(strcasecmp(p,NOXARRAYCONTROL)==0)
 	    noflags |= FLAG_XARRAYDIMS;
-	else if(strcasecmp(p,"zip")==0) zinfo->controls.mapimpl = NCZM_ZIP;
-	else if(strcasecmp(p,"file")==0) zinfo->controls.mapimpl = NCZM_FILE;
-	else if(strcasecmp(p,"s3")==0) zinfo->controls.mapimpl = NCZM_S3;
+	else if(strcasecmp(p,ZARRFORMAT2_STRING)==0)
+	    zinfo->zarr.zarr_format = ZARRFORMAT2;
+	else if(strcasecmp(p,ZARRFORMAT3_STRING)==0)
+	    zinfo->zarr.zarr_format = ZARRFORMAT3;
     }
+
     /* Apply negative controls by turning off negative flags */
     /* This is necessary to avoid order dependence of mode flags when both positive and negative flags are defined */
     zinfo->controls.flags &= (~noflags);

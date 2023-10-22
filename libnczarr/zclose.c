@@ -179,7 +179,7 @@ NCZ_zclose_var1(NC_VAR_INFO_T* var)
 }
 
 /**
- * @internal Close resources for vars in a group.
+ * @internal Close nczarr resources for vars in a group.
  *
  * @param grp Pointer to group info struct.
  *
@@ -297,7 +297,7 @@ zwrite_vars(NC_GRP_INFO_T *grp)
     /* Write all vars for this group breadth first */
     for(i = 0; i < ncindexsize(grp->vars); i++) {
         NC_VAR_INFO_T* var = (NC_VAR_INFO_T*)ncindexith(grp->vars, i);
-	if((stat = ncz_write_var(var))) goto done;
+	if((stat = NCZ_write_var_data(grp->nc4_info, var))) goto done;
     }
 
     /* Recursively call this function for each child group, if any, stopping

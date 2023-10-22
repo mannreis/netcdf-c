@@ -133,6 +133,7 @@ static const struct MACRODEF {
 {"dap2","mode",{"dap2",NULL}},
 {"dap4","mode",{"dap4",NULL}},
 {"s3","mode",{"s3",NULL}},
+{"gs3","mode",{"gs3",NULL}}, /* Google S3 API */
 {"bytes","mode",{"bytes",NULL}},
 {NULL,NULL,{NULL}}
 };
@@ -192,6 +193,7 @@ static struct NCPROTOCOLLIST {
     {"dods","http","mode=dap2"},
     {"dap4","http","mode=dap4"},
     {"s3","s3","mode=s3"},
+    {"gs3","gs3","mode=gs3"},
     {NULL,NULL,NULL} /* Terminate search */
 };
 
@@ -898,7 +900,7 @@ NC_infermodel(const char* path, int* omodep, int iscreate, int useparallel, void
 	printlist(fraglenv,"cleanfragments");
 #endif
 
-        /* Phase 4: Rebuild the url fragment and rebuilt the url */
+        /* Phase 4: Rebuild the url fragment and rebuild the url */
         sfrag = envvlist2string(fraglenv,"&");
         nclistfreeall(fraglenv); fraglenv = NULL;
 #ifdef DEBUG
@@ -908,9 +910,9 @@ NC_infermodel(const char* path, int* omodep, int iscreate, int useparallel, void
         nullfree(sfrag); sfrag = NULL;
 
 	/* If s3, then rebuild the url */
-	if(NC_iss3(uri)) {
+	if(NC_iss3(uri,NULL)) {
 	    NCURI* newuri = NULL;
-	    if((stat = NC_s3urlrebuild(uri,NULL,NULL,&newuri))) goto done;
+	    if((stat = NC_s3urlrebuild(uri,NULL,&newuri))) goto done;
 	    ncurifree(uri);
 	    uri = newuri;
 	} else if(strcmp(uri->protocol,"file")==0) {

@@ -317,7 +317,7 @@ NCZ_inq(int ncid, int *ndimsp, int *nvarsp, int *nattsp, int *unlimdimidp)
     {
         /* Do we need to read the atts? */
         if (!grp->atts_read)
-            if ((stat = ncz_read_atts(file,(NC_OBJ*)grp)))
+            if ((stat = NCZF_readattrs(file,(NC_OBJ*)grp)))
                 return stat;
 
         *nattsp = ncindexcount(grp->att);
@@ -363,6 +363,7 @@ ncz_sync_netcdf4_file(NC_FILE_INFO_T* file, int isclose)
     int stat = NC_NOERR;
 
     assert(file && file->format_file_info);
+
     LOG((3, "%s", __func__));
     ZTRACE(2,"file=%s",file->hdr.name);
 
@@ -390,9 +391,9 @@ ncz_sync_netcdf4_file(NC_FILE_INFO_T* file, int isclose)
         if((stat = NCZ_write_provenance(file)))
             goto done;
 
-        /* Write all the metadata. */
-	if((stat = ncz_sync_file(file,isclose)))
-	    goto done;
+        /* Write out meta-data if we are closing as opposed to enddef() */
+        if(isclose) 
+            {if((stat = NCZF_writemeta(file))) goto done;}
     }
 done:
     return ZUNTRACE(stat);
