@@ -109,12 +109,25 @@ dumpmap() {
 # Function to remove selected -s attributes from file;
 # These attributes might be platform dependent
 sclean() {
-    cat $1 \
- 	| sed -e '/:_IsNetcdf4/d' \
-	| sed -e '/:_Endianness/d' \
-	| sed -e '/_NCProperties/d' \
-	| sed -e '/_SuperblockVersion/d' \
-	| cat > $2
+sed -i.bak -e '/:_IsNetcdf4/d' $1
+sed -i.bak -e '/:_Endianness/d' $1
+sed -i.bak -e '/_NCProperties/d' $1
+sed -i.bak -e '/_SuperblockVersion/d' $1
+}
+
+# s3clean plus remove additional lines
+scleanplus() {
+sclean $1
+sed -i.bak -e '/_Format/d' $1
+sed -i.bak -e '/_global attributes:/d' $1 
+}
+
+# Function to rewrite selected key values in a zmapio output.
+# because these values might be platform dependent
+zmapclean() {
+sed -i.bak -e 's/"_NCProperties":[ ]*"version=\([0-9]\),[^"]*"/"_NCProperties": "version=\1,netcdf=0.0.0,nczarr=0.0.0"/g' $1
+sed -i.bak -e 's/"_nczarr_superblock":[ ]*{[^}]*}/"_nczarr_superblock": {"version": "0.0.0", "format": 2}/g' $1
+sed -i.bak -e 's/"_nczarr_superblock":[ ]*{[^}]*}/"_nczarr_superblock": {"version": "0.0.0", "format": 2}/g' $1
 }
 
 # Make sure execdir and srcdir absolute paths are available
