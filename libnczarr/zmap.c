@@ -593,8 +593,8 @@ nczmap_walk(NCZMAP* map, const char* prefix, NCZWALKFCN fcn, void* param)
     assert(prefix != NULL && strlen(prefix) > 0);
     if(prefix[0] != '/') ncbytescat(path,"/");
     ncbytescat(path,prefix);
-
     stat = nczmap_walkR(map, path, fcn, param);
+    ncbytesfree(path);
     return THROW(stat);
 }
 
