@@ -306,12 +306,10 @@ read_vars(NC_FILE_INFO_T* file, NCZ_FILE_INFO_T* zfile, NCZMAP* map, NC_GRP_INFO
     int stat = NC_NOERR;
     int i,j;
     int purezarr = 0;
-    int xarray = 0;
 
     ZTRACE(3,"file=%s grp=%s |varnames|=%u",file->controller->path,grp->hdr.name,nclistlength(varnames));
 
     if(zfile->controls.flags & FLAG_PUREZARR) purezarr = 1;
-    if(zfile->controls.flags & FLAG_XARRAYDIMS) {xarray = 1;}
 
     /* Load each var in turn */
     for(i = 0; i < nclistlength(varnames); i++) {

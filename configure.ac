@@ -224,11 +224,11 @@ test "x$enable_default_zarr_format_v3" = xyes | enable_default_zarr_format_v3=no
 AC_MSG_RESULT([$enable_default_zarr_format_v3}])
 if test "x$enable_default_zarr_format_v3" = xyes; then
    DFALTZARRFORMAT=3
-   AC_DEFINE_UNQUOTED([DFALTZARRFORMAT], [3], [if true, Zarr format V3 is default])
 else
-   DFALTZARRFORMAT=2
+DFALTZARRFORMAT=2
 fi
-AC_SUBST([DFALTZARRFORMAT],[${DFALTZARRFORMAT}])
+AC_DEFINE_UNQUOTED([DFALTZARRFORMAT], [$DFALTZARRFORMAT], [Default Zarr format])
+AC_SUBST([DFALTZARRFORMAT],[$DFALTZARRFORMAT])
 
 # HDF5 | HDF4 | NCZarr => netcdf-4
 if test "x$enable_hdf5" = xyes || test "x$enable_hdf4" = xyes || test "x$enable_nczarr" = xyes ; then
