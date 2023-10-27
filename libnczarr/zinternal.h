@@ -20,9 +20,9 @@
 #define ZARRFORMAT2 2
 #define ZARRFORMAT3 3
 
-/* Convenience */
-#define ZARRFORMAT2_STRING "2"
-#define ZARRFORMAT3_STRING "3"
+/* Mode encoded formats */
+#define ZARRFORMAT2_STRING "v2"
+#define ZARRFORMAT3_STRING "v3"
 
 /* Define the possible NCZarr format versions */
 /* These are independent of the Zarr specification version */
@@ -72,7 +72,8 @@
 
 /* V3 Reserved Objects */
 #define Z3METAROOT "/zarr.json"
-#define Z2TAG "zarr.info"
+#define Z3GROUP "zarr.json"
+#define Z3ARRAY "zarr.json"
 
 /* Pure Zarr pseudo names */
 #define ZDIMANON "_zdim"
@@ -130,8 +131,9 @@ In v3, the attributes are in a dictionary under the key name "attributes",
 #define NCZ_V2_ATTR_UC    NC_NCZARR_ATTR_UC
 
 #define NCZ_V3_SUPERBLOCK "_nczarr_superblock"
-#define NCZ_V3_GROUP   "_nczarr_group"
-#define NCZ_V3_ARRAY   "_nczarr_array"
+#define NCZ_V3_GROUP  NCZ_V2_GROUP
+#define NCZ_V3_ARRAY  NCZ_V2_ARRAY
+#define NCZ_V3_ATTR   NCZ_V2_ATTR
 
 #define NCZARRCONTROL "nczarr"
 #define PUREZARRCONTROL "zarr"
@@ -142,7 +144,8 @@ In v3, the attributes are in a dictionary under the key name "attributes",
 #define FORMAT3CONTROL "v3"
 
 #define LEGAL_DIM_SEPARATORS "./"
-#define DFALT_DIM_SEPARATOR '.'
+#define DFALT_DIM_SEPARATOR_V2 '.'
+#define DFALT_DIM_SEPARATOR_V3 '/'
 
 #define islegaldimsep(c) ((c) != '\0' && strchr(LEGAL_DIM_SEPARATORS,(c)) != NULL)
 

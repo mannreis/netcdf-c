@@ -110,7 +110,7 @@ static void nccheck(int stat, int line)
 static void
 zmapusage(void)
 {
-    fprintf(stderr,"usage: zmapio [-t <type>][-d][-v][-x] <file>\n");
+    fprintf(stderr,"usage: zmapio [-t <type>][-d][-v][-h][-x] <file>\n");
     exit(1);
 }
 
@@ -513,6 +513,8 @@ keykind(const char* key)
 		    kind = OK_IGNORE;
 		else
 	            kind = OK_META;
+	    } else if(strcasecmp(&suffix[1],"zarr.json")==0) {
+	        kind = OK_META;
             } else if(suffix[strlen(suffix)-1] == '/')
 		kind = OK_GROUP;
 	    else {

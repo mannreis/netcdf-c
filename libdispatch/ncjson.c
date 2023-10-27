@@ -915,6 +915,23 @@ done:
     return NCJTHROW(stat);
 }
 
+/* Insert key-value pair into a dict object. key will be strdup'd */
+OPTSTATIC int
+NCJinsertstring(NCjson* object, const char* key, const char* value)
+{
+    int stat = NCJ_OK;
+    NCjson* jkey = NULL;
+    NCjson* jvalue = NULL;
+    if(key == NULL || value == NULL)
+	{stat = NCJTHROW(NCJ_ERR); goto done;}
+    if((stat = NCJnewstring(NCJ_STRING,key,&jkey))==NCJ_ERR) goto done;
+    if((stat = NCJnewstring(NCJ_STRING,value,&jvalue))==NCJ_ERR) goto done;
+    if((stat = NCJappend(object,jkey))==NCJ_ERR) goto done;
+    if((stat = NCJappend(object,jvalue))==NCJ_ERR) goto done;
+done:
+    return NCJTHROW(stat);
+}
+
 /* Append value to an array or dict object. */
 OPTSTATIC int
 NCJappend(NCjson* object, NCjson* value)

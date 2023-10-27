@@ -16,12 +16,12 @@ if test "x$NCZARR_S3_TEST_BUCKET" = x ; then
 fi
 export NCZARR_S3_TEST_URL="https://${NCZARR_S3_TEST_HOST}/${NCZARR_S3_TEST_BUCKET}"
 
+ZMD="${execdir}/${DL}zmapio"
+S3UTIL="${execdir}/${DL}s3util"
+
 if test "x$VALGRIND" != x ; then
-    ZMD="valgrind --leak-check=full ${execdir}/zmapio"
-    S3UTIL="valgrind --leak-check=full ${execdir}/s3util"
-else
-    ZMD="${execdir}/zmapio"
-    S3UTIL="${execdir}/s3util"
+    ZMD="valgrind --leak-check=full $ZMD"
+    S3UTIL="valgrind --leak-check=full $S3UTIL"
 fi
 
 # Check settings

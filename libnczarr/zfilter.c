@@ -927,6 +927,7 @@ done:
 
 /**************************************************/
 /* JSON Parse/unparse of filters */
+
 int
 NCZ_filter_jsonize(const NC_FILE_INFO_T* file, const NC_VAR_INFO_T* var, NCZ_Filter* filter, NCjson** jfilterp)
 {

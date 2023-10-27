@@ -968,6 +968,7 @@ read_superblock(NC_FILE_INFO_T* file, int* nczarrvp)
     switch(stat = NCZ_downloadjson(zfile->map, Z2METAROOT, &jblock)) {
     case NC_EEMPTY: /* not there */
         nczarr_format = NCZARRFORMAT0; /* apparently pure zarr */	    
+	zfile->controls.flags |= FLAG_PUREZARR;
 	stat = NC_NOERR; /* reset */
 	goto done;
     case NC_NOERR:

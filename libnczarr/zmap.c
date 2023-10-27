@@ -289,6 +289,10 @@ nczm_appendn(char** resultp, int n, ...)
 
 /* A segment is defined as a '/' plus characters following up
    to the end or upto the next '/'
+@param key   [in] to divide
+@param nsegs [in] no. of segs in prefix; < 0 means count from right
+@param prefixp [out] concat of prefix segs
+@param suffixp [out] concat of suffix segs
 */
 int
 nczm_divide_at(const char* key, int nsegs, char** prefixp, char** suffixp)
