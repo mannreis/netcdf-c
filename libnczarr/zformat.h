@@ -56,7 +56,6 @@ extern int NCZF_close(NC_FILE_INFO_T* file);
 extern const NCZ_Formatter* NCZ_formatter1; /* NCZarr V1 dispatch table => Zarr V2 */
 extern const NCZ_Formatter* NCZ_formatter2; /* NCZarr V2 dispatch table => Zarr V2 */
 extern const NCZ_Formatter* NCZ_formatter3; /* NCZarr V3 dispatch table => Zarr V3*/
-
 /**************************************************/
 
 /* Use inference to get map and the formatter */

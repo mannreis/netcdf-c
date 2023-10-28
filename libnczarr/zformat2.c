@@ -437,7 +437,7 @@ write_var_meta(NC_FILE_INFO_T* file, NCZ_FILE_INFO_T* zfile, NCZMAP* map, NC_VAR
 
     /* dimension_separator key */
     /* Single char defining the separator in chunk keys */
-    if(zvar->dimension_separator != DFALT_DIM_SEPARATOR) {
+    if(zvar->dimension_separator != DFALT_DIM_SEPARATOR_V2) {
 	char sep[2];
 	sep[0] = zvar->dimension_separator;/* make separator a string*/
 	sep[1] = '\0';
@@ -2349,6 +2349,9 @@ const NCZ_Formatter* NCZ_formatter2 = &NCZ_formatter2_table;
 int
 NCZF2_initialize(void)
 {
+
+
+
     return NC_NOERR;
 }
 

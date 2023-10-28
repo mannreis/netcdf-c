@@ -93,12 +93,27 @@ for a variable. This is accommodated by providing two special attributes:
 1, "_Filters" attribute shows the HDF5 filters defined on the variable, if any.
 2, "_Codecs" attribute shows the codecs defined on the variable; for zarr, this list
    should always be defined.
+
+For Zarr V3, we add a notion of "pseudo" filters. These are filters
+that place-holders to satisfy the Zarr V3 spec, but whose action is
+actually handled elsewhere in the nczarr code.
+There is currently one one such pseudo filter: "bytes".
+This filter is expected to be the first filter in the filter chain.
+Semantically, "bytes" handles data type endianness.
+
+Such filters do not appear in the _Codecs attribute or the _Filters attribute,
+but are in the Zarr metadata.
+
+When reading a Zarr dataset, the "bytes" codec must occur first in the filter chain,
+else the array is marked as unreadable.
+If it the first codec, then it is parsed to find out the endianness of the array.
 */
 
 /* Codec Info */
 typedef struct NCZ_Codec {
     char* id;              /**< The NumCodecs ID */
     char* codec;           /**< The Codec from the file; NULL if creating */
+    int pseudo;		   /**< If the codec action is handled by non-codec code in netcdf-c */
 } NCZ_Codec;
 
 static NCZ_Codec codec_empty = {NULL, NULL};
@@ -143,6 +158,8 @@ typedef struct NCZ_Filter {
 } NCZ_Filter;
 
 #define FILTERINCOMPLETE(f) ((f)->flags & FLAG_INCOMPLETE?1:0)
+
+static const char* NCZ_KNOWN_PSEUDO_FILTERS = {"bytes",NULL};
 
 /* WARNING: GLOBAL DATA */
 /* TODO: move to common global state */
@@ -750,6 +767,8 @@ int
 NCZ_filter_initialize(void)
 {
     int stat = NC_NOERR;
+    NCjson* json = NULL;
+
     ZTRACE(6,"");
 
     if(NCZ_filter_initialized) goto done;
@@ -758,6 +777,7 @@ NCZ_filter_initialize(void)
     codec_defaults = nclistnew();
     NCZ_filter_initialized = 1;
     memset(loaded_plugins,0,sizeof(loaded_plugins));
+
 #ifdef ENABLE_NCZARR_FILTERS
     if((stat = NCZ_load_all_plugins())) goto done;
 #endif

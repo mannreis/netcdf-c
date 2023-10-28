@@ -9,6 +9,15 @@
 #endif
 
 /**************************************************/
+/* Big endian Bytes filter */
+static const char* NCZ_Bytes_Big_Text = "{\"name\": \"bytes\", \"configuration\": {\"endian\": \"big\"}}";
+NCjson* NCZ_Bytes_Big_Json = NULL;
+
+/* Little endian Bytes filter */
+static const char* NCZ_Bytes_Little_Text = "{\"name\": \"bytes\", \"configuration\": {\"endian\": \"little\"}}";
+NCjson* NCZ_Bytes_Little_Json = NULL;
+
+/**************************************************/
 
 /*Forward*/
 static int ZF3_create(NC_FILE_INFO_T* file, NCURI* uri, NCZMAP* map);
@@ -280,6 +289,7 @@ write_var_meta(NC_FILE_INFO_T* file, NCZ_FILE_INFO_T* zfile, NCZMAP* map, NC_VAR
     NCjson* jtmp2 = NULL;
     NCjson* jtmp3 = NULL;
     NCjson* jfill = NULL;
+    NCjson* jcodecs = NULL;
     char* dtypename = NULL;
     int purezarr = 0;
     size64_t shape[NC_MAX_VAR_DIMS];
@@ -368,7 +378,7 @@ write_var_meta(NC_FILE_INFO_T* file, NCZ_FILE_INFO_T* zfile, NCZMAP* map, NC_VAR
 	nullfree(dtypename); dtypename = NULL;
     }
 
-    /* chunk_grid key */
+    /* chunk_grid key {"name": "regular", "configuration": {"chunk_shape": [n1, n2, ...]}}  */
         /* The zarr format does not support the concept
            of contiguous (or compact), so it will never appear in the read case.
         */
@@ -383,7 +393,7 @@ write_var_meta(NC_FILE_INFO_T* file, NCZ_FILE_INFO_T* zfile, NCZMAP* map, NC_VAR
     }
     /* chunk_shape configuration dict */
     if((stat = NCJnew(NCJ_DICT,&jtmp2))) goto done;
-    if((stat = NCJinsertstring(jtmp2,"chunk_shape",jtmp2))) goto done;
+    if((stat = NCJinsert(jtmp2,"chunk_shape",jtmp3))) goto done;
     jtmp3 = NULL;
 
     /* Assemble chunk_grid */
@@ -431,21 +441,29 @@ write_var_meta(NC_FILE_INFO_T* file, NCZ_FILE_INFO_T* zfile, NCZMAP* map, NC_VAR
     /* Add the endianness codec as first entry */
     
 #ifdef ENABLE_NCZARR_FILTERS
+    /* jcodecs holds the array of filters */
+    if((stat = NCJnew(NCJ_ARRAY,&jcodecs))) goto done;
+    /* Insert the "bytes" codec as first (pseudo-)codec */
+    {
+	NCjson* bytescodec = NULL;
+	int endianness = var->endianness;
+	if(endianness == NC_ENDIAN_NATIVE)
+	    endianness = (NC_isLittleEndian()?NC_ENDIAN_LITTLE:NC_ENDIAN_BIG);
+	if(endianness == NC_ENDIAN_LITTLE) bytescodec = NCZ_Bytes_Little_Json;
+	else {assert(endianness == NC_ENDIAN_LITTLE); bytescodec = NCZ_Bytes_Little_Json;}
+        if((stat = NCJappend(jcodecs,bytescodec))) goto done;    
+    }
+
     if(nclistlength(filterchain) > 0) {
 	int k;
-	/* jcodecs holds the array of filters */
-	if((stat = NCJnew(NCJ_ARRAY,&jcodecs))) goto done;
 	for(k=0;k<nclistlength(filterchain);k++) {
  	    struct NCZ_Filter* filter = (struct NCZ_Filter*)nclistget(filterchain,k);
 	    /* encode up the filter as a string */
 	    if((stat = NCZ_filter_jsonize(file,var,filter,&jfilter))) goto done;
 	    if((stat = NCJappend(jcodecs,jfilter))) goto done;
 	}
-    } else
-#endif
-    { /* no filters at all */
-        if((stat = NCJnew(NCJ_NULL,&jcodecs))) goto done;
     }
+#endif
     if((stat = NCJinsert(jvar,"codecs",jcodecs))) goto done;
     jcodecs = NULL;
 
@@ -2108,7 +2126,14 @@ const NCZ_Formatter* NCZ_formatter3 = &NCZ_formatter3_table;
 int
 NCZF3_initialize(void)
 {
-    return NC_NOERR;
+    int stat = NC_NOERR;
+    NCjson* json = NULL;
+    if(NCJparse(NCZ_Bytes_Little_Text,0,&json) < 0) {stat = NC_EINTERNAL; goto done;}
+    NCZ_Bytes_Little_Json = json;
+    if(NCJparse(NCZ_Bytes_Big_Text,0,&json) < 0) {stat = NC_EINTERNAL; goto done;}
+    NCZ_Bytes_Big_Json = json;
+done:
+    return THROW(stat);
 }
 
 int

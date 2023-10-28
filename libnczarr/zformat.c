@@ -8,18 +8,37 @@
 
 /**************************************************/
 
+
+extern int NCZF1_initialize(void);
+extern int NCZF1_finalize(void);
+extern int NCZF2_initialize(void);
+extern int NCZF2_finalize(void);
+extern int NCZF3_initialize(void);
+extern int NCZF3_finalize(void);
+
+
 /**************************************************/
 
 int
-NCZF0_initialize(void)
+NCZF_initialize(void)
 {
-    return NC_NOERR;
+    int stat = NC_NOERR;
+    if((stat=NCZF1_initialize())) goto done;
+    if((stat=NCZF2_initialize())) goto done;
+    if((stat=NCZF3_initialize())) goto done;
+done:
+    return THROW(stat);
 }
 
 int
-NCZF0_finalize(void)
+NCZF_finalize(void)
 {
-    return NC_NOERR;
+    int stat = NC_NOERR;
+    if((stat=NCZF1_finalize())) goto done;
+    if((stat=NCZF2_finalize())) goto done;
+    if((stat=NCZF3_finalize())) goto done;
+done:
+    return THROW(stat);
 }
 
 int

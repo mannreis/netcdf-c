@@ -27,6 +27,7 @@
 
 /* Opaque */
 struct NCZ_Filter;
+struct NCjson;
 
 int NCZ_filter_initialize(void);
 int NCZ_filter_finalize(void);

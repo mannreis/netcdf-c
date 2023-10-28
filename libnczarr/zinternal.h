@@ -274,9 +274,6 @@ typedef struct NCZCONTENT{
 
 extern int ncz_initialized; /**< True if initialization has happened. */
 
-/* Forward */
-struct NCZ_Filterspec;
-
 /* zinternal.c */
 int NCZ_initialize(void);
 int NCZ_finalize(void);
