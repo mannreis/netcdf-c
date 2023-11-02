@@ -327,13 +327,13 @@ read_vars(NC_FILE_INFO_T* file, NCZ_FILE_INFO_T* zfile, NCZMAP* map, NC_GRP_INFO
 	const char* varname = NULL;
         size64_t* shapes = NULL;
         NClist* dimnames = NULL;
-        int varsized = 0;
         int suppress = 0; /* Abort processing of this variable */
         nc_type vtype = NC_NAT;
         int vtypelen = 0;
         int rank = 0;
         int zarr_rank = 0; /* Need to watch out for scalars */
 #ifdef ENABLE_NCZARR_FILTERS
+        int varsized = 0;
         NCjson* jfilter = NULL;
         int chainindex = 0;
 #endif
@@ -1630,6 +1630,7 @@ done:
 
 /* JSON Parse/unparse of filter codecs */
 
+#ifdef ENABLE_NCZARR_FILTERS
 int
 ZF1_hdf2codec(const NC_FILE_INFO_T* file, const NC_VAR_INFO_T* var, NCZ_Filter* filter)
 {
@@ -1689,6 +1690,7 @@ ZF1_codec2hdf(const NC_FILE_INFO_T* file, const NC_VAR_INFO_T* var, const NCjson
 done:
     return THROW(stat);
 }
+#endif /*ENABLE_NCZARR_FILTERS*/
 
 /**************************************************/
 /* Format Dispatch table */
@@ -1703,8 +1705,13 @@ static const NCZ_Formatter NCZ_formatter1_table = {
     ZF1_readmeta,
     ZF1_writemeta,
     ZF1_readattrs,
+#ifdef ENABLE_NCZARR_FILTERS
     ZF1_codec2hdf,
     ZF1_hdf2codec,
+#else
+    NULL,
+    NULL,
+#endif
     ZF1_close
 };
 
