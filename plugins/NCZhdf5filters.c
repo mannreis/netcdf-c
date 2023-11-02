@@ -66,7 +66,7 @@ static NCZ_codec_t NCZ_shuffle_codec = {
 };
 
 static int
-NCZ_shuffle_codec_to_hdf5(void*, const char* codec, size_t* nparamsp, unsigned** paramsp)
+NCZ_shuffle_codec_to_hdf5(void* env, const char* codec, size_t* nparamsp, unsigned** paramsp)
 {
     int stat = NC_NOERR;
     
@@ -78,7 +78,7 @@ NCZ_shuffle_codec_to_hdf5(void*, const char* codec, size_t* nparamsp, unsigned**
 }
 
 static int
-NCZ_shuffle_hdf5_to_codec(void*, size_t nparams, const unsigned* params, char** codecp)
+NCZ_shuffle_hdf5_to_codec(void* env, size_t nparams, const unsigned* params, char** codecp)
 {
     int stat = NC_NOERR;
     char json[1024];
