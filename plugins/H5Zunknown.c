@@ -76,7 +76,6 @@ H5Z_filter_unknown(unsigned int flags, size_t cd_nelmts,
 	/* reclaim old buffer */
         H5free_memory(*buf);
         *buf = newbuf;
-
     }
     return *buf_size;
 }
@@ -85,14 +84,13 @@ H5Z_filter_unknown(unsigned int flags, size_t cd_nelmts,
 /* NCZarr Codec API */
 
 /* Codec Format
-{
-"id": "unknown",
-}
+V2: {"id": "unknown"}
+V3: {"name": "unknown"}
 */
 
 /* Forward */
-static int NCZ_unknown_codec_to_hdf5(const char* codec, size_t* nparamsp, unsigned** paramsp);
-static int NCZ_unknown_hdf5_to_codec(size_t nparams, const unsigned* params, char** codecp);
+static int NCZ_unknown_codec_to_hdf5(void* env, const char* codec, size_t* nparamsp, unsigned** paramsp);
+static int NCZ_unknown_hdf5_to_codec(void* env, size_t nparams, const unsigned* params, char** codecp);
 
 /* Structure for NCZ_PLUGIN_CODEC */
 static NCZ_codec_t NCZ_unknown_codec = {/* NCZ_codec_t  codec fields */ 
@@ -118,9 +116,11 @@ NCZ_get_codec_info(void)
 /* NCZarr Interface Functions */
 
 static int
-NCZ_unknown_codec_to_hdf5(const char* codec_json, size_t* nparamsp, unsigned** paramsp)
+NCZ_unknown_codec_to_hdf5(void* env, const char* codec_json, size_t* nparamsp, unsigned** paramsp)
 {
     int stat = NC_NOERR;
+
+    NC_UNUSED(env);
 
     *nparamsp = 0;
     *paramsp = NULL;
@@ -129,15 +129,20 @@ NCZ_unknown_codec_to_hdf5(const char* codec_json, size_t* nparamsp, unsigned** p
 }
 
 static int
-NCZ_unknown_hdf5_to_codec(size_t nparams, const unsigned* params, char** codecp)
+NCZ_unknown_hdf5_to_codec(void* env0, size_t nparams, const unsigned* params, char** codecp)
 {
     int stat = NC_NOERR;
     char json[8192];
+    NCZ_codec_env_t* env = (NCZ_codec_env_t*)env0;
 
     if(nparams != 0 || params != NULL)
         {stat = NC_EINVAL; goto done;}
 
-    snprintf(json,sizeof(json),"{\"id\": \"%s\"}",NCZ_unknown_codec.codecid);
+    if(env->zarrformat == 2) {
+        snprintf(json,sizeof(json),"{\"id\": \"%s\"}",NCZ_unknown_codec.codecid);
+    } else {
+        snprintf(json,sizeof(json),"{\"name\": \"%s\"}",NCZ_unknown_codec.codecid);
+    }
     if(codecp) {
         if((*codecp = strdup(json))==NULL) {stat = NC_ENOMEM; goto done;}
     }

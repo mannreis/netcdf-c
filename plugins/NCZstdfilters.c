@@ -38,17 +38,17 @@ Author: Dennis Heimbigner
 
 /* Forward */
 
-static int NCZ_bzip2_codec_to_hdf5(const char* codec, size_t* nparamsp, unsigned** paramsp);
-static int NCZ_bzip2_hdf5_to_codec(size_t nparams, const unsigned* params, char** codecp);
+static int NCZ_bzip2_codec_to_hdf5(void* codec_env, const char* codec, size_t* nparamsp, unsigned** paramsp);
+static int NCZ_bzip2_hdf5_to_codec(void* codec_env, size_t nparams, const unsigned* params, char** codecp);
 
 #ifdef HAVE_ZSTD
-static int NCZ_zstd_codec_to_hdf5(const char* codec, size_t* nparamsp, unsigned** paramsp);
-static int NCZ_zstd_hdf5_to_codec(size_t nparams, const unsigned* params, char** codecp);
+static int NCZ_zstd_codec_to_hdf5(void* codec_env, const char* codec, size_t* nparamsp, unsigned** paramsp);
+static int NCZ_zstd_hdf5_to_codec(void* codec_env, size_t nparams, const unsigned* params, char** codecp);
 #endif
 
 #ifdef HAVE_BLOSC
-static int NCZ_blosc_codec_to_hdf5(const char* codec, size_t* nparamsp, unsigned** paramsp);
-static int NCZ_blosc_hdf5_to_codec(size_t nparams, const unsigned* params, char** codecp);
+static int NCZ_blosc_codec_to_hdf5(void* codec_env, const char* codec, size_t* nparamsp, unsigned** paramsp);
+static int NCZ_blosc_hdf5_to_codec(void* codec_env, size_t nparams, const unsigned* params, char** codecp);
 static int NCZ_blosc_modify_parameters(int ncid, int varid, size_t* vnparamsp, unsigned** vparamsp, size_t* wnparamsp, unsigned** wparamsp);
 static void NCZ_blosc_codec_finalize(void);
 #endif
@@ -77,7 +77,7 @@ NCZ_get_codec_info(void)
 }
 
 static int
-NCZ_bzip2_codec_to_hdf5(const char* codec_json, size_t* nparamsp, unsigned** paramsp)
+NCZ_bzip2_codec_to_hdf5(void* env, const char* codec_json, size_t* nparamsp, unsigned** paramsp)
 {
     int stat = NC_NOERR;
     NCjson* jcodec = NULL;
@@ -118,7 +118,7 @@ done:
 }
 
 static int
-NCZ_bzip2_hdf5_to_codec(size_t nparams, const unsigned* params, char** codecp)
+NCZ_bzip2_hdf5_to_codec(void* env, size_t nparams, const unsigned* params, char** codecp)
 {
     int stat = NC_NOERR;
     unsigned level = 0;
@@ -155,7 +155,7 @@ static NCZ_codec_t NCZ_zstd_codec = {/* NCZ_codec_t  codec fields */
 };
 
 static int
-NCZ_zstd_codec_to_hdf5(const char* codec_json, size_t* nparamsp, unsigned** paramsp)
+NCZ_zstd_codec_to_hdf5(void* env, const char* codec_json, size_t* nparamsp, unsigned** paramsp)
 {
     int stat = NC_NOERR;
     NCjson* jcodec = NULL;
@@ -196,7 +196,7 @@ done:
 }
 
 static int
-NCZ_zstd_hdf5_to_codec(size_t nparams, const unsigned* params, char** codecp)
+NCZ_zstd_hdf5_to_codec(void* env, size_t nparams, const unsigned* params, char** codecp)
 {
     int stat = NC_NOERR;
     unsigned level = 0;
@@ -335,7 +335,7 @@ done:
 }
 
 static int
-NCZ_blosc_codec_to_hdf5(const char* codec_json, size_t* nparamsp, unsigned** paramsp)
+NCZ_blosc_codec_to_hdf5(void* env, const char* codec_json, size_t* nparamsp, unsigned** paramsp)
 {
     int stat = NC_NOERR;
     NCjson* jcodec = NULL;
@@ -406,7 +406,7 @@ done:
 }
 
 static int
-NCZ_blosc_hdf5_to_codec(size_t nparams, const unsigned* params, char** codecp)
+NCZ_blosc_hdf5_to_codec(void* env, size_t nparams, const unsigned* params, char** codecp)
 {
     int stat = NC_NOERR;
     char json[1024];

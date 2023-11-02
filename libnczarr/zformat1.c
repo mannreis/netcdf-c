@@ -6,6 +6,7 @@
 #include "zincludes.h"
 #ifdef ENABLE_NCZARR_FILTERS
 #include "zfilter.h"
+#include "netcdf_filter_build.h"
 #endif
 
 /**************************************************/
@@ -1625,6 +1626,71 @@ done:
 }
 
 /**************************************************/
+/* Format Filter Support Functions */
+
+/* JSON Parse/unparse of filter codecs */
+
+int
+ZF1_hdf2codec(const NC_FILE_INFO_T* file, const NC_VAR_INFO_T* var, NCZ_Filter* filter)
+{
+    int stat = NC_NOERR;
+    NCZ_codec_env_t env = NCZ_CODEC_ENV_EMPTY_V2;
+
+    /* Convert the HDF5 id + visible parameters to the codec form */
+
+    /* Clear any previous codec */
+    nullfree(filter->codec.id); filter->codec.id = NULL;
+    nullfree(filter->codec.codec); filter->codec.codec = NULL;
+    filter->codec.id = strdup(filter->plugin->codec.codec->codecid);
+    if(filter->plugin->codec.codec->NCZ_hdf5_to_codec) {
+	stat = filter->plugin->codec.codec->NCZ_hdf5_to_codec(&env,filter->hdf5.visible.nparams,filter->hdf5.visible.params,&filter->codec.codec);
+#ifdef DEBUGF
+	fprintf(stderr,">>> DEBUGF: NCZ_hdf5_to_codec: visible=%s codec=%s\n",printnczparams(filter->hdf5.visible),filter->codec.codec);
+#endif
+        if(stat) goto done;
+    } else
+        {stat = NC_EFILTER; goto done;}
+
+done:
+    return THROW(stat);
+}
+
+/* Build filter from parsed Zarr metadata */
+int
+ZF1_codec2hdf(const NC_FILE_INFO_T* file, const NC_VAR_INFO_T* var, const NCjson* jfilter, NCZ_Filter* filter, NCZ_Plugin* plugin)
+{
+    int stat = NC_NOERR;
+    NCjson* jvalue = NULL;
+    NCZ_codec_env_t env = NCZ_CODEC_ENV_EMPTY_V2;
+    
+    assert(jfilter != NULL);
+    assert(filter != NULL);
+    
+    if(filter->codec.id == NULL) {
+        /* Get the id of this codec filter */
+        if(NCJdictget(jfilter,"id",&jvalue)<0) {stat = NC_EFILTER; goto done;}
+        if(NCJsort(jvalue) != NCJ_STRING) {stat = THROW(NC_ENOFILTER); goto done;}
+        filter->codec.id = strdup(NCJstring(jvalue));
+    }
+    
+    if(plugin != NULL) {
+	/* Save the hdf5 id */
+	filter->hdf5.id = plugin->codec.codec->hdf5id;
+	/* Convert the codec to hdf5 form visible parameters */
+        if(plugin->codec.codec->NCZ_codec_to_hdf5) {
+            stat = plugin->codec.codec->NCZ_codec_to_hdf5(&env,filter->codec.codec,&filter->hdf5.visible.nparams,&filter->hdf5.visible.params);
+#ifdef DEBUGF
+	    fprintf(stderr,">>> DEBUGF: NCZ_codec_to_hdf5: codec=%s, hdf5=%s\n",printcodec(codec),printhdf5(hdf5));
+#endif
+	    if(stat) goto done;
+	}
+    }
+    
+done:
+    return THROW(stat);
+}
+
+/**************************************************/
 /* Format Dispatch table */
 
 static const NCZ_Formatter NCZ_formatter1_table = {
@@ -1637,6 +1703,8 @@ static const NCZ_Formatter NCZ_formatter1_table = {
     ZF1_readmeta,
     ZF1_writemeta,
     ZF1_readattrs,
+    ZF1_codec2hdf,
+    ZF1_hdf2codec,
     ZF1_close
 };
 

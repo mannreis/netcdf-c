@@ -29,8 +29,8 @@ Author: Dennis Heimbigner
 /**************************************************/
 /* NCZarr Filter Objects */
 
-static int NCZ_szip_codec_to_hdf5(const char* codec, size_t* nparamsp, unsigned** paramsp);
-static int NCZ_szip_hdf5_to_codec(size_t nparams, const unsigned* params, char** codecp);
+static int NCZ_szip_codec_to_hdf5(void* env0, const char* codec, size_t* nparamsp, unsigned** paramsp);
+static int NCZ_szip_hdf5_to_codec(void* env0, size_t nparams, const unsigned* params, char** codecp);
 static int NCZ_szip_modify_parameters(int ncid, int varid, size_t* vnparamsp, unsigned** vparamsp, size_t* wnparamsp, unsigned** wparamsp);
 
 static NCZ_codec_t NCZ_szip_codec = {
@@ -46,14 +46,16 @@ static NCZ_codec_t NCZ_szip_codec = {
 };
 
 static int
-NCZ_szip_codec_to_hdf5(const char* codec_json, size_t* nparamsp, unsigned** paramsp)
+NCZ_szip_codec_to_hdf5(void* env0, const char* codec_json, size_t* nparamsp, unsigned** paramsp)
 {
     int stat = NC_NOERR;
     unsigned* params = NULL;
     size_t nparams = 2; /* No. of visible parameters */
     NCjson* json = NULL;
+    NCjson* jparams = NULL;
     NCjson* jtmp = NULL;
     struct NCJconst jc = {0,0,0,NULL};
+    NCZ_codec_env_t* env = (NCZ_codec_env_t*)env0;    
     
     if(nparamsp == NULL || paramsp == NULL)
         {stat = NC_EINTERNAL; goto done;}
@@ -61,20 +63,20 @@ NCZ_szip_codec_to_hdf5(const char* codec_json, size_t* nparamsp, unsigned** para
     if((params = (unsigned*)calloc(nparams,sizeof(unsigned)))== NULL)
         {stat = NC_ENOMEM; goto done;}
 
-    if(NCJparse(codec_json,0,&json))
-        {stat = NC_EFILTER; goto done;}
+    if(NCJparse(codec_json,0,&json)) {stat = NC_EFILTER; goto done;}
 
-    if(NCJdictget(json,"mask",&jtmp) || jtmp == NULL)
-        {stat = NC_EFILTER; goto done;}
-    if(NCJcvt(jtmp,NCJ_INT,&jc))
-        {stat = NC_EFILTER;  goto done;}
+    if(env->zarrformat == 3) {
+	if(NCZdictget(json,"configuration",&jdict)) {stat = NC_EFILTER; goto done;}
+    } else
+        jdict = json;
+
+    if(NCJdictget(jdict,"mask",&jtmp) || jtmp == NULL) {stat = NC_EFILTER; goto done;}
+    if(NCJcvt(jtmp,NCJ_INT,&jc)) {stat = NC_EFILTER;  goto done;}
     params[H5Z_SZIP_PARM_MASK] = (unsigned)jc.ival;
 
     jtmp = NULL;
-    if(NCJdictget(json,"pixels-per-block",&jtmp) || jtmp == NULL)
-        {stat = NC_EFILTER; goto done;}
-    if(NCJcvt(jtmp,NCJ_INT,&jc))
-        {stat = NC_EFILTER;  goto done;}
+    if(NCJdictget(jdict,"pixels-per-block",&jtmp) || jtmp == NULL) {stat = NC_EFILTER; goto done;}
+    if(NCJcvt(jtmp,NCJ_INT,&jc)) {stat = NC_EFILTER;  goto done;}
     params[H5Z_SZIP_PARM_PPB] = (unsigned)jc.ival;
 
     *nparamsp = nparams;
@@ -87,15 +89,24 @@ done:
 }
 
 static int
-NCZ_szip_hdf5_to_codec(size_t nparams, const unsigned* params, char** codecp)
+NCZ_szip_hdf5_to_codec(void* env0, size_t nparams, const unsigned* params, char** codecp)
 {
     int stat = NC_NOERR;
     char json[2048];
+    NCZ_codec_env_t* env = (NCZ_codec_env_t*)env0;
 
-    snprintf(json,sizeof(json),"{\"id\": \"%s\", \"mask\": %u, \"pixels-per-block\": %u}",
+    if(env->zarrformat == 2) {
+        snprintf(json,sizeof(json),"{\"id\": \"%s\", \"mask\": %u, \"pixels-per-block\": %u}",
     		NCZ_szip_codec.codecid,
 		params[H5Z_SZIP_PARM_MASK],
 		params[H5Z_SZIP_PARM_PPB]);
+    } else {
+        snprintf(json,sizeof(json),"{\"name\": \"%s\", \"configuration\": {\"mask\": %u, \"pixels-per-block\": %u}}",
+    		NCZ_szip_codec.codecid,
+		params[H5Z_SZIP_PARM_MASK],
+		params[H5Z_SZIP_PARM_PPB]);
+    }
+
     if(codecp) {
         if((*codecp = strdup(json))==NULL) {stat = NC_ENOMEM; goto done;}
     }

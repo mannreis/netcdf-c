@@ -1099,16 +1099,14 @@ bytesappendc(NCJbuf* bufp, const char c)
 OPTSTATIC void
 NCJdump(const NCjson* json, unsigned flags, FILE* out)
 {
-    char* text = NULL;
-    (void)NCJunparse(json,0,&text);
+    const char* text = NCJtotext(json,flags);
     if(out == NULL) out = stderr;
     fprintf(out,"%s\n",text);
     fflush(out);
-    nullfree(text);
 }
 
 OPTSTATIC const char*
-NCJtotext(const NCjson* json)
+NCJtotext(const NCjson* json, unsigned flags)
 {
     static char outtext[4096];
     char* text = NULL;

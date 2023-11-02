@@ -49,6 +49,7 @@ extern "C" {
 
 #include "zmap.h"
 #include "zinternal.h"
+#include "zfilter.h"
 #include "zformat.h"
 #include "zdispatch.h"
 #include "zprovenance.h"

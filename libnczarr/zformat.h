@@ -15,6 +15,13 @@
 #define NCZ_FORMATTER_VERSION 1
 #endif /*NCZ_FORMATTER_VERSION*/
 
+/* struct Fill Values */
+#define NCZ_CODEC_ENV_EMPTY_V2 {NCZ_CODEC_ENV_VER, 2}
+#define NCZ_CODEC_ENV_EMPTY_V3 {NCZ_CODEC_ENV_VER, 3}
+
+/* Opaque */
+struct NCZ_Plugin;
+
 /* This is the dispatch table, with a pointer to each netCDF
  * function. */
 typedef struct NCZ_Formatter {
@@ -27,6 +34,8 @@ typedef struct NCZ_Formatter {
     int (*readmeta)  (NC_FILE_INFO_T* file);
     int (*writemeta) (NC_FILE_INFO_T* file);
     int (*readattrs) (NC_FILE_INFO_T* file, NC_OBJ* container); /* Support lazy read */
+    int (*codec2hdf) (const NC_FILE_INFO_T* file, const NC_VAR_INFO_T* var, const NCjson* jfilter, NCZ_Filter* filter, struct NCZ_Plugin* plugin);
+    int (*hdf2codec) (const NC_FILE_INFO_T* file, const NC_VAR_INFO_T* var, NCZ_Filter* filter);
     int (*close)     (NC_FILE_INFO_T* file);
 } NCZ_Formatter;
 
@@ -35,8 +44,8 @@ extern "C" {
 #endif
 
 /* Called by nc_initialize and nc_finalize respectively */
-extern int NCZFMT_initialize(void);
-extern int NCZFMT_finalize(void);
+extern int NCZF_initialize(void);
+extern int NCZF_finalize(void);
 
 /* Wrappers for the formatter functions */
 
@@ -44,8 +53,12 @@ extern int NCZF_create(NC_FILE_INFO_T* file, NCURI* uri, NCZMAP* map);
 extern int NCZF_open(NC_FILE_INFO_T* file, NCURI* uri, NCZMAP* map);
 extern int NCZF_readmeta(NC_FILE_INFO_T* file);
 extern int NCZF_writemeta(NC_FILE_INFO_T* file);
-extern int NCZF_readattrs(NC_FILE_INFO_T* file, NC_OBJ* container); /* Support lazy read */
 extern int NCZF_close(NC_FILE_INFO_T* file);
+
+extern int NCZF_readattrs(NC_FILE_INFO_T* file, NC_OBJ* container); /* Support lazy read */
+
+extern int NCZF_codec2hdf(const NC_FILE_INFO_T* file, const NC_VAR_INFO_T* var, const NCjson* jfilter, NCZ_Filter* filter, struct NCZ_Plugin* plugin);
+extern int NCZF_hdf2codec(const NC_FILE_INFO_T* file, const NC_VAR_INFO_T* var, NCZ_Filter* filter);
 
 /* Define known dispatch tables and initializers */
 /* Each handles a specific NCZarr format + Pure Zarr */

@@ -44,6 +44,11 @@ and do the command:
 
 #define NCJ_NSORTS   8
 
+/* Dump/text/unparse flags */
+#define NCJFLAG_NONE	    0
+#define NCJFLAG_INDENTED    1
+
+
 /* Define a struct to store primitive values as unquoted
    strings. The sort will provide more info.  Do not bother with
    a union since the amount of saved space is minimal.
@@ -119,7 +124,7 @@ OPTEXPORT int NCJclone(const NCjson* json, NCjson** clonep);
 /* dump NCjson* object to output file */
 OPTEXPORT void NCJdump(const NCjson* json, unsigned flags, FILE*);
 /* convert NCjson* object to output string */
-OPTEXPORT const char* NCJtotext(const NCjson* json);
+OPTEXPORT const char* NCJtotext(const NCjson* json, unsigned flags);
 #endif
 
 #if defined(__cplusplus)

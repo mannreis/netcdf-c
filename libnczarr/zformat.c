@@ -5,6 +5,10 @@
 
 #include "zincludes.h"
 #include "zformat.h"
+#ifdef ENABLE_NCZARR_FILTERS
+#include "zfilter.h"
+#include "netcdf_filter_build.h"
+#endif
 
 /**************************************************/
 
@@ -89,6 +93,18 @@ NCZF_writemeta(NC_FILE_INFO_T* file)
     return THROW(stat);
 }
 
+int
+NCZF_close(NC_FILE_INFO_T* file)
+{
+    int stat = NC_NOERR;
+    NCZ_FILE_INFO_T* zfile = NULL;
+
+    zfile = (NCZ_FILE_INFO_T*)file->format_file_info;
+    assert(zfile != NULL);
+    stat = zfile->dispatcher->close(file);
+    return THROW(stat);
+}
+
 /* Support lazy read */
 int
 NCZF_readattrs(NC_FILE_INFO_T* file, NC_OBJ* container)
@@ -103,13 +119,26 @@ NCZF_readattrs(NC_FILE_INFO_T* file, NC_OBJ* container)
 }
 
 int
-NCZF_close(NC_FILE_INFO_T* file)
+NCZF_hdf2codec(const NC_FILE_INFO_T* file, const NC_VAR_INFO_T* var, NCZ_Filter* filter)
 {
     int stat = NC_NOERR;
     NCZ_FILE_INFO_T* zfile = NULL;
 
     zfile = (NCZ_FILE_INFO_T*)file->format_file_info;
     assert(zfile != NULL);
-    stat = zfile->dispatcher->close(file);
+    stat = zfile->dispatcher->hdf2codec(file,var,filter);
     return THROW(stat);
 }
+
+int
+NCZF_codec2hdf(const NC_FILE_INFO_T* file, const NC_VAR_INFO_T* var, const NCjson* jfilter, NCZ_Filter* filter, struct NCZ_Plugin* plugin)
+{
+    int stat = NC_NOERR;
+    NCZ_FILE_INFO_T* zfile = NULL;
+    
+    zfile = (NCZ_FILE_INFO_T*)file->format_file_info;
+    assert(zfile != NULL);
+    stat = zfile->dispatcher->codec2hdf(file,var,jfilter,filter,plugin);
+    return THROW(stat);
+}
+

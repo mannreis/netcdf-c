@@ -28,6 +28,9 @@
 /* Version of the NCZ_codec_t structure */
 #define NCZ_CODEC_CLASS_VER 1
 
+/* Version of the NCZ_codec_env_t structure */
+#define NCZ_CODEC_ENV_VER 1
+
 /* List of the kinds of NCZ_codec_t formats */
 #define NCZ_CODEC_HDF5 1 /* HDF5 <-> Codec converter */
 
@@ -94,8 +97,9 @@ void (*NCZ_codec_finalize)(void);
 * Convert a JSON representation to an HDF5 representation. Invoked when a NumCodec JSON Codec is extracted
 from Zarr metadata.
 
-int (*NCZ_codec_to_hdf5)(const char* codec, int* nparamsp, unsigned** paramsp);
+int (*NCZ_codec_to_hdf5)(void* codec_env, const char* codec, int* nparamsp, unsigned** paramsp);
 
+@param codec_env -- (in) extra environmental information
 @param codec   -- (in) ptr to JSON string representing the codec.
 @param nparamsp -- (out) store the length of the converted HDF5 unsigned vector
 @param paramsp -- (out) store a pointer to the converted HDF5 unsigned vector;
@@ -105,8 +109,9 @@ int (*NCZ_codec_to_hdf5)(const char* codec, int* nparamsp, unsigned** paramsp);
 
 * Convert an HDF5 vector of visible parameters to a JSON representation.
 
-int (*NCZ_hdf5_to_codec)(size_t nparams, const unsigned* params, char** codecp);
+int (*NCZ_hdf5_to_codec)(void* codec_env, size_t nparams, const unsigned* params, char** codecp);
 
+@param codec_env -- (in) extra environmental information
 @param nparams -- (in) the length of the HDF5 unsigned vector
 @param params -- (in) pointer to the HDF5 unsigned vector.
 @param codecp -- (out) store the string representation of the codec; caller must free.
@@ -127,14 +132,26 @@ int (*NCZ_modify_parameters)(int ncid, int varid, size_t* vnparamsp, unsigned** 
 
 * Convert an HDF5 vector of visible parameters to a JSON representation.
 
-int (*NCZ_hdf5_to_codec)(size_t nparams, const unsigned* params, char** codecp);
+int (*NCZ_hdf5_to_codec)(void* codec_env, size_t nparams, const unsigned* params, char** codecp);
 
+@param codec_env -- (in) extra environmental information
 @param nparams -- (in) the length of the HDF5 unsigned vector
 @param params -- (in) pointer to the HDF5 unsigned vector.
 @param codecp -- (out) store the string representation of the codec; caller must free.
 @return -- a netcdf-c error code.
 
 */
+
+/*
+The following struct is passed to all NCZ_codec_t functions
+to provide extra environmental information.
+*/
+typedef struct NCZ_codec_env_t {
+    int codec_env_version;
+    int zarrformat;
+} NCZ_codec_env_t;
+
+#define NCZ_CODEC_ENV_EMPTY {NCZ_CODEC_ENV_VER, 0}
 
 /*
 The struct that provides the necessary filter info.
@@ -149,8 +166,8 @@ typedef struct NCZ_codec_t {
     unsigned int hdf5id; /* corresponding hdf5 id */
     void (*NCZ_codec_initialize)(void);
     void (*NCZ_codec_finalize)(void);
-    int (*NCZ_codec_to_hdf5)(const char* codec, size_t* nparamsp, unsigned** paramsp);
-    int (*NCZ_hdf5_to_codec)(size_t nparams, const unsigned* params, char** codecp);
+    int (*NCZ_codec_to_hdf5)(void* codec_env, const char* codec, size_t* nparamsp, unsigned** paramsp);
+    int (*NCZ_hdf5_to_codec)(void* codec_env, size_t nparams, const unsigned* params, char** codecp);
     int (*NCZ_modify_parameters)(int ncid, int varid, size_t* vnparamsp, unsigned** vparamsp, size_t* wnparamsp, unsigned** wparamsp);
 } NCZ_codec_t;
 
