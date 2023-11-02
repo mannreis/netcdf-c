@@ -46,7 +46,7 @@ filters](./md_filters.html "filters") for details.
 
 Briefly, the data model supported by NCZarr is netcdf-4 minus
 the user-defined types. However, a restricted form of String type
-is supported (see Appendix E).
+is supported (see Appendix D).
 As with netcdf-4 chunking is supported.  Filters and compression
 are also [supported](./md_filters.html "filters").
 
@@ -481,10 +481,9 @@ collections — High-performance dataset datatypes](https://docs.python.org/2/li
 
 # Appendix A. Building NCZarr Support {#nczarr_build}
 
-
 Currently the following build cases are known to work.
 Note that this does not include S3 support.
-A separate tabulation of S3 support is in the document cloud.md.
+A separate tabulation of S3 support is in the document _cloud.md_.
 
 <table>
 <tr><td><u>Operating System</u><td><u>Build System</u><td><u>NCZarr</u>
@@ -555,22 +554,7 @@ Some of the relevant limits are as follows:
 Note that the limit is defined in terms of bytes and not (Unicode) characters.
 This affects the depth to which groups can be nested because the key encodes the full path name of a group.
 
-# Appendix C. NCZarr Version 1 Meta-Data Representation. {#nczarr_version1}
-
-In NCZarr Version 1, the NCZarr specific metadata was represented using new objects rather than as keys in existing Zarr objects.
-Due to conflicts with the Zarr specification, that format is deprecated in favor of the one described above.
-However the netcdf-c NCZarr support can still read the version 1 format.
-
-The version 1 format defines three specific objects: _.nczgroup_, _.nczarray_,_.nczattr_.
-These are stored in parallel with the corresponding Zarr objects. So if there is a key of the form "/x/y/.zarray", then there is also a key "/x/y/.nczarray".
-The content of these objects is the same as the contents of the corresponding keys. So the value of the ''_NCZARR_ARRAY'' key is the same as the content of the ''.nczarray'' object. The list of connections is as follows:
-
-* ''.nczarr'' <=> ''_nczarr_superblock_''
-* ''.nczgroup <=> ''_nczarr_group_''
-* ''.nczarray <=> ''_nczarr_array_''
-* ''.nczattr <=> ''_nczarr_attr_''
-
-# Appendix D. JSON Attribute Convention. {#nczarr_json}
+# Appendix C. JSON Attribute Convention. {#nczarr_json}
 
 The Zarr V2 specification is somewhat vague on what is a legal
 value for an attribute. The examples all show one of two cases:
@@ -658,7 +642,7 @@ actions "read-write-read" is equivalent to a single "read" and "write-read-write
 The "almost" caveat is necessary because (1) whitespace may be added or lost during the sequence of operations,
 and (2) numeric precision may change.
 
-# Appendix E. Support for string types
+# Appendix D. Support for string types
 
 Zarr supports a string type, but it is restricted to
 fixed size strings. NCZarr also supports such strings,
@@ -705,6 +689,52 @@ So when reading data with a pure zarr implementaion
 the above types should always appear as strings,
 and the type that signals NC_CHAR (in NCZarr)
 would be handled by Zarr as a string of length 1.
+
+# Appendix E. NCZarr Version 1 Meta-Data Representation. {#nczarr_version1}
+
+In NCZarr Version 1, the NCZarr specific metadata was represented using new objects rather than as keys in existing Zarr objects.
+Due to conflicts with the Zarr specification, that format is deprecated in favor of the one described above.
+However the netcdf-c NCZarr support can still read the version 1 format.
+
+The version 1 format defines three specific objects: _.nczgroup_, _.nczarray_,_.nczattr_.
+These are stored in parallel with the corresponding Zarr objects. So if there is a key of the form "/x/y/.zarray", then there is also a key "/x/y/.nczarray".
+The content of these objects is the same as the contents of the corresponding keys. So the value of the ''_NCZARR_ARRAY'' key is the same as the content of the ''.nczarray'' object. The list of connections is as follows:
+
+* ''.nczarr'' <=> ''_nczarr_superblock_''
+* ''.nczgroup <=> ''_nczarr_group_''
+* ''.nczarray <=> ''_nczarr_array_''
+* ''.nczattr <=> ''_nczarr_attr_''
+
+# Appendix F. Zarr Version 3: NCZarr Version 3 Meta-Data Representation. {#nczarr_version3}
+
+For Zarr version 3, the added NCZarr specific metadata is stored in a different way than in Zarr version 2.
+Specifically, the following Netcdf information needs to be captured by NCZarr:
+    1. Shared dimensions: name and size.
+    2. Unlimited dimensions: which dimensions are unlimited.
+    3. Attribute types.
+    4. Netcdf types not included in Zarr: currently only "char".
+    5. Zarr types not included in Netcdf: currently only "complex(32|64)"
+As with NCZarr version 2, the above information is captured by adding special dictionary keys in various locations
+in the standard Zarr version 3 objects.
+
+## NCZarr Superblock
+The primary repository for NCZarr metadata is in the _zarr.info_ object in the root group of the Zarr file.
+Within that object, the following Dictionary key and corresponding JSON value is stored. Note that this will
+be extended over time.
+````
+"_nczarr_superblock": {
+    "nczarr_format": "x.y.0",
+    "dimensions": {
+        "dim1": {"size": <integer>, "unlimited": 1|0}, "dim2": {"size": <integer>, "unlimited": 1|0} ...
+    }
+    "builtin-types": {
+        {"char"},
+        {"complex32"},
+        {"complex64"}
+    }
+}
+````
+
 
 # Change Log {#nczarr_changelog}
 [Note: minor text changes are not included.]
