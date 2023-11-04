@@ -759,12 +759,15 @@ Within that object, the following Dictionary key and corresponding JSON value is
     "nczarr_format": "3.0.0",
     "dimensions": {
         "<FQN>": {"size": <integer>, "unlimited": 1|0}, "<FQN>": {"size": <integer>, "unlimited": 1|0} ...
-    }
+    },
+    "groups": ["<FQN>", "<FQN>", ...],
+    "arrays": ["<FQN>", "<FQN>", ...],
 }
 ````
 The "dimensions" key holds information about all the shared dimensions across
 all groups. This aggregation improves performance by not requiring all groups
 to be searched looking for dimension information.
+Similarly, the gross structure of the subgroups and variables (aka arrays) is captured.
 
 FQN is an acronym for "Fully Qualified Name".
 It is a series of names separated by the "/" character, much

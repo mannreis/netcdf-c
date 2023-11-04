@@ -89,6 +89,8 @@ EXTERNL int NCZ_fixed2char(const void* fixed, char** charp, size_t count, int ma
 EXTERNL int NCZ_char2fixed(const char** charp, void* fixed, size_t count, int maxstrlen);
 EXTERNL int NCZ_copy_data(NC_FILE_INFO_T* file, NC_VAR_INFO_T* var, const void* memory, size_t count, int reading, void* copy);
 EXTERNL int NCZ_iscomplexjson(NCjson* value, nc_type typehint);
+EXTERNL int NCZ_makeFQN(NC_GRP_INFO_T* parent, NC_OBJ* object, NCbytes* fqn);
+EXTERNL int NCZ_parseFQN(NC_FILE_INFO_T* file, const char* fqn0, NClist* path);
 
 /* zwalk.c */
 EXTERNL int NCZ_read_chunk(int ncid, int varid, size64_t* zindices, void* chunkdata);

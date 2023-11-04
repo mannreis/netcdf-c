@@ -40,7 +40,7 @@ static int read_dims(NC_FILE_INFO_T* file, NCZ_FILE_INFO_T* zinfo, NCZMAP* map, 
 static int read_vars(NC_FILE_INFO_T* file, NCZ_FILE_INFO_T* zinfo, NCZMAP* map, NC_GRP_INFO_T* grp, NClist* varnames);
 static int read_subgrps(NC_FILE_INFO_T* file, NCZ_FILE_INFO_T* zinfo, NCZMAP* map, NC_GRP_INFO_T* grp, NClist* subgrpnames);
 
-static int NCZ_collect_dims(NC_FILE_INFO_T* file, NC_GRP_INFO_T* grp, NCjson** jdimsp);
+static int NCZ_collect_dims(NC_FILE_INFO_T* file, NCjson** jdimsp);
 static int NCZ_parse_group_content(NCjson* jcontent, NClist* dimdefs, NClist* varnames, NClist* subgrps);
 static int NCZ_parse_group_content_pure(NC_FILE_INFO_T* file, NCZ_FILE_INFO_T* zinfo, NC_GRP_INFO_T* grp, NClist* varnames, NClist* subgrps);
 static int NCZ_read_atts(NC_FILE_INFO_T* file, NCZ_FILE_INFO_T* zfile, NC_OBJ* container, NCjson* jblock);
@@ -146,89 +146,96 @@ write_grp(NC_FILE_INFO_T* file, NCZ_FILE_INFO_T* zfile, NCZMAP* map, NC_GRP_INFO
     int i,stat = NC_NOERR;
     char version[1024];
     int purezarr = 0;
+    int rootgrp = 0;
     char* fullpath = NULL;
     char* key = NULL;
-    NCjson* jncgrp = NULL;
     NCjson* jgroup = NULL;
     NCjson* jdims = NULL;
-    NCjson* jvars = NULL;
     NCjson* jsubgrps = NULL;
     NCjson* jsuper = NULL;
-    NCjson* jtmp = NULL;
     NCjson* jatts = NULL;
     NCjson* jtypes = NULL;
+    NCjson* jarrays = NULL;
+    NCbytes* fqn = ncbytesnew();
 
     ZTRACE(3,"file=%s grp=%s isclose=%d",file->controller->path,grp->hdr.name,isclose);
 
     purezarr = (zfile->controls.flags & FLAG_PUREZARR)?1:0;
+    rootgrp = (grp->parent == NULL);
 
     /* Construct grp key */
     if((stat = NCZ_grpkey(grp,&fullpath)))
 	goto done;
 
-    if(!purezarr) {
-        /* Create dimensions dict */
-        if((stat = NCZ_collect_dims(file,grp,&jdims))) goto done;
-
-        /* Create vars list */
-        if((stat = NCJnew(NCJ_ARRAY,&jvars)))
-	    goto done;
-        for(i=0; i<ncindexsize(grp->vars); i++) {
-	    NC_VAR_INFO_T* var = (NC_VAR_INFO_T*)ncindexith(grp->vars,i);
-	    if((stat = NCJaddstring(jvars,NCJ_STRING,var->hdr.name))) goto done;
-        }
-
-        /* Create subgroups list */
-        if((stat = NCJnew(NCJ_ARRAY,&jsubgrps)))
-    	    goto done;
-        for(i=0; i<ncindexsize(grp->children); i++) {
-	    NC_GRP_INFO_T* g = (NC_GRP_INFO_T*)ncindexith(grp->children,i);
-	    if((stat = NCJaddstring(jsubgrps,NCJ_STRING,g->hdr.name))) goto done;
-        }
-
-        /* Create the "_nczarr_group" dict */
-        if((stat = NCJnew(NCJ_DICT,&jncgrp)))
-	    goto done;
-        /* Insert the various dicts and arrays */
-        if((stat = NCJinsert(jncgrp,"dims",jdims))) goto done;
-        jdims = NULL; /* avoid memory problems */
-        if((stat = NCJinsert(jncgrp,"vars",jvars))) goto done;
-        jvars = NULL; /* avoid memory problems */
-        if((stat = NCJinsert(jncgrp,"groups",jsubgrps))) goto done;
-        jsubgrps = NULL; /* avoid memory problems */
+    /* If the zarr.info for non-root group has attributes,
+       then build Z3GROUP contents
+    */
+    if(rootgrp || ncindexsize(grp->att) > 0) {
+        if((stat = NCJnew(NCJ_DICT,&jgroup))) goto done;
+        if((stat = NCJinsertstring(jgroup,"node_type","group"))) goto done;
+        snprintf(version,sizeof(version),"%d",zfile->zarr.zarr_format);
+        if((stat = NCJinsertstring(jgroup,"zarr_format",version))) goto done;
+        /* Insert the group attributes */
+        /* Build the attributes dictionary */
+        assert(grp->att);
+        if((stat = build_atts(file,zfile,(NC_OBJ*)grp, grp->att, &jatts, &jtypes))) goto done;
+        if((stat = NCJinsert(jgroup,"attributes",jatts))) goto done;
+        if(!purezarr && jtypes)
+            {if((stat = NCJinsert(jgroup,NCZ_V3_ATTR,jtypes))) goto done;}
     }
 
-    /* build Z3GROUP contents */
-    if((stat = NCJnew(NCJ_DICT,&jgroup))) goto done;
-    if((stat = NCJinsertstring(jgroup,"node_type","group"))) goto done;
-    snprintf(version,sizeof(version),"%d",zfile->zarr.zarr_format);
-    if((stat = NCJinsertstring(jgroup,"zarr_format",version))) goto done;
-
-    /* Insert the group attributes */
-    /* Build the attributes dictionary */
-    assert(grp->att);
-    if((stat = build_atts(file,zfile,(NC_OBJ*)grp, grp->att, &jatts, &jtypes))) goto done;
-    if((stat = NCJinsert(jgroup,"attributes",jatts))) goto done;
-    if(!purezarr && jtypes)
-        {if((stat = NCJinsert(jgroup,NCZ_V3_ATTR,jtypes))) goto done;}
-
-    if(!purezarr && grp->parent == NULL) { /* Root group */
+    if(!purezarr && rootgrp) {
+        /* Build the superblock */
 	/* Track the library version that wrote this */
 	strncpy(version,NCZARR_PACKAGE_VERSION,sizeof(version));
 	if((stat = NCJnew(NCJ_DICT,&jsuper))) goto done;
 	if((stat = NCJinsertstring(jsuper,"version",version))) goto done;
         snprintf(version,sizeof(version),"%u", (unsigned)zfile->zarr.nczarr_format);
 	if((stat = NCJinsertstring(jsuper,"format",version))) goto done;
-	if((stat = NCJinsert(jgroup,NCZ_V3_SUPERBLOCK,jsuper))) goto done;
-	jsuper = NULL;
+
+        /* Create dimensions dict */
+        if((stat = NCZ_collect_dims(file,&jdims))) goto done;
+
+        /* Create vars list */
+        if((stat = NCJnew(NCJ_ARRAY,&jarrays))) goto done;
+        for(i=0; i<ncindexsize(grp->vars); i++) {
+	    NC_VAR_INFO_T* var = (NC_VAR_INFO_T*)ncindexith(grp->vars,i);
+	    ncbytesclear(fqn);
+	    if((stat = NCZ_makeFQN(var->container,(NC_OBJ*)var,fqn))) goto done;
+	    if((stat = NCJaddstring(jarrays,NCJ_STRING,ncbytescontents(fqn)))) goto done;
+        }
+
+        /* Create subgroups list */
+        if((stat = NCJnew(NCJ_ARRAY,&jsubgrps))) goto done;
+        for(i=0; i<ncindexsize(grp->children); i++) {
+	    NC_GRP_INFO_T* g = (NC_GRP_INFO_T*)ncindexith(grp->children,i);
+	    ncbytesclear(fqn);
+	    if((stat = NCZ_makeFQN(g->parent,(NC_OBJ*)g,fqn))) goto done;
+	    if((stat = NCJaddstring(jsubgrps,NCJ_STRING,ncbytescontents(fqn)))) goto done;
+        }
+
+	/* Assemble the superblock */
+
+        /* Insert the "dimensions" dict */
+        if((stat = NCJinsert(jsuper,"dimensions",jdims))) goto done;
+        jdims = NULL;
+
+        /* Insert the "arrays" dict */
+        if((stat = NCJinsert(jsuper,"arrays",jarrays))) goto done;
+        jarrays = NULL;
+
+        /* Insert the "groups" dict */
+        if((stat = NCJinsert(jsuper,"groups",jsubgrps))) goto done;
+        jsubgrps = NULL;
     }
 
-    if(!purezarr) {
+    /* Insert superblock into root group */
+    if(jsuper != NULL) {
 	/* Disable must_understand */
 	if((stat = NCJinsertstring(jgroup,"must_understand","false"))) goto done;
-        /* Insert the "_nczarr_group" dict */
-        if((stat = NCJinsert(jgroup,NCZ_V3_GROUP,jncgrp))) goto done;
-        jncgrp = NULL;
+	assert(jgroup != NULL);
+	if((stat = NCJinsert(jgroup,NCZ_V3_SUPERBLOCK,jsuper))) goto done;
+	jsuper = NULL;
     }
 
     /* build Z3GROUP path */
@@ -253,15 +260,14 @@ write_grp(NC_FILE_INFO_T* file, NCZ_FILE_INFO_T* zfile, NCZMAP* map, NC_GRP_INFO
     }
 
 done:
-    NCJreclaim(jtmp);
-    NCJreclaim(jsuper);
-    NCJreclaim(jncgrp);
-    NCJreclaim(jgroup);
-    NCJreclaim(jdims);
-    NCJreclaim(jvars);
-    NCJreclaim(jsubgrps);
-    nullfree(fullpath);
     nullfree(key);
+    nullfree(fullpath);
+    ncbytesfree(fqn);
+    NCJreclaim(jsuper);
+    NCJreclaim(jgroup);
+    NCJreclaim(jarrays);
+    NCJreclaim(jsubgrps);
+    NCJreclaim(jdims);
     return ZUNTRACE(THROW(stat));
 }
 
@@ -1369,48 +1375,45 @@ done:
 /**
  * @internal Synchronize dimension data from memory to map.
  *
- * @param grp Pointer to grp struct containing the dims.
+ * @param  file pointer to file struct
  *
  * @return ::NC_NOERR No error.
  * @author Dennis Heimbigner
  */
 static int
-NCZ_collect_dims(NC_FILE_INFO_T* file, NC_GRP_INFO_T* grp, NCjson** jdimsp)
+NCZ_collect_dims(NC_FILE_INFO_T* file, NCjson** jdimsp)
 {
     int i, stat=NC_NOERR;
     NCjson* jdims = NULL;
     NCjson* jdimsize = NULL;
     NCjson* jdimargs = NULL;
+    NCbytes* fqn = ncbytesnew();
+    char slen[64];
 
     ZTRACE(3,"file=%s grp=%s",file->controller->path,grp->hdr.name);
 
     NCJnew(NCJ_DICT,&jdims);
-    for(i=0; i<ncindexsize(grp->dim); i++) {
-	NC_DIM_INFO_T* dim = (NC_DIM_INFO_T*)ncindexith(grp->dim,i);
-	char slen[128];
+
+    for(i=0; i<nclistlength(file->alldims); i++) {
+	NC_DIM_INFO_T* dim = (NC_DIM_INFO_T*)nclistget(file->alldims,i);
+
+	/* Compute FQN for dimension */
+	ncbytesclear(fqn);
+	if((stat = NCZ_makeFQN(dim->container,(NC_OBJ*)dim,fqn))) goto done;
 
         snprintf(slen,sizeof(slen),"%llu",(unsigned long long)dim->len);
 	if((stat = NCJnewstring(NCJ_INT,slen,&jdimsize))) goto done;
 
-	/* If dim is not unlimited, then write in the old format to provide
-           maximum back compatibility.
-        */
-	if(dim->unlimited) {
-	    NCJnew(NCJ_DICT,&jdimargs);
-	    if((stat = NCJaddstring(jdimargs,NCJ_STRING,"size"))) goto done;
-	    if((stat = NCJappend(jdimargs,jdimsize))) goto done;
-	    jdimsize = NULL;
-  	    if((stat = NCJaddstring(jdimargs,NCJ_STRING,"unlimited"))) goto done;
-	    if((stat = NCJaddstring(jdimargs,NCJ_INT,"1"))) goto done;
-	} else { /* !dim->unlimited */
-	    jdimargs = jdimsize;
-	    jdimsize = NULL;
-	}
-	if((stat = NCJaddstring(jdims,NCJ_STRING,dim->hdr.name))) goto done;
-	if((stat = NCJappend(jdims,jdimargs))) goto done;
+        if((stat = NCJnew(NCJ_DICT,&jdimargs))) goto done;
+	if((stat = NCJinsert(jdimargs,"size",jdimsize))) goto done;
+        jdimsize = NULL;
+	if(dim->unlimited)
+  	    {if((stat = NCJinsertstring(jdimargs,"unlimited","1"))) goto done;}
+	if((stat = NCJinsert(jdims,ncbytescontents(fqn),jdimargs))) goto done;
     }
     if(jdimsp) {*jdimsp = jdims; jdims = NULL;}
 done:
+    ncbytesfree(fqn);
     NCJreclaim(jdims);
     return ZUNTRACE(THROW(stat));
 }
@@ -2214,3 +2217,4 @@ NCZF3_finalize(void)
 {
     return NC_NOERR;
 }
+

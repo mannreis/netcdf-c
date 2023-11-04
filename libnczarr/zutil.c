@@ -108,6 +108,8 @@ NCJ_STRING, /*NC_STRING*/
 };
 
 /* Forward */
+static char* backslashescape(const char* s);
+static char* deescape(const char* esc);
 
 /**************************************************/
 
@@ -1113,4 +1115,151 @@ NCZ_iscomplexjson(NCjson* json, nc_type typehint)
     }
 done:
     return stat;
+}
+
+/* Caller must free return value */
+int
+NCZ_makeFQN(NC_GRP_INFO_T* parent, NC_OBJ* object, NCbytes* fqn)
+{
+    int i, stat = NC_NOERR;
+    NClist* segments = nclistnew();
+    NC_GRP_INFO_T* grp = NULL;
+    char* escaped = NULL;
+
+    /* Add in the object name */
+    if((escaped = backslashescape(object->name))==NULL) goto done;
+    nclistpush(segments,escaped);
+    escaped = NULL;
+
+    /* Collect the group prefix segments (escaped) */
+    for(grp=parent;grp->parent!=NULL;grp=grp->parent) {
+	/* Add in the group name */
+	if((escaped = backslashescape(grp->hdr.name))==NULL) goto done;
+        nclistpush(segments,escaped);
+	escaped = NULL;
+    }
+    
+    /* Create the the fqn */
+    for(i=(nclistlength(segments)-1);i>=0;i--) {
+	ncbytescat(fqn,"/");
+	ncbytescat(fqn,nclistget(segments,i));
+    }
+
+done:
+    nclistfreeall(segments);
+    nullfree(escaped);
+    return THROW(stat);
+}
+
+/* Parse an fqn into a sequence of groups + some kind of object */
+int
+NCZ_parseFQN(NC_FILE_INFO_T* file, const char* fqn0, NClist* path)
+{
+    int i,ret = NC_NOERR;
+    int count;
+    char* p;
+    char* start;
+    char* fqn = NULL;
+    char* descaped = NULL;
+    NC_GRP_INFO_T* grp = NULL;
+
+    assert(fqn0 != NULL && fqn0[0] == '/');
+    fqn = strdup(fqn0);
+    start = fqn+1; /* leave off the leading '/' */
+    count = 0;
+    /* Step 1: Break fqn into pieces at occurrences of '/' */
+    for(p=start;*p;) {
+	switch(*p) {
+	case '\\':
+	    p+=2;
+	    break;
+	case '/': /*capture the piece name */
+	    *p++ = '\0';
+	    start = p; /* mark start of the next part */
+	    count++;
+	    break;
+	default: /* ordinary char */
+	    p++;
+	    break;
+	}
+    }
+    /* Re-walk to convert to groups */
+    p = fqn+1;
+    grp = file->root_grp; /* Starting group */
+    for(i=0;i<count;i++){
+	NC_OBJ* object = NULL;
+	descaped = deescape(p);
+
+	/* Find the relevant object for this segment in grp context */
+	object = ncindexlookup(grp->children,descaped);
+	if(object == NULL) object = ncindexlookup(grp->dim,descaped);
+	if(object == NULL) object = ncindexlookup(grp->vars,descaped);
+	if(object == NULL) object = ncindexlookup(grp->type,descaped);
+	if(object == NULL) object = ncindexlookup(grp->att,descaped);
+	if(object == NULL) {ret = NC_EINVAL; goto done;}
+	nclistpush(path,object);
+	p = p + strlen(p) + 1; /* skip past the terminating nul */
+	nullfree(descaped);
+	descaped = NULL;
+    }
+    /* Verify this looks like an FQN */
+    for(i=0;i<(count-1);i++) {
+	NC_OBJ* object = nclistget(path,i);
+	if(object->sort != NCGRP) {ret = NC_EINVAL; goto done;}
+    }
+done:
+    nullfree(descaped);
+    nullfree(fqn);
+    return THROW(ret);
+}
+
+static char*
+backslashescape(const char* s)
+{
+    const char* p;
+    char* q;
+    size_t len;
+    char* escaped = NULL;
+
+    len = strlen(s);
+    escaped = (char*)malloc(1+(2*len)); /* max is everychar is escaped */
+    if(escaped == NULL) return NULL;
+    for(p=s,q=escaped;*p;p++) {
+        char c = *p;
+        switch (c) {
+	case '\\':
+	case '/':
+	case '.':
+	case '@':
+	    *q++ = '\\'; *q++ = '\\';
+	    break;
+	default: *q++ = c; break;
+        }
+    }
+    *q = '\0';
+    return escaped;
+}
+
+static char*
+deescape(const char* esc)
+{
+    size_t len;
+    char* s;
+    const char* p;
+    char* q;
+
+    if(esc == NULL) return NULL;
+    len = strlen(esc);
+    s = (char*)malloc(len+1);
+    if(s == NULL) return NULL;
+    for(p=esc,q=s;*p;) {
+	switch (*p) {
+	case '\\':
+	     p++;
+	     /* fall thru */
+	default: *q++ = *p++; break;
+	}
+    }
+    *q = '\0';
+    return s;
 }
