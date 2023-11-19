@@ -89,8 +89,8 @@ V3: {"name": "unknown"}
 */
 
 /* Forward */
-static int NCZ_unknown_codec_to_hdf5(void* env, const char* codec, size_t* nparamsp, unsigned** paramsp);
-static int NCZ_unknown_hdf5_to_codec(void* env, size_t nparams, const unsigned* params, char** codecp);
+static int NCZ_unknown_codec_to_hdf5(const NCproplist* env, const char* codec, int* idp, size_t* nparamsp, unsigned** paramsp);
+static int NCZ_unknown_hdf5_to_codec(const NCproplist* env, int id, size_t nparams, const unsigned* params, char** codecp);
 
 /* Structure for NCZ_PLUGIN_CODEC */
 static NCZ_codec_t NCZ_unknown_codec = {/* NCZ_codec_t  codec fields */ 
@@ -116,33 +116,39 @@ NCZ_get_codec_info(void)
 /* NCZarr Interface Functions */
 
 static int
-NCZ_unknown_codec_to_hdf5(void* env, const char* codec_json, size_t* nparamsp, unsigned** paramsp)
+NCZ_unknown_codec_to_hdf5(const NCproplist* env, const char* codec_json, int* idp, size_t* nparamsp, unsigned** paramsp)
 {
     int stat = NC_NOERR;
 
     NC_UNUSED(env);
-
+    
     *nparamsp = 0;
     *paramsp = NULL;
+    if(idp) *idp = H5Z_FILTER_UNKNOWN;
     
     return stat;
 }
 
 static int
-NCZ_unknown_hdf5_to_codec(void* env0, size_t nparams, const unsigned* params, char** codecp)
+NCZ_unknown_hdf5_to_codec(const NCproplist* env, int id, size_t nparams, const unsigned* params, char** codecp)
 {
     int stat = NC_NOERR;
     char json[8192];
-    NCZ_codec_env_t* env = (NCZ_codec_env_t*)env0;
+    uintptr_t zarrformat = 0;
 
+    NC_UNUSED(id);
+    
     if(nparams != 0 || params != NULL)
         {stat = NC_EINVAL; goto done;}
+  
+    ncplistget(env,"zarrformat",&zarrformat,NULL);
 
-    if(env->zarrformat == 2) {
-        snprintf(json,sizeof(json),"{\"id\": \"%s\"}",NCZ_unknown_codec.codecid);
-    } else {
+    if(zarrformat == 3) {
         snprintf(json,sizeof(json),"{\"name\": \"%s\"}",NCZ_unknown_codec.codecid);
+    } else {
+        snprintf(json,sizeof(json),"{\"id\": \"%s\"}",NCZ_unknown_codec.codecid);
     }
+
     if(codecp) {
         if((*codecp = strdup(json))==NULL) {stat = NC_ENOMEM; goto done;}
     }

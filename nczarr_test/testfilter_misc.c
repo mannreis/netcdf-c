@@ -111,7 +111,7 @@ report(const char* msg, int lineno)
 static int
 verifychunks(void)
 {
-    int i;
+    size_t i;
     int store = -1;
     size_t localchunks[MAXDIMS];
     memset(localchunks,0,sizeof(localchunks));
@@ -122,7 +122,7 @@ verifychunks(void)
     }
     for(i=0;i<ndims;i++) {
         if(chunksize[i] != localchunks[i]) {
-            fprintf(stderr,"bad chunk size: %d\n",i);
+            fprintf(stderr,"bad chunk size: %zu\n",i);
             return 0;
         }
     }
@@ -132,14 +132,14 @@ verifychunks(void)
 static int
 create(void)
 {
-    int i;
+    size_t i;
 
     /* Create a file with one big variable whose dimensions may or may not be a multiple of chunksize (to see what happens) */
     CHECK(nc_create(testfile, NC_NETCDF4|NC_CLOBBER, &ncid));
     CHECK(nc_set_fill(ncid, NC_NOFILL, NULL));
     for(i=0;i<ndims;i++) {
         char dimname[1024];
-        snprintf(dimname,sizeof(dimname),"dim%d",i);
+        snprintf(dimname,sizeof(dimname),"dim%zu",i);
         CHECK(nc_def_dim(ncid, dimname, dimsize[i], &dimids[i]));
     }
     CHECK(nc_def_var(ncid, "var", NC_FLOAT, ndims, dimids, &varid));
@@ -168,7 +168,7 @@ setvarfilter(void)
 static void
 verifyparams(void)
 {
-    int i;
+    size_t i;
     CHECK(nc_inq_var_filter(ncid,varid,&filterid,&nparams,params));
     if(filterid != TEST_ID) REPORT("id mismatch");
     if(nparams != NPARAMS) REPORT("nparams mismatch");
@@ -289,7 +289,7 @@ compare(void)
 static void
 showparameters(void)
 {
-    int i;
+    size_t i;
     fprintf(stderr,"test: nparams=%ld: params=",(unsigned long)nparams);
     for(i=0;i<nparams;i++) {
         fprintf(stderr," %u",params[i]);
@@ -497,7 +497,7 @@ odom_more(void)
 static int
 odom_next(void)
 {
-    int i; /* do not make unsigned */
+    ssize_t i; /* do not make unsigned */
     for(i=ndims-1;i>=0;i--) {
         odom[i] += 1;
         if(odom[i] < dimsize[i]) break;
@@ -510,7 +510,7 @@ odom_next(void)
 static int
 odom_offset(void)
 {
-    int i;
+    size_t i;
     int offset = 0;
     for(i=0;i<ndims;i++) {
         offset *= dimsize[i];
@@ -522,7 +522,7 @@ odom_offset(void)
 static float
 expectedvalue(void)
 {
-    int i;
+    size_t i;
     float offset = 0;
 
     for(i=0;i<ndims;i++) {
@@ -535,7 +535,7 @@ expectedvalue(void)
 static void
 init(int argc, char** argv)
 {
-    int i;
+    size_t i;
 
     /* get the testfile path */
     if(argc > 1)

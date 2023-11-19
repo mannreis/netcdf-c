@@ -51,6 +51,7 @@ ncz_close_file(NC_FILE_INFO_T* file, int abort)
 	goto done;
     NCZ_freestringvec(0,zinfo->envv_controls);
     NC_authfree(zinfo->auth);
+
     nullfree(zinfo);
 
 done:

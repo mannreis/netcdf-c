@@ -736,7 +736,7 @@ ubyte enum _bool_t {FALSE=0, TRUE=1};
 ````
 The type complex64 is supported by by defining this compound type:
 ````
-compound _complex64_t { float64 i; float64 j;}
+compound _Complex64_t { float64 i; float64 j;}
 ````
 
 Strings present a problem because there is a proposal

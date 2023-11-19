@@ -1,8 +1,8 @@
-/* Copyright 2018, UCAR/Unidata and OPeNDAP, Inc.
+/* Copyright 2018, UCAR/Unidata
    See the COPYRIGHT file for more information. */
 
-#ifndef UTILS_H
-#define UTILS_H 1
+#ifndef NCVUTILS_H
+#define NCVUTILS_H 1
 
 /* Define a header-only simple version of a dynamically expandable list and byte buffer */
 /* To be used in code that should be independent of libnetcdf */
@@ -239,4 +239,4 @@ util_initialize(void)
 #define vsclear(vs)  vssetlength(vs,0)
 #define vssetlength(vs,len)  do{if((vs)!=NULL) (vs)->length=len;} while(0)
 
-#endif /*UTILS_H*/
+#endif /*NCVUTIL_H*/

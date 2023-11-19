@@ -71,8 +71,9 @@ typedef struct NCZ_Plugin {
     } hdf5;
     struct CodecAPI {
 	int defaulted; /* codeclib was a defaulting library */
+	int ishdf5raw; /* The codec is the hdf5raw codec */
 	const struct NCZ_codec_t* codec;
-	struct NCPSharedLib* codeclib; /* of the source codec; null if same as hdf5 */
+	struct NCPSharedLib* codeclib; /* of the codec; null if same as hdf5 */
     } codec;
 } NCZ_Plugin;
 
@@ -83,7 +84,7 @@ typedef struct NCZ_Params {
 
 /* HDF5 Info */
 typedef struct NCZ_HDF5 {
-    unsigned id;           /**< HDF5 id corresponding to filterid. */
+    int id;           /**< HDF5 id corresponding to filterid. */
     NCZ_Params visible;
     NCZ_Params working;
 } NCZ_HDF5;
@@ -97,13 +98,13 @@ typedef struct NCZ_Codec {
 
 typedef struct NCZ_Filter {
     int flags;             	/**< Flags describing state of this filter. */
-#	define FLAG_VISIBLE	1 /* If set, then visible parameters are defined */
-#	define FLAG_WORKING	2 /* If set, then WORKING parameters are defined */
-#	define FLAG_CODEC	4 /* If set, then visbile parameters come from an existing codec string */
-#	define FLAG_HDF5	8 /* If set, => visible parameters came from nc_def_var_filter */
-#	define FLAG_NEWVISIBLE	16 /* If set, => visible parameters  were modified */
-#	define FLAG_INCOMPLETE	32 /* If set, => filter has no complete matching plugin */
-#	define FLAG_SUPPRESS	64 /* If set, => filter should not be used (probably because variable is not fixed size */
+#	define FLAG_VISIBLE	  1 /* If set, then visible parameters are defined */
+#	define FLAG_WORKING	  2 /* If set, then WORKING parameters are defined */
+#	define FLAG_CODEC	  4 /* If set, then visbile parameters come from an existing codec string */
+#	define FLAG_HDF5	  8 /* If set, => visible parameters came from nc_def_var_filter */
+#	define FLAG_NEWVISIBLE	 16 /* If set, => visible parameters  were modified */
+#	define FLAG_INCOMPLETE	 32 /* If set, => filter has no complete matching plugin */
+#	define FLAG_SUPPRESS	 64 /* If set, => filter should not be used (probably because variable is not fixed size */
     NCZ_HDF5 hdf5;
     NCZ_Codec codec;
     struct NCZ_Plugin* plugin;  /**< Implementation of this filter. */

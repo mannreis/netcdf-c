@@ -27,6 +27,9 @@
 extern int nc_log_level;
 #endif /* LOGGING */
 
+const NCproplist* NCplistzarrv2 = NULL;
+const NCproplist* NCplistzarrv3 = NULL;
+
 #ifdef LOOK
 /**
  * @internal Provide a wrapper for H5Eset_auto
@@ -73,6 +76,10 @@ NCZ_initialize_internal(void)
 		ngs->zarr.dimension_separator = dimsep[0];
         }    
     }
+    /* Build some common proplists */
+    NCplistzarrv2 = ncplistnew();
+    ncplistadd((NCproplist*)NCplistzarrv2,"zarrformat",(uintptr_t)2);
+    ncplistadd((NCproplist*)NCplistzarrv3,"zarrformat",(uintptr_t)3);
 
     return stat;
 }
@@ -92,6 +99,11 @@ NCZ_finalize_internal(void)
 #ifdef ENABLE_S3
     NCZ_s3finalize();
 #endif
+
+    /* Cleanup common proplists */
+    ncplistfree((NCproplist*)NCplistzarrv2); NCplistzarrv2 = NULL;
+    ncplistfree((NCproplist*)NCplistzarrv3); NCplistzarrv3 = NULL;
+
     return NC_NOERR;
 }
 

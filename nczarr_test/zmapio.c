@@ -85,6 +85,7 @@ struct Dumpptions {
     int xflags;
 #	define XNOZMETADATA 1	
     int strlen;
+    int zarrformat;
 } dumpoptions;
 
 /* Forward */
@@ -110,7 +111,7 @@ static void nccheck(int stat, int line)
 static void
 zmapusage(void)
 {
-    fprintf(stderr,"usage: zmapio [-t <type>][-d][-v][-h][-x] <file>\n");
+    fprintf(stderr,"usage: zmapio [-2|-3][-t <type>][-d][-v][-h][-x] <file>\n");
     exit(1);
 }
 
@@ -152,8 +153,14 @@ main(int argc, char** argv)
     /* Init options */
     memset((void*)&dumpoptions,0,sizeof(dumpoptions));
 
-    while ((c = getopt(argc, argv, "dhvx:t:F:T:X:")) != EOF) {
+    while ((c = getopt(argc, argv, "23dhvx:t:F:T:X:")) != EOF) {
 	switch(c) {
+	case '2':
+	    dumpoptions.zarrformat = 2;
+	    break;
+	case '3':
+	    dumpoptions.zarrformat = 3;
+	    break;
 	case 'd': 
 	    dumpoptions.debug = 1;	    
 	    break;
@@ -497,7 +504,7 @@ printcontent(size64_t len, const char* content, OBJKIND kind)
     }
 }
 
-static char chunkchars[] = ".0123456789";
+static char chunkchars[] = "./c0123456789";
 
 static OBJKIND
 keykind(const char* key)
@@ -513,8 +520,13 @@ keykind(const char* key)
 		    kind = OK_IGNORE;
 		else
 	            kind = OK_META;
+		if(!dumpoptions.zarrformat) dumpoptions.zarrformat = 2;
 	    } else if(strcasecmp(&suffix[1],"zarr.json")==0) {
 	        kind = OK_META;
+		if(!dumpoptions.zarrformat) dumpoptions.zarrformat = 3;
+	    } else if(strcasecmp(&suffix[1],"zarr.json")==0) {
+	        kind = OK_META;
+		if(!dumpoptions.zarrformat) dumpoptions.zarrformat = 3;
             } else if(suffix[strlen(suffix)-1] == '/')
 		kind = OK_GROUP;
 	    else {

@@ -38,7 +38,6 @@
 #define NCZ_CHUNKSIZE_FACTOR (10)
 #define NCZ_MIN_CHUNK_SIZE (2)
 
-
 /**************************************************/
 /* Constants */
 
@@ -78,6 +77,9 @@
 /* Pure Zarr pseudo names */
 #define ZDIMANON "_zdim"
 
+/* Bytes codec name */
+#define ZBYTES3 "bytes"
+
 /* V2 Reserved Attributes */
 /*
 Inserted into /.zgroup
@@ -102,13 +104,10 @@ Inserted into any .zattrs ? or should it go into the container?
 /* V3 Reserved Attributes */
 /*
 Inserted into group zarr.json:
-_nczarr_superblock: {"version": "[23].0.0"}
-Inserted into any group zarr.json:
-"_nczarr_group": "{
-\"dimensions\": {\"d1\": \"1\", \"d2\": \"1\",...}
-\"variables\": [\"v1\", \"v2\", ...]
-\"groups\": [\"g1\", \"g2\", ...]
-}"
+_nczarr_superblock: {
+<TBD>
+},
+
 Inserted into any array zarr.json:
 "_nczarr_array": "{
 \"dimensions\": [\"/g1/g2/d1\", \"/d2\",...]
@@ -161,7 +160,7 @@ In v3, the attributes are in a dictionary under the key name "attributes",
 #define ncidfor(var) ncidforx((var)->container->nc4_info,(var)->container->hdr.id)
 
 /**************************************************/
-/* Forward */
+/* Opaque */
 
 struct NClist;
 struct NCjson;
@@ -169,6 +168,7 @@ struct NCauth;
 struct NCZMAP;
 struct NCZChunkCache;
 struct NCZ_Formatter;
+struct NCproplist;
 
 /**************************************************/
 /* Define annotation data for NCZ objects */
@@ -200,6 +200,7 @@ typedef struct NCZ_FILE_INFO {
 #		define FLAG_NCZARR_V1   16
 	NCZM_IMPL mapimpl;
     } controls;
+    NCjson* superblock; /* Only used by NCZarr 3.0.0 and later */
     struct NCZ_Formatter* dispatcher;
 } NCZ_FILE_INFO_T;
 
@@ -216,18 +217,7 @@ typedef struct  NCZ_ATT_INFO {
 /* Struct to hold ZARR-specific info for a group. */
 typedef struct NCZ_GRP_INFO {
     NCZcommon common;
-#if 0
-    /* The jcontent field stores the following:
-	1. List of (name,length) for dims in the group
-	2. List of (name,type) for user-defined types in the group
-	3. List of var names in the group
-	4. List of subgroups names in the group
-    */
-    NClist* dims;
-    NClist* types; /* currently not used */
-    NClist* vars;
-    NClist* grps;
-#endif
+    NCjson* grpsuper; /* Corresponding info from the superblock */
 } NCZ_GRP_INFO_T;
 
 /* Struct to hold ZARR-specific info for a variable. */
@@ -254,6 +244,14 @@ typedef struct NCZ_TYPE_INFO {
     NCZcommon common;
 } NCZ_TYPE_INFO_T;
 
+/* Parsed dimension info */
+struct NCZ_DimInfo {
+    char* path;
+    size64_t dimlen;
+    int unlimited;
+};
+
+
 #if 0
 /* Define the contents of the .nczcontent object */
 /* The .nczcontent field stores the following:
@@ -269,6 +267,12 @@ typedef struct NCZCONTENT{
     NClist* grps;
 } NCZCONTENT;
 #endif
+
+/**************************************************/
+
+/* Common property lists */
+EXTERNL const struct NCproplist* NCplistzarrv2;
+EXTERNL const struct NCproplist* NCplistzarrv3;
 
 /**************************************************/
 

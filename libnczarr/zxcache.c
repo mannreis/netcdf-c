@@ -577,54 +577,6 @@ done:
     return THROW(stat);
 }
 
-/**************************************************/
-/*
-From Zarr V2 Specification:
-"The compressed sequence of bytes for each chunk is stored under
-a key formed from the index of the chunk within the grid of
-chunks representing the array.  To form a string key for a
-chunk, the indices are converted to strings and concatenated
-with the dimension_separator character ('.' or '/') separating
-each index. For example, given an array with shape (10000,
-10000) and chunk shape (1000, 1000) there will be 100 chunks
-laid out in a 10 by 10 grid. The chunk with indices (0, 0)
-provides data for rows 0-1000 and columns 0-1000 and is stored
-under the key "0.0"; the chunk with indices (2, 4) provides data
-for rows 2000-3000 and columns 4000-5000 and is stored under the
-key "2.4"; etc."
-*/
-
-/**
- * @param R Rank
- * @param chunkindices The chunk indices
- * @param dimsep the dimension separator
- * @param keyp Return the chunk key string
- */
-int
-NCZ_buildchunkkey(size_t R, const size64_t* chunkindices, char dimsep, char** keyp)
-{
-    int stat = NC_NOERR;
-    int r;
-    NCbytes* key = ncbytesnew();
-
-    if(keyp) *keyp = NULL;
-
-    assert(islegaldimsep(dimsep));
-    
-    for(r=0;r<R;r++) {
-	char sindex[64];
-        if(r > 0) ncbytesappend(key,dimsep);
-	/* Print as decimal with no leading zeros */
-	snprintf(sindex,sizeof(sindex),"%lu",(unsigned long)chunkindices[r]);	
-	ncbytescat(key,sindex);
-    }
-    ncbytesnull(key);
-    if(keyp) *keyp = ncbytesextract(key);
-
-    ncbytesfree(key);
-    return THROW(stat);
-}
-
 /**
  * @internal Push data to chunk of a file.
  * If chunk does not exist, create it
@@ -847,7 +799,7 @@ NCZ_buildchunkpath(NCZChunkCache* cache, const size64_t* chunkindices, struct Ch
 
     assert(key != NULL);
     /* Get the chunk object name */
-    if((stat = NCZ_buildchunkkey(cache->ndims, chunkindices, cache->dimension_separator, &chunkname))) goto done;
+    if((stat = NCZF_buildchunkkey(cache->var->container->nc4_info,cache->ndims, chunkindices, cache->dimension_separator, &chunkname))) goto done;
     /* Get the var object key */
     if((stat = NCZ_varkey(cache->var,&varkey))) goto done;
     key->varkey = varkey; varkey = NULL;
