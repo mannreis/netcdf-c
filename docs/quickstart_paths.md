@@ -121,7 +121,7 @@ For all of the above URL forms, there are two additional pieces.
 * Query: currently not used.
 * Fragment: the fragment is of the form _key=value&key=value&..._. Depending on the key, the _value_ part may be left out and some default value will be used. The exact set of possible keys is defined in the nczarr documentation.
 
-## Point of Contact {#nczarr_poc}
+## Point of Contact {#nc_paths_poc}
 
 __Author__: Dennis Heimbigner<br>
 __Email__: dmh at ucar dot edu<br>
