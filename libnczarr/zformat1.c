@@ -129,7 +129,7 @@ ZF1_readmeta(NC_FILE_INFO_T* file)
     zinfo = file->format_file_info;
     map = zinfo->map;
 
-    purezarr = (zinfo->controls.flags & FLAG_PUREZARR);
+    purezarr = (zinfo->flags & FLAG_PUREZARR);
 
     /* Ok, try to read superblock */
     switch(stat = read_superblock(file,&nczarr_format)) {
@@ -171,7 +171,7 @@ read_superblock(NC_FILE_INFO_T* file, int* nczarrvp)
     switch(stat = NCZ_downloadjson(zinfo->map, NCZMETAROOT, &jblock)) {
     case NC_EEMPTY: /* not there */
 	nczarr_format = NCZARRFORMAT0; /* apparently pure zarr */
-	zinfo->controls.flags |= FLAG_PUREZARR;
+	zinfo->flags |= FLAG_PUREZARR;
 	goto done;
     case NC_NOERR:
 	if((stat = NCJdictget(jblock,"nczarr_format",&jtmp))) goto done;
@@ -211,7 +211,7 @@ read_grp(NC_FILE_INFO_T* file, NCZ_FILE_INFO_T* zinfo, NCZMAP* map, NC_GRP_INFO_
 
     ZTRACE(3,"file=%s grp=%s",file->controller->path,grp->hdr.name);
     
-    purezarr = (zinfo->controls.flags & FLAG_PUREZARR);
+    purezarr = (zinfo->flags & FLAG_PUREZARR);
 
     /* Construct grp path */
     if((stat = NCZ_grpkey(grp,&fullpath)))
@@ -316,7 +316,7 @@ read_vars(NC_FILE_INFO_T* file, NCZ_FILE_INFO_T* zfile, NCZMAP* map, NC_GRP_INFO
 
     ZTRACE(3,"file=%s grp=%s |varnames|=%u",file->controller->path,grp->hdr.name,nclistlength(varnames));
 
-    if(zfile->controls.flags & FLAG_PUREZARR) purezarr = 1;
+    if(zfile->flags & FLAG_PUREZARR) purezarr = 1;
 
     /* Load each var in turn */
     for(i = 0; i < nclistlength(varnames); i++) {
@@ -731,7 +731,7 @@ ZF1_readattrs(NC_FILE_INFO_T* file, NC_OBJ* container)
     zinfo = file->format_file_info;
     map = zinfo->map;
 
-    purezarr = (zinfo->controls.flags & FLAG_PUREZARR)?1:0;
+    purezarr = (zinfo->flags & FLAG_PUREZARR)?1:0;
  
     if(container->sort == NCGRP) {	
 	grp = ((NC_GRP_INFO_T*)container);
@@ -971,7 +971,7 @@ NCZ_read_atts(NC_FILE_INFO_T* file, NCZ_FILE_INFO_T* zinfo, NCZMAP* map, NC_OBJ*
     zinfo = file->format_file_info;
     map = zinfo->map;
 
-    purezarr = (zinfo->controls.flags & FLAG_PUREZARR)?1:0;
+    purezarr = (zinfo->flags & FLAG_PUREZARR)?1:0;
  
     if(container->sort == NCGRP) {	
 	grp = ((NC_GRP_INFO_T*)container);
@@ -1282,8 +1282,8 @@ NCZ_computedimrefs(NC_FILE_INFO_T* file, NCZ_FILE_INFO_T* zinfo, NCZMAP* map, NC
     ZTRACE(3,"file=%s var=%s purezarr=%d xarray=%d ndims=%d shape=%s",
     	file->controller->path,var->hdr.name,purezarr,xarray,(int)ndims,nczprint_vector(ndims,shapes));
 
-    if(zinfo->controls.flags & FLAG_PUREZARR) purezarr = 1;
-    if(zinfo->controls.flags & FLAG_XARRAYDIMS) xarray = 1;
+    if(zinfo->flags & FLAG_PUREZARR) purezarr = 1;
+    if(zinfo->flags & FLAG_XARRAYDIMS) xarray = 1;
 
     if(purezarr && xarray) {/* Read in the attributes to get xarray dimdef attribute; Note that it might not exist */
 	/* Note that if xarray && !purezarr, then xarray will be superceded by the nczarr dimensions key */

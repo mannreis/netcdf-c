@@ -152,7 +152,7 @@ write_grp(NC_FILE_INFO_T* file, NCZ_FILE_INFO_T* zfile, NCZMAP* map, NC_GRP_INFO
 
     ZTRACE(3,"file=%s grp=%s isclose=%d",file->controller->path,grp->hdr.name,isclose);
 
-    purezarr = (zfile->controls.flags & FLAG_PUREZARR)?1:0;
+    purezarr = (zfile->flags & FLAG_PUREZARR)?1:0;
 
     /* Construct grp key */
     if((stat = NCZ_grpkey(grp,&fullpath)))
@@ -293,7 +293,7 @@ write_var_meta(NC_FILE_INFO_T* file, NCZ_FILE_INFO_T* zfile, NCZMAP* map, NC_VAR
     zfile = file->format_file_info;
     map = zfile->map;
 
-    purezarr = (zfile->controls.flags & FLAG_PUREZARR)?1:0;
+    purezarr = (zfile->flags & FLAG_PUREZARR)?1:0;
 
     /* Make sure that everything is established */
     /* ensure the fill value */
@@ -600,9 +600,9 @@ write_atts(NC_FILE_INFO_T* file, NCZ_FILE_INFO_T* zfile, NCZMAP* map, NC_OBJ* co
         grp = (NC_GRP_INFO_T*)container;
     }
 
-    purezarr = (zfile->controls.flags & FLAG_PUREZARR)?1:0;
+    purezarr = (zfile->flags & FLAG_PUREZARR)?1:0;
 
-    if(zfile->controls.flags & FLAG_XARRAYDIMS) isxarray = 1;
+    if(zfile->flags & FLAG_XARRAYDIMS) isxarray = 1;
 
     /* Create the attribute dictionary */
     if((stat = NCJnew(NCJ_DICT,&jatts))) goto done;
@@ -775,7 +775,7 @@ ZF2_readmeta(NC_FILE_INFO_T* file)
     zfile = file->format_file_info;
     map = zfile->map;
 
-    purezarr = (zfile->controls.flags & FLAG_PUREZARR);
+    purezarr = (zfile->flags & FLAG_PUREZARR);
 
     /* Ok, try to read superblock */
     switch(stat = read_superblock(file,&nczarr_format)) {
@@ -834,7 +834,7 @@ ZF2_readattrs(NC_FILE_INFO_T* file, NC_OBJ* container)
     zinfo = file->format_file_info;
     map = zinfo->map;
 
-    purezarr = (zinfo->controls.flags & FLAG_PUREZARR)?1:0;
+    purezarr = (zinfo->flags & FLAG_PUREZARR)?1:0;
  
     if(container->sort == NCGRP) {	
 	grp = ((NC_GRP_INFO_T*)container);
@@ -974,7 +974,7 @@ read_superblock(NC_FILE_INFO_T* file, int* nczarrvp)
     switch(stat = NCZ_downloadjson(zfile->map, Z2METAROOT, &jblock)) {
     case NC_EEMPTY: /* not there */
         nczarr_format = NCZARRFORMAT0; /* apparently pure zarr */	    
-	zfile->controls.flags |= FLAG_PUREZARR;
+	zfile->flags |= FLAG_PUREZARR;
 	stat = NC_NOERR; /* reset */
 	goto done;
     case NC_NOERR:
@@ -1024,7 +1024,7 @@ read_grp(NC_FILE_INFO_T* file, NCZ_FILE_INFO_T* zfile, NCZMAP* map, NC_GRP_INFO_
 
     ZTRACE(3,"file=%s grp=%s",file->controller->path,grp->hdr.name);
     
-    purezarr = (zfile->controls.flags & FLAG_PUREZARR);
+    purezarr = (zfile->flags & FLAG_PUREZARR);
 
     /* Construct grp path */
     if((stat = NCZ_grpkey(grp,&fullpath)))
@@ -1129,7 +1129,7 @@ read_vars(NC_FILE_INFO_T* file, NCZ_FILE_INFO_T* zfile, NCZMAP* map, NC_GRP_INFO
 
     ZTRACE(3,"file=%s grp=%s |varnames|=%u",file->controller->path,grp->hdr.name,nclistlength(varnames));
 
-    if(zfile->controls.flags & FLAG_PUREZARR) purezarr = 1;
+    if(zfile->flags & FLAG_PUREZARR) purezarr = 1;
 
     /* Load each var in turn */
     for(i = 0; i < nclistlength(varnames); i++) {
@@ -1769,7 +1769,7 @@ NCZ_read_atts(NC_FILE_INFO_T* file, NCZ_FILE_INFO_T* zfile, NCZMAP* map, NC_OBJ*
     zfile = file->format_file_info;
     map = zfile->map;
 
-    purezarr = (zfile->controls.flags & FLAG_PUREZARR)?1:0;
+    purezarr = (zfile->flags & FLAG_PUREZARR)?1:0;
  
     if(container->sort == NCGRP) {	
 	grp = ((NC_GRP_INFO_T*)container);
@@ -2080,8 +2080,8 @@ NCZ_computedimrefs(NC_FILE_INFO_T* file, NCZ_FILE_INFO_T* zfile, NCZMAP* map, NC
     ZTRACE(3,"file=%s var=%s purezarr=%d xarray=%d ndims=%d shape=%s",
     	file->controller->path,var->hdr.name,purezarr,xarray,(int)ndims,nczprint_vector(ndims,shapes));
 
-    if(zfile->controls.flags & FLAG_PUREZARR) purezarr = 1;
-    if(zfile->controls.flags & FLAG_XARRAYDIMS) xarray = 1;
+    if(zfile->flags & FLAG_PUREZARR) purezarr = 1;
+    if(zfile->flags & FLAG_XARRAYDIMS) xarray = 1;
 
     if(purezarr && xarray) {/* Read in the attributes to get xarray dimdef attribute; Note that it might not exist */
 	/* Note that if xarray && !purezarr, then xarray will be superceded by the nczarr dimensions key */

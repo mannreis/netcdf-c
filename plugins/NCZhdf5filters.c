@@ -98,9 +98,6 @@ NCZ_raw_codec_to_hdf5(const NCproplist* env, const char* codec, int* idp, size_t
     if(nparamsp == NULL || paramsp == NULL)
         {stat = NC_EINTERNAL; goto done;}
     
-    if((params = (unsigned*)calloc(1,sizeof(unsigned)))== NULL)
-        {stat = NC_ENOMEM; goto done;}
-
     ncplistget(env,"zarrformat",&zarrformat,NULL);
 
     /* parse the JSON */
@@ -132,6 +129,11 @@ NCZ_raw_codec_to_hdf5(const NCproplist* env, const char* codec, int* idp, size_t
     /* Validate nparams */
     if(NCJlength(jdict) != 2* (nparams + 2)) {stat = NC_EFILTER; goto done;}
 
+    if(nparams == 0) goto setvalues;
+    
+    if((params = (unsigned*)calloc(nparams,sizeof(unsigned)))== NULL)
+        {stat = NC_ENOMEM; goto done;}
+
     /* Get params */
     for(i=0;i<(int)nparams;i++) {
 	unsigned param;
@@ -143,6 +145,7 @@ NCZ_raw_codec_to_hdf5(const NCproplist* env, const char* codec, int* idp, size_t
 	params[i] = param;
     }
     
+setvalues:
     if(idp) *idp = hdf5id;
     *nparamsp = nparams;
     *paramsp = params; params = NULL;

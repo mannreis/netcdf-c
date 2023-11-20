@@ -22,7 +22,7 @@ static int applycontrols(NCZ_FILE_INFO_T* zinfo);
 */
 
 int
-ncz_create_dataset(NC_FILE_INFO_T* file, NC_GRP_INFO_T* root, const char** controls)
+ncz_create_dataset(NC_FILE_INFO_T* file, NC_GRP_INFO_T* root, NClist* urlcontrols)
 {
     int stat = NC_NOERR;
     NCZ_FILE_INFO_T* zfile = NULL;
@@ -32,7 +32,7 @@ ncz_create_dataset(NC_FILE_INFO_T* file, NC_GRP_INFO_T* root, const char** contr
     NCjson* json = NULL;
     char* key = NULL;
 
-    ZTRACE(3,"file=%s root=%s controls=%s",file->hdr.name,root->hdr.name,(controls?nczprint_envv(controls):"null"));
+    ZTRACE(3,"file=%s root=%s urlcontrols=%s",file->hdr.name,root->hdr.name,(controls?nczprint_env(urlcontrols):"null"));
 
     nc = (NC*)file->controller;
 
@@ -52,7 +52,7 @@ ncz_create_dataset(NC_FILE_INFO_T* file, NC_GRP_INFO_T* root, const char** contr
     zfile->creating = 1;
     zfile->common.file = file;
     zfile->native_endianness = (NCZ_isLittleEndian() ? NC_ENDIAN_LITTLE : NC_ENDIAN_BIG);
-    if((zfile->envv_controls=NCZ_clonestringvec(0,controls)) == NULL)
+    if((zfile->urlcontrols=nclistclone(urlcontrols,1)) == NULL)
 	{stat = NC_ENOMEM; goto done;}
     zfile->default_maxstrlen = NCZ_MAXSTR_DEFAULT;
 
@@ -71,7 +71,7 @@ ncz_create_dataset(NC_FILE_INFO_T* file, NC_GRP_INFO_T* root, const char** contr
         zfile->zarr.zarr_format = DFALTZARRFORMAT;
 
     /* initialize map handle*/
-    if((stat = NCZ_get_map(file,uri,nc->mode,zfile->controls.flags,NULL,&zfile->map))) goto done;
+    if((stat = NCZ_get_map(file,uri,nc->mode,zfile->flags,NULL,&zfile->map))) goto done;
 
     /* And get the format dispatcher */
     if((stat = NCZ_get_formatter(file, (const NCZ_Formatter**)&zfile->dispatcher))) goto done;
@@ -92,7 +92,7 @@ done:
 */
 
 int
-ncz_open_dataset(NC_FILE_INFO_T* file, const char** controls)
+ncz_open_dataset(NC_FILE_INFO_T* file, NClist* urlcontrols)
 {
     int stat = NC_NOERR;
     NC* nc = NULL;
@@ -121,7 +121,7 @@ ncz_open_dataset(NC_FILE_INFO_T* file, const char** controls)
     zfile->creating = 0;
     zfile->common.file = file;
     zfile->native_endianness = (NCZ_isLittleEndian() ? NC_ENDIAN_LITTLE : NC_ENDIAN_BIG);
-    if((zfile->envv_controls = NCZ_clonestringvec(0,controls))==NULL) /*0=>envv style*/
+    if((zfile->urlcontrols = nclistclone(urlcontrols,1))==NULL) /*0=>envv style*/
 	{stat = NC_ENOMEM; goto done;}
     zfile->default_maxstrlen = NCZ_MAXSTR_DEFAULT;
 
@@ -141,7 +141,7 @@ ncz_open_dataset(NC_FILE_INFO_T* file, const char** controls)
     }
 
     /* initialize map handle*/
-    if((stat = NCZ_get_map(file,uri,nc->mode,zfile->controls.flags,NULL,&zfile->map))) goto done;
+    if((stat = NCZ_get_map(file,uri,nc->mode,zfile->flags,NULL,&zfile->map))) goto done;
 
     /* And get the format dispatcher */
     if((stat = NCZ_get_formatter(file, (const NCZ_Formatter**)&zfile->dispatcher))) goto done;
@@ -281,12 +281,13 @@ done:
 
 
 static const char*
-controllookup(const char** envv_controls, const char* key)
+controllookup(NClist* controls, const char* key)
 {
-    const char** p;
-    for(p=envv_controls;*p;p+=2) {
-	if(strcasecmp(key,*p)==0) {
-	    return p[1];
+    int i;
+    for(i=0;i<nclistlength(controls);i+=2) {
+        const char* p = (char*)nclistget(controls,i);
+	if(strcasecmp(key,p)==0) {
+	    return (const char*)nclistget(controls,i+1);
 	}
     }
     return NULL;
@@ -300,19 +301,19 @@ applycontrols(NCZ_FILE_INFO_T* zinfo)
     NClist* modelist = nclistnew();
     int noflags = 0; /* track non-default negative flags */
 
-    if((value = controllookup((const char**)zinfo->envv_controls,"mode")) != NULL) {
+    if((value = controllookup(zinfo->urlcontrols,"mode")) != NULL) {
 	if((stat = NCZ_comma_parse(value,modelist))) goto done;
     }
 
     /* Process the modelist */
-    zinfo->controls.mapimpl = NCZM_DEFAULT;
-    zinfo->controls.flags |= FLAG_XARRAYDIMS; /* Always support XArray convention where possible */
+    zinfo->mapimpl = NCZM_DEFAULT;
+    zinfo->flags |= FLAG_XARRAYDIMS; /* Always support XArray convention where possible */
     for(i=0;i<nclistlength(modelist);i++) {
         const char* p = nclistget(modelist,i);
 	if(strcasecmp(p,PUREZARRCONTROL)==0)
-	    zinfo->controls.flags |= (FLAG_PUREZARR);
+	    zinfo->flags |= (FLAG_PUREZARR);
 	else if(strcasecmp(p,XARRAYCONTROL)==0)
-	    zinfo->controls.flags |= FLAG_PUREZARR;
+	    zinfo->flags |= FLAG_PUREZARR;
 	else if(strcasecmp(p,NOXARRAYCONTROL)==0)
 	    noflags |= FLAG_XARRAYDIMS;
 	else if(strcasecmp(p,ZARRFORMAT2_STRING)==0)
@@ -323,16 +324,16 @@ applycontrols(NCZ_FILE_INFO_T* zinfo)
 
     /* Apply negative controls by turning off negative flags */
     /* This is necessary to avoid order dependence of mode flags when both positive and negative flags are defined */
-    zinfo->controls.flags &= (~noflags);
+    zinfo->flags &= (~noflags);
 
     /* Process other controls */
-    if((value = controllookup((const char**)zinfo->envv_controls,"log")) != NULL) {
-	zinfo->controls.flags |= FLAG_LOGGING;
+    if((value = controllookup(zinfo->urlcontrols,"log")) != NULL) {
+	zinfo->flags |= FLAG_LOGGING;
         ncsetloglevel(NCLOGNOTE);
     }
-    if((value = controllookup((const char**)zinfo->envv_controls,"show")) != NULL) {
+    if((value = controllookup(zinfo->urlcontrols,"show")) != NULL) {
 	if(strcasecmp(value,"fetch")==0)
-	    zinfo->controls.flags |= FLAG_SHOWFETCH;
+	    zinfo->flags |= FLAG_SHOWFETCH;
     }
 done:
     nclistfreeall(modelist);
@@ -388,7 +389,7 @@ ncz_unload_jatts(NCZ_FILE_INFO_T* zinfo, NC_OBJ* container, NCjson* jattrs, NCjs
 	}
     }
 
-    if(!(zinfo->controls.flags & FLAG_PUREZARR)) {
+    if(!(zinfo->flags & FLAG_PUREZARR)) {
         /* Insert the jtypes into the set of attributes */
          if((stat = NCJinsert(jattrs,NCZ_V2_ATTRS,jtypes))) goto done;
     }

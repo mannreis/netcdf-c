@@ -160,7 +160,7 @@ write_grp(NC_FILE_INFO_T* file, NCZ_FILE_INFO_T* zfile, NCZMAP* map, NC_GRP_INFO
 
     ZTRACE(3,"file=%s grp=%s isclose=%d",file->controller->path,grp->hdr.name,isclose);
 
-    purezarr = (zfile->controls.flags & FLAG_PUREZARR)?1:0;
+    purezarr = (zfile->flags & FLAG_PUREZARR)?1:0;
     rootgrp = (grp->parent == NULL);
 
     /* Construct grp key */
@@ -272,7 +272,7 @@ write_var_meta(NC_FILE_INFO_T* file, NCZ_FILE_INFO_T* zfile, NCZMAP* map, NC_VAR
     zfile = file->format_file_info;
     map = zfile->map;
 
-    purezarr = (zfile->controls.flags & FLAG_PUREZARR)?1:0;
+    purezarr = (zfile->flags & FLAG_PUREZARR)?1:0;
 
     /* Make sure that everything is established */
     /* ensure the fill value */
@@ -569,7 +569,7 @@ build_atts(NC_FILE_INFO_T* file, NCZ_FILE_INFO_T* zfile, NC_OBJ* container, NCin
     if(container->sort == NCVAR)
         var = (NC_VAR_INFO_T*)container;
 
-    purezarr = (zfile->controls.flags & FLAG_PUREZARR)?1:0;
+    purezarr = (zfile->flags & FLAG_PUREZARR)?1:0;
 
     /* Create the attribute dictionary */
     if((stat = NCJnew(NCJ_DICT,&jatts))) goto done;
@@ -774,7 +774,7 @@ ZF3_readmeta(NC_FILE_INFO_T* file)
     /* Read the root group's metadata */
     switch(stat = NCZ_downloadjson(zfile->map, Z3METAROOT, &jblock)) {
     case NC_EEMPTY: /* not there */
-	zfile->controls.flags |= FLAG_PUREZARR;
+	zfile->flags |= FLAG_PUREZARR;
 	stat = NC_NOERR; /* reset */
 	goto done;
     case NC_NOERR:
@@ -906,7 +906,7 @@ read_grp(NC_FILE_INFO_T* file, NC_GRP_INFO_T* grp)
 
     ZTRACE(3,"file=%s grp=%s",file->controller->path,grp->hdr.name);
     
-    purezarr = (zfile->controls.flags & FLAG_PUREZARR);
+    purezarr = (zfile->flags & FLAG_PUREZARR);
 
     /* Construct grp path */
     if((stat = NCZ_grpkey(grp,&fullpath)))
@@ -1036,7 +1036,7 @@ read_vars(NC_FILE_INFO_T* file, NC_GRP_INFO_T* grp, NClist* varnames)
 
     ZTRACE(3,"file=%s grp=%s |varnames|=%u",file->controller->path,grp->hdr.name,nclistlength(varnames));
 
-    if(zfile->controls.flags & FLAG_PUREZARR) purezarr = 1;
+    if(zfile->flags & FLAG_PUREZARR) purezarr = 1;
 
     if(nclistlength(varnames) == 0) goto done; /* Nothing to create */
 
@@ -1648,7 +1648,7 @@ NCZ_read_atts(NC_FILE_INFO_T* file, NC_OBJ* container, NCjson* jblock)
 
     ZTRACE(3,"file=%s container=%s",file->controller->path,container->name);
 
-    purezarr = (zfile->controls.flags & FLAG_PUREZARR)?1:0;
+    purezarr = (zfile->flags & FLAG_PUREZARR)?1:0;
  
     if(container->sort == NCGRP) {	
 	grp = ((NC_GRP_INFO_T*)container);
@@ -1961,7 +1961,7 @@ NCZ_computedimrefs(NC_FILE_INFO_T* file, NC_VAR_INFO_T* var, NCjson* jvar, NClis
     ZTRACE(3,"file=%s var=%s purezarr=%d ndims=%d shape=%s",
     	file->controller->path,var->hdr.name,purezarr,(int)ndims,nczprint_vector(ndims,shapes));
 
-    if(zfile->controls.flags & FLAG_PUREZARR) purezarr = 1;
+    if(zfile->flags & FLAG_PUREZARR) purezarr = 1;
 
     assert(var->atts_read);
 
