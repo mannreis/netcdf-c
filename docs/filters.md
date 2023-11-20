@@ -1034,9 +1034,9 @@ This hdf5raw codec manager encodes the parameters of the HDF5 filter
 into one of these two codec forms:
 
 * Zarr Version 2
-    ````{"id": "hdf5raw", "hdf5id": "<hdf5-id>, "nparams": <uint>, "0": <uint>...,"<N>": <uint>}````
+    ````{"id": "hdf5raw", "hdf5id": "&lt;hdf5-id&gt;, "nparams": &lt;uint&gt;, "0": &lt;uint&gt;...,"&lt;N&gt;": &lt;uint&gt;}````
 * Zarr Version 3
-    ````{"name": "hdf5raw, "configuration": {"hdf5id": <uint>, "nparams": <uint>, "0": <uint>...,"<N>": <uint>}}````
+    ````{"name": "hdf5raw, "configuration": {"hdf5id": &lt;uint&gt;, "nparams": &lt;uint&gt;, "0": &lt;uint&gt;...,"&lt;N&gt;": &lt;uint&gt;}}````
 
 There are couple things to note about hdf5raw:
 1. this cannot be used if a modify_parameters function is required.
