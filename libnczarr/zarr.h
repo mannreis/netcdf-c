@@ -26,8 +26,8 @@ struct ZCVT {
 #define zcvt_empty {0,0,0.0,NULL}
 
 /* zarr.c */
-EXTERNL int ncz_create_dataset(NC_FILE_INFO_T*, NC_GRP_INFO_T*, const char** controls);
-EXTERNL int ncz_open_dataset(NC_FILE_INFO_T*, const char** controls);
+EXTERNL int ncz_create_dataset(NC_FILE_INFO_T*, NC_GRP_INFO_T*, NClist* controls);
+EXTERNL int ncz_open_dataset(NC_FILE_INFO_T*, NClist* controls);
 EXTERNL int ncz_del_attr(NC_FILE_INFO_T* file, NC_OBJ* container, const char* name);
 
 /* HDF5 Mimics */
@@ -65,8 +65,12 @@ EXTERNL int ncz_splitkey(const char* path, NClist* segments);
 EXTERNL int NCZ_readdict(NCZMAP* zmap, const char* key, NCjson** jsonp);
 EXTERNL int NCZ_readarray(NCZMAP* zmap, const char* key, NCjson** jsonp);
 EXTERNL int ncz_nctypedecode(const char* snctype, nc_type* nctypep);
-EXTERNL int ncz_nctype2dtype(nc_type nctype, int endianness, int purezarr,int len, char** dnamep);
-EXTERNL int ncz_dtype2nctype(const char* dtype, nc_type typehint, int purezarr, nc_type* nctypep, int* endianp, int* typelenp);
+
+EXTERNL int ncz2_nctype2dtype(nc_type nctype, int endianness, int purezarr,int len, char** dnamep);
+EXTERNL int ncz2_dtype2nctype(const char* dtype, nc_type typehint, int purezarr, nc_type* nctypep, int* endianp, int* typelenp);
+EXTERNL int ncz3_nctype2dtype(nc_type nctype, int purezarr, int strlen, char** dnamep);
+EXTERNL int ncz3_dtype2nctype(const char* dtype, int purezarr, nc_type* nctypep, int* typelenp);
+
 EXTERNL int NCZ_inferattrtype(NCjson* value, nc_type typehint, nc_type* typeidp);
 EXTERNL int NCZ_inferinttype(unsigned long long u64, int negative);
 EXTERNL int ncz_fill_value_sort(nc_type nctype, int*);
@@ -89,6 +93,11 @@ EXTERNL int NCZ_fixed2char(const void* fixed, char** charp, size_t count, int ma
 EXTERNL int NCZ_char2fixed(const char** charp, void* fixed, size_t count, int maxstrlen);
 EXTERNL int NCZ_copy_data(NC_FILE_INFO_T* file, NC_VAR_INFO_T* var, const void* memory, size_t count, int reading, void* copy);
 EXTERNL int NCZ_iscomplexjson(NCjson* value, nc_type typehint);
+EXTERNL int NCZ_makeFQN(NC_GRP_INFO_T* parent, NC_OBJ* object, NCbytes* fqn);
+EXTERNL int NCZ_locateFQN(NC_GRP_INFO_T* parent, const char* fqn, NC_SORT sort, NC_OBJ** objectp);
+EXTERNL char* NCZ_deescape(const char* s);
+EXTERNL char* NCZ_backslashescape(const char* s);
+EXTERNL int NCZ_sort(void* vec, size_t count, int (*compare)(const void*, const void*));
 
 /* zwalk.c */
 EXTERNL int NCZ_read_chunk(int ncid, int varid, size64_t* zindices, void* chunkdata);

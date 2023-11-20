@@ -12,8 +12,7 @@
  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
 
 /*
- * Programmer:  Robb Matzke
- *              Friday, August 27, 1999
+ * Programmer:  Dennis Heimbigner
  */
 
 /* Converted to NCZarr support by Dennis Heimbigner 5/1/2021 */
@@ -73,8 +72,8 @@ static const char* fields[14] = {
 };
 
 /* Forward */
-static int NCZ_misc_codec_to_hdf5(void* env, const char* codec, size_t* nparamsp, unsigned** paramsp);
-static int NCZ_misc_hdf5_to_codec(void* env, size_t nparams, const unsigned* params, char** codecp);
+static int NCZ_misc_codec_to_hdf5(const NCproplist* env, const char* codec, int* idp, size_t* nparamsp, unsigned** paramsp);
+static int NCZ_misc_hdf5_to_codec(const NCproplist* env, int id, size_t nparams, const unsigned* params, char** codecp);
 
 /* Structure for NCZ_PLUGIN_CODEC */
 static NCZ_codec_t NCZ_misc_codec = {/* NCZ_codec_t  codec fields */ 
@@ -100,7 +99,7 @@ NCZ_get_codec_info(void)
 /* NCZarr Interface Functions */
 
 static int
-NCZ_misc_codec_to_hdf5(void* env0, const char* codec_json, size_t* nparamsp, unsigned** paramsp)
+NCZ_misc_codec_to_hdf5(const NCproplist* env, const char* codec_json, int* idp, size_t* nparamsp, unsigned** paramsp)
 {
     int stat = NC_NOERR;
     NCjson* jcodec = NULL;
@@ -109,9 +108,11 @@ NCZ_misc_codec_to_hdf5(void* env0, const char* codec_json, size_t* nparamsp, uns
     size_t i,nparams = 0;
     unsigned* params = NULL;
     int isv2 = 0;
-    NCZ_codec_env_t* env = (NCZ_codec_env_t*)env0;
+    uintptr_t zarrformat = 0;
 
-    if(env->zarrformat == 2) isv2 = 1;
+    ncplistget(env,"zarrformat",&zarrformat,NULL);
+
+    if(zarrformat == 2) isv2 = 1;
 
     /* parse the JSON */
     if(NCJparse(codec_json,0,&jcodec))
@@ -120,18 +121,18 @@ NCZ_misc_codec_to_hdf5(void* env0, const char* codec_json, size_t* nparamsp, uns
 
     /* Verify the codec ID */
 
-    if(env->zarrformat == 2) {
-        if(NCJdictget(jcodec,"id",&jtmp)) {stat = NC_EFILTER; goto done;}
-    } else {
+    if(zarrformat == 3) {
         if(NCJdictget(jcodec,"name",&jtmp)) {stat = NC_EFILTER; goto done;}
+    } else {
+        if(NCJdictget(jcodec,"id",&jtmp)) {stat = NC_EFILTER; goto done;}
     }
     if(jtmp == NULL || !NCJisatomic(jtmp)) {stat = NC_EINVAL; goto done;}
     if(strcmp(NCJstring(jtmp),NCZ_misc_codec.codecid)!=0) {stat = NC_EINVAL; goto done;}
   
-    if(env->zarrformat == 2)
-        jparams = jcodec;
-    else { /* V3 */
+    if(zarrformat == 3) {
 	if(NCJdictget(jcodec,"configuration",&jparams)) {stat = NC_EFILTER; goto done;}
+    } else { /* V2 */
+        jparams = jcodec;
     }
 
     /* The codec will have (2*14 + 1) + 1 = 29 dict entries + id if v2*/
@@ -154,6 +155,7 @@ NCZ_misc_codec_to_hdf5(void* env0, const char* codec_json, size_t* nparamsp, uns
     }
     if(nparamsp) *nparamsp = nparams;
     if(paramsp) {*paramsp = params; params = NULL;}
+    if(idp) *idp = H5Z_FILTER_TEST;
     
 done:
     if(params) free(params);
@@ -162,13 +164,15 @@ done:
 }
 
 static int
-NCZ_misc_hdf5_to_codec(void* env0, size_t nparams, const unsigned* params, char** codecp)
+NCZ_misc_hdf5_to_codec(const NCproplist* env, int id, size_t nparams, const unsigned* params, char** codecp)
 {
     int i,stat = NC_NOERR;
     char json[4096];
     char value[1024];
     size_t count, jlen;
-    NCZ_codec_env_t* env = (NCZ_codec_env_t*)env0;
+    uintptr_t zarrformat = 0;
+    
+    NC_UNUSED(id);
     
     if(nparams == 0 || params == NULL)
         {stat = NC_EINVAL; goto done;}
@@ -177,8 +181,11 @@ NCZ_misc_hdf5_to_codec(void* env0, size_t nparams, const unsigned* params, char*
 	stat = NC_EINVAL;
 	goto done;
     }
+
+    ncplistget(env,"zarrformat",&zarrformat,NULL);
+
     jlen = sizeof(json);
-    if(env->zarrformat == 2) {
+    if(zarrformat == 2) {
         count = snprintf(json,sizeof(json),"{\"id\": \"%s\"",NCZ_misc_codec.codecid);
         for(i=0;i<14;i++) {
             size_t len = snprintf(value,sizeof(value),", \"%s\": \"%u\"",fields[i],params[i]);
@@ -186,7 +193,7 @@ NCZ_misc_hdf5_to_codec(void* env0, size_t nparams, const unsigned* params, char*
 	    strcat(json,value);
         }
         count += 1; assert(jlen > count);
-    } else if(env->zarrformat == 3) {
+    } else if(zarrformat == 3) {
         snprintf(json,sizeof(json),"{\"name\": \"%s\", \"configuration\": {",NCZ_misc_codec.codecid);
         for(i=0;i<14;i++) {
 	    if(i > 0) strcat(json,", ");

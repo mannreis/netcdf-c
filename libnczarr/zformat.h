@@ -31,12 +31,13 @@ typedef struct NCZ_Formatter {
 
     int (*create)    (NC_FILE_INFO_T* file, NCURI* uri, NCZMAP* map);
     int (*open)      (NC_FILE_INFO_T* file, NCURI* uri, NCZMAP* map);
+    int (*close)     (NC_FILE_INFO_T* file);
     int (*readmeta)  (NC_FILE_INFO_T* file);
     int (*writemeta) (NC_FILE_INFO_T* file);
     int (*readattrs) (NC_FILE_INFO_T* file, NC_OBJ* container); /* Support lazy read */
+    int (*buildchunkkey)(size_t rank, const size64_t* chunkindices, char dimsep, char** keyp);
     int (*codec2hdf) (const NC_FILE_INFO_T* file, const NC_VAR_INFO_T* var, const NCjson* jfilter, NCZ_Filter* filter, struct NCZ_Plugin* plugin);
     int (*hdf2codec) (const NC_FILE_INFO_T* file, const NC_VAR_INFO_T* var, NCZ_Filter* filter);
-    int (*close)     (NC_FILE_INFO_T* file);
 } NCZ_Formatter;
 
 #if defined(__cplusplus)
@@ -54,11 +55,13 @@ extern int NCZF_open(NC_FILE_INFO_T* file, NCURI* uri, NCZMAP* map);
 extern int NCZF_readmeta(NC_FILE_INFO_T* file);
 extern int NCZF_writemeta(NC_FILE_INFO_T* file);
 extern int NCZF_close(NC_FILE_INFO_T* file);
-
+    
 extern int NCZF_readattrs(NC_FILE_INFO_T* file, NC_OBJ* container); /* Support lazy read */
 
 extern int NCZF_codec2hdf(const NC_FILE_INFO_T* file, const NC_VAR_INFO_T* var, const NCjson* jfilter, NCZ_Filter* filter, struct NCZ_Plugin* plugin);
 extern int NCZF_hdf2codec(const NC_FILE_INFO_T* file, const NC_VAR_INFO_T* var, NCZ_Filter* filter);
+
+extern int NCZF_buildchunkkey(const NC_FILE_INFO_T* file, size_t rank, const size64_t* chunkindices, char dimsep, char** keyp);
 
 /* Define known dispatch tables and initializers */
 /* Each handles a specific NCZarr format + Pure Zarr */

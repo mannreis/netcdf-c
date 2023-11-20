@@ -51,10 +51,10 @@ Note also that if we read a pure zarr file we will probably always
 see "|S1", so we will never see a variable of type NC_CHAR.
 We might however see an attribute of type string.
 */
-static const struct ZTYPES {
-    char* zarr[3];
-    char* nczarr[3];
-} znames[NUM_ATOMIC_TYPES] = {
+static const struct ZTYPESV2 {
+    const char* zarr[3];
+    const char* nczarr[3];
+} znamesv2[NUM_ATOMIC_TYPES] = {
 /* nc_type          Pure Zarr          NCZarr
                    NE   LE     BE       NE    LE    BE*/
 /*NC_NAT*/	{{NULL,NULL,NULL},   {NULL,NULL,NULL}},
@@ -71,24 +71,6 @@ static const struct ZTYPES {
 /*NC_UINT64*/	{{"|u8","<u8",">u8"},{"|u8","<u8",">u8"}},
 /*NC_STRING*/	{{"|S%d","|S%d","|S%d"},{"|S%d","|S%d","|S%d"}},
 };
-
-#if 0
-static const char* zfillvalue[NUM_ATOMIC_TYPES] = {
-NULL, /*NC_NAT*/
-"-127", /*NC_BYTE*/
-"0", /*NC_CHAR*/
-"-32767", /*NC_SHORT*/
-"-2147483647", /*NC_INT*/
-"9.9692099683868690e+36f", /* near 15 * 2^119 */ /*NC_FLOAT*/
-"9.9692099683868690e+36", /*NC_DOUBLE*/
-"255", /*NC_UBYTE*/
-"65535", /*NC_USHORT*/
-"4294967295", /*NC_UINT*/
-"-9223372036854775806", /*NC_INT64*/
-"18446744073709551614", /*NC_UINT64*/
-"", /*NC_STRING*/
-};
-#endif
 
 /* map nc_type -> NCJ_SORT */
 static int zjsonsort[NUM_ATOMIC_TYPES] = {
@@ -107,7 +89,39 @@ NCJ_INT, /*NC_UINT64*/
 NCJ_STRING, /*NC_STRING*/
 };
 
+static const struct ZTYPESV3 {
+    const char* zarr;
+    const char* nczarr;
+} znamesv3[NUM_ATOMIC_TYPES] = {
+/* nc_type      Pure Zarr	NCZarr */
+/*NC_NAT*/	{NULL,		NULL},
+/*NC_BYTE*/	{"int8",	"int8"},
+/*NC_CHAR*/	{"uint8",	"uint8"},
+/*NC_SHORT*/	{"int16",	"int16"},
+/*NC_INT*/	{"int32",	"int32"},
+/*NC_FLOAT*/	{"float32",	"float32"},
+/*NC_DOUBLE*/	{"float64",	"float64"},
+/*NC_UBYTE*/	{"uint8",	"uint8"},
+/*NC_USHORT*/	{"uint16",	"uint16"},
+/*NC_UINT*/	{"uint32",	"uint32"},
+/*NC_INT64*/	{"int64",	"int64"},
+/*NC_UINT64*/	{"uint64",	"uint64"},
+/*NC_STRING*/	{"r%u",		"r%u"},
+};
+
+/* Map dtypes to nctype */
+/* Keep sorted for binary search */
+static struct ZDTYPEV3 {
+    const char* dtype;
+    nc_type nctype;
+    size_t nctypelen;
+} zdtypesv3[NUM_ATOMIC_TYPES];
+static int zdtypesv3n = 0;
+static int zdtypesinitialized=0;
+
 /* Forward */
+static void znamesv3init(void);
+static int splitfqn(const char* fqn0, NClist* segments);
 
 /**************************************************/
 
@@ -508,20 +522,8 @@ done:
     return stat;
 }
 
-#if 0
-/* Convert a netcdf-4 type integer */
-int
-ncz_nctypedecode(const char* snctype, nc_type* nctypep)
-{
-    unsigned nctype = 0;
-    if(sscanf(snctype,"%u",&nctype)!=1) return NC_EINVAL;
-    if(nctypep) *nctypep = nctype;
-    return NC_NOERR;
-}
-#endif
-
 /**
-@internal Given an nc_type+other, produce the corresponding dtype string.
+@internal Given an nc_type+other, produce the corresponding Zarr v2 dtype string.
 @param nctype     - [in] nc_type
 @param endianness - [in] endianness
 @param purezarr   - [in] 1=>pure zarr, 0 => nczarr
@@ -533,23 +535,23 @@ ncz_nctypedecode(const char* snctype, nc_type* nctypep)
 */
 
 int
-ncz_nctype2dtype(nc_type nctype, int endianness, int purezarr, int len, char** dnamep)
+ncz2_nctype2dtype(nc_type nctype, int endianness, int purezarr, int len, char** dnamep)
 {
     char dname[64];
-    char* format = NULL;
+    const char* format = NULL;
 
     if(nctype <= NC_NAT || nctype > NC_MAX_ATOMIC_TYPE) return NC_EINVAL;
     if(purezarr)
-        format = znames[nctype].zarr[endianness];
+        format = znamesv2[nctype].zarr[endianness];
     else
-        format = znames[nctype].nczarr[endianness];
+        format = znamesv2[nctype].nczarr[endianness];
     snprintf(dname,sizeof(dname),format,len);
     if(dnamep) *dnamep = strdup(dname);
     return NC_NOERR;		
 }
 
 /*
-@internal Convert a numcodecs dtype spec to a corresponding nc_type.
+@internal Convert a numcodecs Zarr v2 dtype spec to a corresponding nc_type.
 @param nctype   - [in] dtype the dtype to convert
 @param nctype   - [in] typehint help disambiguate char vs string
 @param purezarr - [in] 1=>pure zarr, 0 => nczarr
@@ -562,7 +564,7 @@ ncz_nctype2dtype(nc_type nctype, int endianness, int purezarr, int len, char** d
 */
 
 int
-ncz_dtype2nctype(const char* dtype, nc_type typehint, int purezarr, nc_type* nctypep, int* endianp, int* typelenp)
+ncz2_dtype2nctype(const char* dtype, nc_type typehint, int purezarr, nc_type* nctypep, int* endianp, int* typelenp)
 {
     int stat = NC_NOERR;
     int typelen = 0;
@@ -655,6 +657,114 @@ done:
 zerr:
     stat = NC_ENCZARR;
     goto done;
+}
+
+/**
+@internal Given an nc_type+other, produce the corresponding Zarr v3 dtype string.
+@param nctype     - [in] nc_type
+@param purezarr   - [in] 1=>pure zarr, 0 => nczarr
+@param strlen     - [in] max string length
+@param namep      - [out] pointer to hold pointer to the dtype; user frees
+@return NC_NOERR
+@return NC_EINVAL
+@author Dennis Heimbigner
+*/
+
+int
+ncz3_nctype2dtype(nc_type nctype, int purezarr, int strlen, char** dnamep)
+{
+    char dname[64];
+    const char* format = NULL;
+
+    if(nctype <= NC_NAT || nctype > NC_MAX_ATOMIC_TYPE) return NC_EINVAL;
+    if(purezarr)
+        format = znamesv3[nctype].zarr;
+    else
+        format = znamesv3[nctype].nczarr;
+    snprintf(dname,sizeof(dname),format,strlen*8);
+    if(dnamep) *dnamep = strdup(dname);
+    return NC_NOERR;		
+}
+
+/*
+@internal Convert a Zarr v3 data_type spec to a corresponding nc_type.
+@param nctype   - [in] data_type the dtype to convert
+@param purezarr - [in] 1=>pure zarr, 0 => nczarr
+@param nctypep  - [out] hold corresponding type
+@param typelenp - [out] hold corresponding type size (for fixed length strings)
+@return NC_NOERR
+@return NC_EINVAL
+@author Dennis Heimbigner
+*/
+
+/* Comparator for search */
+static int
+srchznamesv3(const void* a, const void* b)
+{
+    const char* key = (const char*)a;
+    const struct ZDTYPEV3* elem = (struct ZDTYPEV3*)b;
+    return strcasecmp(key,elem->dtype);
+}
+
+int
+ncz3_dtype2nctype(const char* dtype, int purezarr, nc_type* nctypep, int* typelenp)
+{
+    int stat = NC_NOERR;
+    nc_type nctype = NC_NAT;
+    int typelen = 0;
+    void* match = NULL;
+
+    NC_UNUSED(purezarr);
+
+    if(nctypep) *nctypep = NC_NAT;
+    if(dtype == NULL) goto zerr;
+    if(!zdtypesinitialized) znamesv3init();
+
+    /* Special case for r<n> == string */
+    if(1 == sscanf(dtype,"r%d",&typelen)) {
+	nctype = NC_STRING;	
+	if((typelen % 8) != 0) goto zerr;
+	typelen = typelen / 8; /* convert bits to bytes */
+	goto done;
+    }
+    match = bsearch((void*)dtype,(void*)zdtypesv3,zdtypesv3n,sizeof(struct ZDTYPEV3),srchznamesv3);
+    if(match == NULL) goto zerr;
+    nctype = ((struct ZDTYPEV3*)match)->nctype;
+    typelen = ((struct ZDTYPEV3*)match)->nctypelen;
+
+done:
+    if(nctypep) *nctypep = nctype;
+    if(typelenp) *typelenp = typelen;
+    return stat;
+zerr:
+    stat = NC_ENCZARR;
+    goto done;
+}
+
+/* Comparator for sort */
+static int
+cmpznamesv3(const void* a, const void* b)
+{
+    struct ZDTYPEV3* za = (struct ZDTYPEV3*)a;
+    struct ZDTYPEV3* zb = (struct ZDTYPEV3*)b;
+    return strcasecmp(za->dtype,zb->dtype);
+}
+
+static void
+znamesv3init(void)
+{
+    uintptr_t i,j;
+    struct ZDTYPEV3 zt;
+    memset((void*)zdtypesv3,0,sizeof(zdtypesv3));
+    for(j=0,i=NC_BYTE;i<NC_STRING;i++) {
+	zt.dtype = znamesv3[i].zarr;
+	zt.nctype = i;
+	nc_inq_type(0,i,NULL,&zt.nctypelen);
+	zdtypesv3[j++] = zt;
+    }
+    zdtypesv3n = j;
+    qsort((void*)zdtypesv3,zdtypesv3n,sizeof(struct ZDTYPEV3),cmpznamesv3);
+    zdtypesinitialized = 1;
 }
 
 /* Infer the attribute's type based
@@ -1114,3 +1224,193 @@ NCZ_iscomplexjson(NCjson* json, nc_type typehint)
 done:
     return stat;
 }
+
+/* Caller must free return value */
+int
+NCZ_makeFQN(NC_GRP_INFO_T* parent, NC_OBJ* object, NCbytes* fqn)
+{
+    int i, stat = NC_NOERR;
+    NClist* segments = nclistnew();
+    NC_GRP_INFO_T* grp = NULL;
+    char* escaped = NULL;
+
+    /* Add in the object name */
+    if((escaped = NCZ_backslashescape(object->name))==NULL) goto done;
+    nclistpush(segments,escaped);
+    escaped = NULL;
+
+    /* Collect the group prefix segments (escaped) */
+    for(grp=parent;grp->parent!=NULL;grp=grp->parent) {
+	/* Add in the group name */
+	if((escaped = NCZ_backslashescape(grp->hdr.name))==NULL) goto done;
+        nclistpush(segments,escaped);
+	escaped = NULL;
+    }
+    
+    /* Create the the fqn */
+    for(i=(nclistlength(segments)-1);i>=0;i--) {
+	ncbytescat(fqn,"/");
+	ncbytescat(fqn,nclistget(segments,i));
+    }
+
+done:
+    nclistfreeall(segments);
+    nullfree(escaped);
+    return THROW(stat);
+}
+
+/* Find an object matching the given name and of given sort */
+int
+NCZ_locateFQN(NC_GRP_INFO_T* parent, const char* fqn, NC_SORT sort, NC_OBJ** objectp)
+{
+    int i,ret = NC_NOERR;
+    NC_GRP_INFO_T* grp = NULL;
+    NC_OBJ* object = NULL;
+    NClist* segments = nclistnew();
+    size_t count = 0;
+
+    assert(fqn != NULL && fqn[0] == '/');
+    /* Step 1: Break fqn into segments at occurrences of '/' */
+    if((ret = splitfqn(fqn,segments))) goto done;
+    count = nclistlength(segments);
+
+    /* walk to convert to groups + 1 left over for the final object*/
+    grp = parent;
+    for(i=0;i<count-1;i++){
+	const char* segment = (const char*)nclistget(segments,i);
+	NC_OBJ* object = NULL;
+	/* Walk the group prefixes */
+	object = ncindexlookup(grp->children,segment);
+	if(object == NULL || object->sort != NCGRP) {ret = NC_ENOOBJECT; goto done;}
+	grp = (NC_GRP_INFO_T*)object; object = NULL;
+    }
+    /* Find an object to match the sort and last segment */
+    do {
+	const char* segment = (const char*)nclistget(segments,count-1); /* last segment */
+        object = ncindexlookup(grp->children,segment);
+        if(object != NULL && (sort == NCNAT || sort == NCGRP)) break; /* not this */
+        object = ncindexlookup(grp->dim,segment);
+        if(object != NULL && (sort == NCNAT || sort == NCDIM)) break; /* not this */
+        object = ncindexlookup(grp->vars,segment);
+        if(object != NULL && (sort == NCNAT || sort == NCVAR)) break; /* not this */
+	object = ncindexlookup(grp->type,segment);
+        if(object != NULL && (sort == NCNAT || sort == NCTYP)) break; /* not this */
+	object = ncindexlookup(grp->att,segment);
+        if(object != NULL && (sort == NCNAT || sort == NCATT)) break; /* not this */
+	object = NULL; /* not found */
+    } while(0);
+    if(object == NULL) {ret = NC_ENOOBJECT; goto done;}
+    if(objectp) *objectp = object;
+done:
+    nclistfreeall(segments);
+    return THROW(ret);
+}
+
+static int
+splitfqn(const char* fqn0, NClist* segments)
+{
+    int i,stat = NC_NOERR;
+    char* fqn = NULL;
+    char* p = NULL;
+    char* start = NULL;
+    int count = 0;
+
+    assert(fqn0 != NULL && fqn0[0] == '/');
+    fqn = strdup(fqn0);
+    start = fqn+1; /* leave off the leading '/' */
+    count = 0;
+    /* Break fqn into pieces at occurrences of '/' */
+    for(p=start;*p;) {
+	switch(*p) {
+	case '\\':
+	    p+=2;
+	    break;
+	case '/': /*capture the piece name */
+	    *p++ = '\0';
+	    start = p; /* mark start of the next part */
+	    count++;
+	    break;
+	default: /* ordinary char */
+	    p++;
+	    break;
+	}
+    }
+    /* collect segments */
+    p = fqn+1;
+    for(i=0;i<count;i++){
+	char* descaped = NCZ_deescape(p);
+	nclistpush(segments,descaped);
+    }
+    return stat;
+}
+
+char*
+NCZ_backslashescape(const char* s)
+{
+    const char* p;
+    char* q;
+    size_t len;
+    char* escaped = NULL;
+
+    len = strlen(s);
+    escaped = (char*)malloc(1+(2*len)); /* max is everychar is escaped */
+    if(escaped == NULL) return NULL;
+    for(p=s,q=escaped;*p;p++) {
+        char c = *p;
+        switch (c) {
+	case '\\':
+	case '/':
+	case '.':
+	case '@':
+	    *q++ = '\\'; *q++ = '\\';
+	    break;
+	default: *q++ = c; break;
+        }
+    }
+    *q = '\0';
+    return escaped;
+}
+
+char*
+NCZ_deescape(const char* esc)
+{
+    size_t len;
+    char* s;
+    const char* p;
+    char* q;
+
+    if(esc == NULL) return NULL;
+    len = strlen(esc);
+    s = (char*)malloc(len+1);
+    if(s == NULL) return NULL;
+    for(p=esc,q=s;*p;) {
+	switch (*p) {
+	case '\\':
+	     p++;
+	     /* fall thru */
+	default: *q++ = *p++; break;
+	}
+    }
+    *q = '\0';
+    return s;
+}
+
+/* Define a static qsort comparator for strings for use with qsort */
+static int
+cmp_strings(const void* a1, const void* a2)
+{
+    const char** s1 = (const char**)a1;
+    const char** s2 = (const char**)a2;
+    return strcmp(*s1,*s2);
+}
+
+int
+NCZ_sort(void* vec, size_t count, int (*compare)(const void*, const void*))
+{
+    if(compare == NULL) compare = cmp_strings; /* default comparator */
+    if(vec != NULL && count > 0) {
+        qsort(vec, count, sizeof(void*), compare);
+    }
+    return NC_NOERR;
+}
+

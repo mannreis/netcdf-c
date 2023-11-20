@@ -29,7 +29,7 @@ and do the command:
 #define OPTEXPORT static
 #else
 #define OPTEXPORT DLLEXPORT
-#endif /*NETCDF_JSON_H*/
+#endif
 
 /**************************************************/
 /* Json object sorts (note use of term sort rather than e.g. type or discriminant) */
@@ -114,6 +114,9 @@ OPTEXPORT int NCJinsert(NCjson* object, const char* key, NCjson* jvalue);
 /* Insert key-value pair into a dict object. key and value will be copied */
 OPTEXPORT int NCJinsertstring(NCjson* object, const char* key, const char* value);
 
+/* Insert key-value pair into a dict object. key and value will be copied */
+OPTEXPORT int NCJinsertint(NCjson* object, const char* key, int n);
+
 /* Unparser to convert NCjson object to text in buffer */
 OPTEXPORT int NCJunparse(const NCjson* json, unsigned flags, char** textp);
 
@@ -149,5 +152,4 @@ OPTEXPORT const char* NCJtotext(const NCjson* json, unsigned flags);
 
 /**************************************************/
 
-#endif /*NCJSON_H*/
-
+#endif /*!NCJSON_H!*/ /* Leave the ! as a tag for sed */

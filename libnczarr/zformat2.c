@@ -14,10 +14,15 @@
 /*Forward*/
 static int ZF2_create(NC_FILE_INFO_T* file, NCURI* uri, NCZMAP* map);
 static int ZF2_open(NC_FILE_INFO_T* file, NCURI* uri, NCZMAP* map);
+static int ZF2_close(NC_FILE_INFO_T* file);
 static int ZF2_writemeta(NC_FILE_INFO_T* file);
 static int ZF2_readmeta(NC_FILE_INFO_T* file);
 static int ZF2_readattrs(NC_FILE_INFO_T* file, NC_OBJ* container);
-static int ZF2_close(NC_FILE_INFO_T* file);
+static int ZF2_buildchunkkey(size_t rank, const size64_t* chunkindices, char dimsep, char** keyp);
+#ifdef ENABLE_NCZARR_FILTERS
+static int ZF2_hdf2codec(const NC_FILE_INFO_T* file, const NC_VAR_INFO_T* var, NCZ_Filter* filter);
+static int ZF2_codec2hdf(const NC_FILE_INFO_T* file, const NC_VAR_INFO_T* var, const NCjson* jfilter, NCZ_Filter* filter, NCZ_Plugin* plugin);
+#endif
 
 static int write_grp(NC_FILE_INFO_T* file, NCZ_FILE_INFO_T* zfile, NCZMAP* map, NC_GRP_INFO_T* grp);
 static int write_var_meta(NC_FILE_INFO_T* file, NCZ_FILE_INFO_T* zfile, NCZMAP* map, NC_VAR_INFO_T* var);
@@ -147,7 +152,7 @@ write_grp(NC_FILE_INFO_T* file, NCZ_FILE_INFO_T* zfile, NCZMAP* map, NC_GRP_INFO
 
     ZTRACE(3,"file=%s grp=%s isclose=%d",file->controller->path,grp->hdr.name,isclose);
 
-    purezarr = (zfile->controls.flags & FLAG_PUREZARR)?1:0;
+    purezarr = (zfile->flags & FLAG_PUREZARR)?1:0;
 
     /* Construct grp key */
     if((stat = NCZ_grpkey(grp,&fullpath)))
@@ -288,7 +293,7 @@ write_var_meta(NC_FILE_INFO_T* file, NCZ_FILE_INFO_T* zfile, NCZMAP* map, NC_VAR
     zfile = file->format_file_info;
     map = zfile->map;
 
-    purezarr = (zfile->controls.flags & FLAG_PUREZARR)?1:0;
+    purezarr = (zfile->flags & FLAG_PUREZARR)?1:0;
 
     /* Make sure that everything is established */
     /* ensure the fill value */
@@ -345,7 +350,7 @@ write_var_meta(NC_FILE_INFO_T* file, NCZ_FILE_INFO_T* zfile, NCZMAP* map, NC_VAR
 	int endianness = var->type_info->endianness;
 	int atomictype = var->type_info->hdr.id;
 	assert(atomictype > 0 && atomictype <= NC_MAX_ATOMIC_TYPE);
-	if((stat = ncz_nctype2dtype(atomictype,endianness,purezarr,NCZ_get_maxstrlen((NC_OBJ*)var),&dtypename))) goto done;
+	if((stat = ncz2_nctype2dtype(atomictype,endianness,purezarr,NCZ_get_maxstrlen((NC_OBJ*)var),&dtypename))) goto done;
 	if((stat = NCJaddstring(jvar,NCJ_STRING,dtypename))) goto done;
 	nullfree(dtypename); dtypename = NULL;
     }
@@ -595,9 +600,9 @@ write_atts(NC_FILE_INFO_T* file, NCZ_FILE_INFO_T* zfile, NCZMAP* map, NC_OBJ* co
         grp = (NC_GRP_INFO_T*)container;
     }
 
-    purezarr = (zfile->controls.flags & FLAG_PUREZARR)?1:0;
+    purezarr = (zfile->flags & FLAG_PUREZARR)?1:0;
 
-    if(zfile->controls.flags & FLAG_XARRAYDIMS) isxarray = 1;
+    if(zfile->flags & FLAG_XARRAYDIMS) isxarray = 1;
 
     /* Create the attribute dictionary */
     if((stat = NCJnew(NCJ_DICT,&jatts))) goto done;
@@ -628,7 +633,7 @@ write_atts(NC_FILE_INFO_T* file, NCZ_FILE_INFO_T* zfile, NCZMAP* map, NC_OBJ* co
 
 	    /* Collect the corresponding dtype */
 	    {
-	        if((stat = ncz_nctype2dtype(a->nc_typeid,endianness,purezarr,typesize,&tname))) goto done;
+	        if((stat = ncz2_nctype2dtype(a->nc_typeid,endianness,purezarr,typesize,&tname))) goto done;
   	        if((stat = NCJnewstring(NCJ_STRING,tname,&jtype))) goto done;
 	        nullfree(tname); tname = NULL;
 	        if((stat = NCJinsert(jtypes,a->hdr.name,jtype))) goto done; /* add {name: type} */
@@ -770,7 +775,7 @@ ZF2_readmeta(NC_FILE_INFO_T* file)
     zfile = file->format_file_info;
     map = zfile->map;
 
-    purezarr = (zfile->controls.flags & FLAG_PUREZARR);
+    purezarr = (zfile->flags & FLAG_PUREZARR);
 
     /* Ok, try to read superblock */
     switch(stat = read_superblock(file,&nczarr_format)) {
@@ -829,7 +834,7 @@ ZF2_readattrs(NC_FILE_INFO_T* file, NC_OBJ* container)
     zinfo = file->format_file_info;
     map = zinfo->map;
 
-    purezarr = (zinfo->controls.flags & FLAG_PUREZARR)?1:0;
+    purezarr = (zinfo->flags & FLAG_PUREZARR)?1:0;
  
     if(container->sort == NCGRP) {	
 	grp = ((NC_GRP_INFO_T*)container);
@@ -872,7 +877,7 @@ ZF2_readattrs(NC_FILE_INFO_T* file, NC_OBJ* container)
 		/* case 1: name = _NCProperties, grp=root, varid==NC_GLOBAL */
 		if(strcmp(aname,NCPROPS)==0 && grp != NULL && file->root_grp == grp) {
 		    /* Setup provenance */
-		    if(NCJsort(value) != NCJ_STRING)
+		    if(!NCJisatomic(value))
 			{stat = (THROW(NC_ENCZARR)); goto done;} /*malformed*/
 		    if((stat = NCZ_read_provenance(file,aname,NCJstring(value))))
 			goto done;
@@ -886,7 +891,7 @@ ZF2_readattrs(NC_FILE_INFO_T* file, NC_OBJ* container)
 		        {stat = NC_ENOMEM; goto done;}
 		    for(i=0;i<NCJlength(value);i++) {
 			const NCjson* k = NCJith(value,i);
-			assert(k != NULL && NCJsort(k) == NCJ_STRING);
+			assert(k != NULL && NCJisatomic(k));
 			nclistpush(zvar->xarray,strdup(NCJstring(k)));
 		    }
 		}
@@ -969,7 +974,7 @@ read_superblock(NC_FILE_INFO_T* file, int* nczarrvp)
     switch(stat = NCZ_downloadjson(zfile->map, Z2METAROOT, &jblock)) {
     case NC_EEMPTY: /* not there */
         nczarr_format = NCZARRFORMAT0; /* apparently pure zarr */	    
-	zfile->controls.flags |= FLAG_PUREZARR;
+	zfile->flags |= FLAG_PUREZARR;
 	stat = NC_NOERR; /* reset */
 	goto done;
     case NC_NOERR:
@@ -1019,7 +1024,7 @@ read_grp(NC_FILE_INFO_T* file, NCZ_FILE_INFO_T* zfile, NCZMAP* map, NC_GRP_INFO_
 
     ZTRACE(3,"file=%s grp=%s",file->controller->path,grp->hdr.name);
     
-    purezarr = (zfile->controls.flags & FLAG_PUREZARR);
+    purezarr = (zfile->flags & FLAG_PUREZARR);
 
     /* Construct grp path */
     if((stat = NCZ_grpkey(grp,&fullpath)))
@@ -1124,7 +1129,7 @@ read_vars(NC_FILE_INFO_T* file, NCZ_FILE_INFO_T* zfile, NCZMAP* map, NC_GRP_INFO
 
     ZTRACE(3,"file=%s grp=%s |varnames|=%u",file->controller->path,grp->hdr.name,nclistlength(varnames));
 
-    if(zfile->controls.flags & FLAG_PUREZARR) purezarr = 1;
+    if(zfile->flags & FLAG_PUREZARR) purezarr = 1;
 
     /* Load each var in turn */
     for(i = 0; i < nclistlength(varnames); i++) {
@@ -1198,7 +1203,7 @@ read_vars(NC_FILE_INFO_T* file, NCZ_FILE_INFO_T* zfile, NCZMAP* map, NC_GRP_INFO
 	    int endianness;
 	    if((stat = NCJdictget(jvar,"dtype",&jvalue))) goto done;
 	    /* Convert dtype to nc_type + endianness */
-	    if((stat = ncz_dtype2nctype(NCJstring(jvalue),NC_NAT,purezarr,&vtype,&endianness,&vtypelen)))
+	    if((stat = ncz2_dtype2nctype(NCJstring(jvalue),NC_NAT,purezarr,&vtype,&endianness,&vtypelen)))
 		goto done;
 	    if(vtype > NC_NAT && vtype <= NC_MAX_ATOMIC_TYPE) {
 		/* Locate the NC_TYPE_INFO_T object */
@@ -1246,7 +1251,7 @@ read_vars(NC_FILE_INFO_T* file, NCZ_FILE_INFO_T* zfile, NCZMAP* map, NC_GRP_INFO
 		    rank = NCJlength(jdimrefs);
 		    for(j=0;j<rank;j++) {
 		        const NCjson* dimpath = NCJith(jdimrefs,j);
-		        assert(NCJsort(dimpath) == NCJ_STRING);
+		        assert(NCJisatomic(dimpath));
 		        nclistpush(dimnames,strdup(NCJstring(dimpath)));
 		    }
 		}
@@ -1268,7 +1273,7 @@ read_vars(NC_FILE_INFO_T* file, NCZ_FILE_INFO_T* zfile, NCZMAP* map, NC_GRP_INFO
 	    if((stat = NCJdictget(jvar,"dimension_separator",&jvalue))) goto done;
 	    if(jvalue != NULL) {
 	        /* Verify its value */
-		if(NCJsort(jvalue) == NCJ_STRING && NCJstring(jvalue) != NULL && strlen(NCJstring(jvalue)) == 1)
+		if(NCJisatomic(jvalue) && NCJstring(jvalue) != NULL && strlen(NCJstring(jvalue)) == 1)
 		   zvar->dimension_separator = NCJstring(jvalue)[0];
 	    }
 	    /* If value is invalid, then use global default */
@@ -1764,7 +1769,7 @@ NCZ_read_atts(NC_FILE_INFO_T* file, NCZ_FILE_INFO_T* zfile, NCZMAP* map, NC_OBJ*
     zfile = file->format_file_info;
     map = zfile->map;
 
-    purezarr = (zfile->controls.flags & FLAG_PUREZARR)?1:0;
+    purezarr = (zfile->flags & FLAG_PUREZARR)?1:0;
  
     if(container->sort == NCGRP) {	
 	grp = ((NC_GRP_INFO_T*)container);
@@ -1807,7 +1812,7 @@ NCZ_read_atts(NC_FILE_INFO_T* file, NCZ_FILE_INFO_T* zfile, NCZMAP* map, NC_OBJ*
 		/* case 1: name = _NCProperties, grp=root, varid==NC_GLOBAL */
 		if(strcmp(aname,NCPROPS)==0 && grp != NULL && file->root_grp == grp) {
 		    /* Setup provenance */
-		    if(NCJsort(value) != NCJ_STRING)
+		    if(!NCJisatomic(value))
 			{stat = (THROW(NC_ENCZARR)); goto done;} /*malformed*/
 		    if((stat = NCZ_read_provenance(file,aname,NCJstring(value))))
 			goto done;
@@ -1821,7 +1826,7 @@ NCZ_read_atts(NC_FILE_INFO_T* file, NCZ_FILE_INFO_T* zfile, NCZMAP* map, NC_OBJ*
 		        {stat = NC_ENOMEM; goto done;}
 		    for(i=0;i<NCJlength(value);i++) {
 			const NCjson* k = NCJith(value,i);
-			assert(k != NULL && NCJsort(k) == NCJ_STRING);
+			assert(k != NULL && NCJisatomic(k));
 			nclistpush(zvar->xarray,strdup(NCJstring(k)));
 		    }
 		}
@@ -1987,7 +1992,7 @@ NCZ_computeattrinfo(const char* name, NClist* atypes, nc_type typehint, int pure
 	const char* aname = nclistget(atypes,i);
 	if(strcmp(aname,name)==0) {
 	    const char* atype = nclistget(atypes,i+1);
-	    if((stat = ncz_dtype2nctype(atype,typehint,purezarr,&typeid,NULL,NULL))) goto done;
+	    if((stat = ncz2_dtype2nctype(atype,typehint,purezarr,&typeid,NULL,NULL))) goto done;
 	    break;
 	}
     }
@@ -2075,8 +2080,8 @@ NCZ_computedimrefs(NC_FILE_INFO_T* file, NCZ_FILE_INFO_T* zfile, NCZMAP* map, NC
     ZTRACE(3,"file=%s var=%s purezarr=%d xarray=%d ndims=%d shape=%s",
     	file->controller->path,var->hdr.name,purezarr,xarray,(int)ndims,nczprint_vector(ndims,shapes));
 
-    if(zfile->controls.flags & FLAG_PUREZARR) purezarr = 1;
-    if(zfile->controls.flags & FLAG_XARRAYDIMS) xarray = 1;
+    if(zfile->flags & FLAG_PUREZARR) purezarr = 1;
+    if(zfile->flags & FLAG_XARRAYDIMS) xarray = 1;
 
     if(purezarr && xarray) {/* Read in the attributes to get xarray dimdef attribute; Note that it might not exist */
 	/* Note that if xarray && !purezarr, then xarray will be superceded by the nczarr dimensions key */
@@ -2248,8 +2253,8 @@ NCZ_jtypes2atypes(NCjson* jtypes, NClist* atypes)
     for(i=0;i<NCJlength(jtypes);i+=2) {
 	const NCjson* key = NCJith(jtypes,i);
 	const NCjson* value = NCJith(jtypes,i+1);
-	if(NCJsort(key) != NCJ_STRING) {stat = (THROW(NC_ENCZARR)); goto done;}
-	if(NCJsort(value) != NCJ_STRING) {stat = (THROW(NC_ENCZARR)); goto done;}
+	if(!NCJisatomic(key)) {stat = (THROW(NC_ENCZARR)); goto done;}
+	if(!NCJisatomic(value)) {stat = (THROW(NC_ENCZARR)); goto done;}
 	nclistpush(atypes,strdup(NCJstring(key)));
 	nclistpush(atypes,strdup(NCJstring(value)));
     }
@@ -2329,6 +2334,31 @@ done:
     return stat;
 }
 
+static int
+ZF2_buildchunkkey(size_t rank, const size64_t* chunkindices, char dimsep, char** keyp)
+{
+    int stat = NC_NOERR;
+    int r;
+    NCbytes* key = ncbytesnew();
+
+    if(keyp) *keyp = NULL;
+
+    assert(islegaldimsep(dimsep));
+    
+    for(r=0;r<rank;r++) {
+	char sindex[64];
+        if(r > 0) ncbytesappend(key,dimsep);
+	/* Print as decimal with no leading zeros */
+	snprintf(sindex,sizeof(sindex),"%lu",(unsigned long)chunkindices[r]);	
+	ncbytescat(key,sindex);
+    }
+    ncbytesnull(key);
+    if(keyp) *keyp = ncbytesextract(key);
+
+    ncbytesfree(key);
+    return THROW(stat);
+}
+
 /**************************************************/
 /* Format Filter Support Functions */
 
@@ -2339,7 +2369,6 @@ int
 ZF2_hdf2codec(const NC_FILE_INFO_T* file, const NC_VAR_INFO_T* var, NCZ_Filter* filter)
 {
     int stat = NC_NOERR;
-    NCZ_codec_env_t env = NCZ_CODEC_ENV_EMPTY_V2;
 
     /* Convert the HDF5 id + visible parameters to the codec form */
 
@@ -2348,7 +2377,7 @@ ZF2_hdf2codec(const NC_FILE_INFO_T* file, const NC_VAR_INFO_T* var, NCZ_Filter* 
     nullfree(filter->codec.codec); filter->codec.codec = NULL;
     filter->codec.id = strdup(filter->plugin->codec.codec->codecid);
     if(filter->plugin->codec.codec->NCZ_hdf5_to_codec) {
-	stat = filter->plugin->codec.codec->NCZ_hdf5_to_codec(&env,filter->hdf5.visible.nparams,filter->hdf5.visible.params,&filter->codec.codec);
+	stat = filter->plugin->codec.codec->NCZ_hdf5_to_codec(NCplistzarrv2,filter->hdf5.id,filter->hdf5.visible.nparams,filter->hdf5.visible.params,&filter->codec.codec);
 #ifdef DEBUGF
 	fprintf(stderr,">>> DEBUGF: NCZ_hdf5_to_codec: visible=%s codec=%s\n",printnczparams(filter->hdf5.visible),filter->codec.codec);
 #endif
@@ -2366,7 +2395,6 @@ ZF2_codec2hdf(const NC_FILE_INFO_T* file, const NC_VAR_INFO_T* var, const NCjson
 {
     int stat = NC_NOERR;
     NCjson* jvalue = NULL;
-    NCZ_codec_env_t env = NCZ_CODEC_ENV_EMPTY_V2;
     
     assert(jfilter != NULL);
     assert(filter != NULL);
@@ -2374,7 +2402,7 @@ ZF2_codec2hdf(const NC_FILE_INFO_T* file, const NC_VAR_INFO_T* var, const NCjson
     if(filter->codec.id == NULL) {
         /* Get the id of this codec filter */
         if(NCJdictget(jfilter,"id",&jvalue)<0) {stat = NC_EFILTER; goto done;}
-        if(NCJsort(jvalue) != NCJ_STRING) {stat = THROW(NC_ENOFILTER); goto done;}
+        if(!NCJisatomic(jvalue)) {stat = THROW(NC_ENOFILTER); goto done;}
         filter->codec.id = strdup(NCJstring(jvalue));
     }
     
@@ -2385,10 +2413,10 @@ ZF2_codec2hdf(const NC_FILE_INFO_T* file, const NC_VAR_INFO_T* var, const NCjson
     
     if(plugin != NULL) {
 	/* Save the hdf5 id */
-	filter->hdf5.id = plugin->codec.codec->hdf5id;
+	filter->hdf5.id = plugin->hdf5.filter->id;
 	/* Convert the codec to hdf5 form visible parameters */
         if(plugin->codec.codec->NCZ_codec_to_hdf5) {
-            stat = plugin->codec.codec->NCZ_codec_to_hdf5(&env,filter->codec.codec,&filter->hdf5.visible.nparams,&filter->hdf5.visible.params);
+            stat = plugin->codec.codec->NCZ_codec_to_hdf5(NCplistzarrv2,filter->codec.codec,&filter->hdf5.id,&filter->hdf5.visible.nparams,&filter->hdf5.visible.params);
 #ifdef DEBUGF
 	    fprintf(stderr,">>> DEBUGF: NCZ_codec_to_hdf5: codec=%s, hdf5=%s\n",printcodec(codec),printhdf5(hdf5));
 #endif
@@ -2411,9 +2439,11 @@ static const NCZ_Formatter NCZ_formatter2_table = {
 
     ZF2_create,
     ZF2_open,
+    ZF2_close,
     ZF2_readmeta,
     ZF2_writemeta,
     ZF2_readattrs,
+    ZF2_buildchunkkey,
 #ifdef ENABLE_NCZARR_FILTERS
     ZF2_codec2hdf,
     ZF2_hdf2codec,
@@ -2421,7 +2451,6 @@ static const NCZ_Formatter NCZ_formatter2_table = {
     NULL,
     NULL,
 #endif
-    ZF2_close
 };
 
 const NCZ_Formatter* NCZ_formatter2 = &NCZ_formatter2_table;

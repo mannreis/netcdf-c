@@ -1,7 +1,5 @@
 #!/bin/sh
 
-set -e
-
 if test "x$srcdir" = x ; then srcdir=`pwd`; fi 
 . ../test_common.sh
 
@@ -45,7 +43,6 @@ testcasezip() {
 }
 
 testcases3() {
-  set -x
   echo -e "\to Running S3 Testcase:\t$1\t$2"
   zext=s3
   base=$1

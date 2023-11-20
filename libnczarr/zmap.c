@@ -182,26 +182,14 @@ nczmap_write(NCZMAP* map, const char* key, size64_t count, const void* content)
     return map->api->write(map, key, count, content);
 }
 
-/* Define a static qsort comparator for strings for use with qsort */
-static int
-cmp_strings(const void* a1, const void* a2)
-{
-    const char** s1 = (const char**)a1;
-    const char** s2 = (const char**)a2;
-    return strcmp(*s1,*s2);
-}
-
 int
 nczmap_search(NCZMAP* map, const char* prefix, NClist* matches)
 {
     int stat = NC_NOERR;
     if((stat = map->api->search(map, prefix, matches)) == NC_NOERR) {
-        /* sort the list */
-        if(nclistlength(matches) > 1) {
-	    void* base = nclistcontents(matches);
-            qsort(base, nclistlength(matches), sizeof(char*), cmp_strings);
-	}
+        if((stat = NCZ_sort(nclistcontents(matches),nclistlength(matches),NULL))) goto done; /* sort the list */
     }
+done:
     return stat;
 }
 
