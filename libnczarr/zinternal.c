@@ -64,11 +64,12 @@ NCZ_initialize_internal(void)
     ngs = NC_getglobalstate();
     if(ngs != NULL) {
         /* Defaults */
-#if DFALTZARRFORMAT == 3
-	ngs->zarr.dimension_separator = DFALT_DIM_SEPARATOR_V3;
-#else
-	ngs->zarr.dimension_separator = DFALT_DIM_SEPARATOR_V2;
-#endif
+	ngs->zarr.default_zarrformat = DFALTZARRFORMAT;
+
+	if(ngs->zarr.default_zarrformat == 3)
+	    ngs->zarr.dimension_separator = DFALT_DIM_SEPARATOR_V3;
+	else
+	    ngs->zarr.dimension_separator = DFALT_DIM_SEPARATOR_V2;
         dimsep = NC_rclookup("ZARR.DIMENSION_SEPARATOR",NULL,NULL);
         if(dimsep != NULL) {
             /* Verify its value */

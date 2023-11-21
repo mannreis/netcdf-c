@@ -322,7 +322,7 @@ typedef struct NC_FILE_INFO
     } mem;
 } NC_FILE_INFO_T;
 
-/* Collect global state info in one place */
+/* Begin to collect global state info in one place (more to do) */
 typedef struct NCglobalstate {
     int initialized;
     char* tempdir; /* track a usable temp dir */
@@ -331,6 +331,7 @@ typedef struct NCglobalstate {
     struct NCRCinfo* rcinfo; /* Currently only one rc file per session */
     struct GlobalZarr { /* Zarr specific parameters */
 	char dimension_separator;
+	int default_zarrformat;
     } zarr;
     struct Alignment { /* H5Pset_alignment parameters */
         int defined; /* 1 => threshold and alignment explicitly set */

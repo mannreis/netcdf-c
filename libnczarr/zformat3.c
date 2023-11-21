@@ -52,7 +52,8 @@ static int NCZ_collect_grps(NC_FILE_INFO_T* file, NC_GRP_INFO_T* parent, NCjson*
 static int NCZ_collect_arrays(NC_FILE_INFO_T* file, NC_GRP_INFO_T* parent, NCjson** jarraysp);
 static int NCZ_collect_dims(NC_FILE_INFO_T* file, NC_GRP_INFO_T* parent, NCjson** jdimsp);
 
-static int NCZ_decodeints(NCjson* jshape, size64_t* shapes);
+static int NCZ_decodesizet64vec(NCjson* jshape, size64_t* shapes);
+static int NCZ_decodesizetvec(NCjson* jshape, size_t* shapes);
 static int NCZ_computeattrinfo(const char* name, NClist* atypes, nc_type typehint, int purezarr, NCjson* values, nc_type* typeidp, size_t* typelenp, size_t* lenp, void** datap);
 static int NCZ_computeattrdata(nc_type typehint, nc_type* typeidp, NCjson* values, size_t* typelenp, size_t* countp, void** datap);
 static int NCZ_computedimrefs(NC_FILE_INFO_T* file, NC_VAR_INFO_T* var, NCjson* jvar, NClist* dimnames, size64_t* shapes, NC_DIM_INFO_T** dims);
@@ -179,8 +180,10 @@ write_grp(NC_FILE_INFO_T* file, NCZ_FILE_INFO_T* zfile, NCZMAP* map, NC_GRP_INFO
         assert(grp->att);
         if((stat = build_atts(file,zfile,(NC_OBJ*)grp, grp->att, &jatts, &jtypes))) goto done;
         if((stat = NCJinsert(jgroup,"attributes",jatts))) goto done;
+	jatts = NULL;
         if(!purezarr && jtypes)
             {if((stat = NCJinsert(jgroup,NCZ_V3_ATTR,jtypes))) goto done;}
+	jtypes = NULL;
     }
 
     if(!purezarr && rootgrp) {
@@ -205,7 +208,6 @@ write_grp(NC_FILE_INFO_T* file, NCZ_FILE_INFO_T* zfile, NCZMAP* map, NC_GRP_INFO
         /* Write to map */
         if((stat=NCZ_uploadjson(map,key,jgroup))) goto done;
         nullfree(key); key = NULL;
-        jgroup = NULL;
     }
 
     /* Now write all the variables */
@@ -1058,7 +1060,6 @@ read_vars(NC_FILE_INFO_T* file, NC_GRP_INFO_T* grp, NClist* varnames)
         char* key = NULL;
 	const char* varname = NULL;
         size64_t* shapes = NULL;
-        size64_t* chunks = NULL;
         NClist* dimnames = NULL;
         int suppress = 0; /* Abort processing of this variable */
         nc_type vtype = NC_NAT;
@@ -1146,7 +1147,7 @@ read_vars(NC_FILE_INFO_T* file, NC_GRP_INFO_T* grp, NClist* varnames)
 	        /* extract the shapes */
 	        if((shapes = (size64_t*)malloc(sizeof(size64_t)*rank)) == NULL)
 	            {stat = (THROW(NC_ENOMEM)); goto done;}
-	        if((stat = NCZ_decodeints(jvalue, shapes))) goto done;
+	        if((stat = NCZ_decodesizet64vec(jvalue, shapes))) goto done;
 	    }
 	    /* Set storage flag */
     	    var->storage = (zvar->scalar?NC_CONTIGUOUS:NC_CHUNKED);
@@ -1259,11 +1260,11 @@ read_vars(NC_FILE_INFO_T* file, NC_GRP_INFO_T* grp, NClist* varnames)
                 if(rank != NCJlength(jtmp2)) {stat = (THROW(NC_ENCZARR)); goto done;}
     
                 /* Get the chunks and chunkproduct */
-                if((chunks = (size64_t*)malloc(sizeof(size64_t)*rank)) == NULL)
+                if((var->chunksizes = (size_t*)malloc(sizeof(size_t)*rank)) == NULL)
                         {stat = (THROW(NC_ENOMEM)); goto done;}
-                if((stat = NCZ_decodeints(jtmp2, chunks))) goto done;
+                if((stat = NCZ_decodesizetvec(jtmp2, var->chunksizes))) goto done;
                 zvar->chunkproduct = 1;
-                for(k=0;k<rank;k++) zvar->chunkproduct *= chunks[i];
+                for(k=0;k<rank;k++) zvar->chunkproduct *= var->chunksizes[i];
                 zvar->chunksize = zvar->chunkproduct * var->type_info->size;
                 /* Create the cache */
                 if((stat = NCZ_create_chunk_cache(var,zvar->chunksize,zvar->dimension_separator,&zvar->cache))) goto done;
@@ -1821,9 +1822,9 @@ subobjects(NCZ_FILE_INFO_T* zfile, NC_GRP_INFO_T* grp, NClist* varnames, NClist*
     return NC_NOERR;
 }
 
-/* Convert a list of integer strings to 64 bit dimension sizes (shapes) */
+/* Convert a list of integer strings to size_t integer */
 static int
-NCZ_decodeints(NCjson* jshape, size64_t* shapes)
+NCZ_decodesizet64vec(NCjson* jshape, size64_t* shapes)
 {
     int i, stat = NC_NOERR;
 
@@ -1834,11 +1835,38 @@ NCZ_decodeints(NCjson* jshape, size64_t* shapes)
 	if((stat = NCZ_json2cvt(jv,&zcvt,&typeid))) goto done;
 	switch (typeid) {
 	case NC_INT64:
-	if(zcvt.int64v < 0) {stat = (THROW(NC_ENCZARR)); goto done;}
-	    shapes[i] = (size64_t)zcvt.int64v;
+	    if(zcvt.int64v < 0) {stat = (THROW(NC_ENCZARR)); goto done;}
+	    shapes[i] = zcvt.int64v;
 	    break;
 	case NC_UINT64:
-	    shapes[i] = (size64_t)zcvt.uint64v;
+	    shapes[i] = zcvt.uint64v;
+	    break;
+	default: {stat = (THROW(NC_ENCZARR)); goto done;}
+	}
+    }
+
+done:
+    return THROW(stat);
+}
+
+/* Convert a list of integer strings to size_t integer */
+static int
+NCZ_decodesizetvec(NCjson* jshape, size_t* shapes)
+{
+    int i, stat = NC_NOERR;
+
+    for(i=0;i<NCJlength(jshape);i++) {
+	struct ZCVT zcvt;
+	nc_type typeid = NC_NAT;
+	NCjson* jv = NCJith(jshape,i);
+	if((stat = NCZ_json2cvt(jv,&zcvt,&typeid))) goto done;
+	switch (typeid) {
+	case NC_INT64:
+	    if(zcvt.int64v < 0) {stat = (THROW(NC_ENCZARR)); goto done;}
+	    shapes[i] = (size_t)zcvt.int64v;
+	    break;
+	case NC_UINT64:
+	    shapes[i] = (size_t)zcvt.uint64v;
 	    break;
 	default: {stat = (THROW(NC_ENCZARR)); goto done;}
 	}

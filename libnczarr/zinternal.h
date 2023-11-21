@@ -34,6 +34,9 @@
 /* Map the NCZarr Format version to a string */
 #define NCZARR_FORMAT_VERSION_TEMPLATE "%d.0.0"
 
+/* The name of the env var for changing default zarr format */
+#define NCZARRDEFAULTFORMAT "NCZARRFORMAT"
+
 /* These have to do with creating chunked datasets in ZARR. */
 #define NCZ_CHUNKSIZE_FACTOR (10)
 #define NCZ_MIN_CHUNK_SIZE (2)

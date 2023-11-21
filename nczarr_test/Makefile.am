@@ -342,6 +342,9 @@ clean-local:
 if ENABLE_S3_TESTALL
 check-local:
 	bash ${abs_top_builddir}/s3cleanup.sh
+
+clean-local:
+	bash ${abs_top_builddir}/s3cleanup.sh
 endif
 
 DISTCLEANFILES = findplugin.sh ${BUILT_SOURCES}
