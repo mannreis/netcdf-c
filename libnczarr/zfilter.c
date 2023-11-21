@@ -737,7 +737,7 @@ NCZ_filter_finalize(void)
 	}
     }
 #else
-    memset(loaded_plugins,0,sizeof(loaded_plugins));
+    memset(plugins.loaded_plugins,0,sizeof(plugins.loaded_plugins));
 #endif
     nclistfree(plugins.default_libs); plugins.default_libs = NULL;
     nclistfree(plugins.codec_defaults); plugins.codec_defaults = NULL;
