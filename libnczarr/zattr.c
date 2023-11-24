@@ -1050,3 +1050,19 @@ done:
     return THROW(stat);
 }
 
+/**
+Find the attributes and attrbute types in json form
+and then create them in the appropriate container.
+@param file
+@param container Group or Variable.
+*/
+
+int
+NCZF_readattrs(NC_FILE_INFO_T* file, NC_OBJ* container)
+{
+    NC_GRP_INFO_T* grp = NULL;
+    NC_VAR_INFO_T* var = NULL;
+
+????            if ((retval = NCZF_readattrs(file, (NC_OBJ*)grp)))
+
+}

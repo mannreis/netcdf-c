@@ -13,7 +13,6 @@ zinfer.c
 zformat.c
 zformat3.c
 zformat2.c
-zformat1.c
 zarr.c
 zattr.c
 zxcache.c

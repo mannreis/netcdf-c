@@ -564,10 +564,10 @@ ncz2_nctype2dtype(nc_type nctype, int endianness, int purezarr, int len, char** 
 */
 
 int
-ncz2_dtype2nctype(const char* dtype, nc_type typehint, int purezarr, nc_type* nctypep, int* endianp, int* typelenp)
+ncz2_dtype2nctype(const char* dtype, nc_type typehint, int purezarr, nc_type* nctypep, int* endianp, size_t* typelenp)
 {
     int stat = NC_NOERR;
-    int typelen = 0;
+    size_t typelen = 0;
     int count;
     char tchar;
     nc_type nctype = NC_NAT;
@@ -588,7 +588,7 @@ ncz2_dtype2nctype(const char* dtype, nc_type typehint, int purezarr, nc_type* nc
     }
     tchar = *p++; /* get the base type */
     /* Decode the type length */
-    count = sscanf(p,"%d%n",&typelen,&n);
+    count = sscanf(p,"%zu%n",&typelen,&n);
     if(count == 0) goto zerr;
     p += n;
 
@@ -707,11 +707,11 @@ srchznamesv3(const void* a, const void* b)
 }
 
 int
-ncz3_dtype2nctype(const char* dtype, int purezarr, nc_type* nctypep, int* typelenp)
+ncz3_dtype2nctype(const char* dtype, int purezarr, nc_type* nctypep, size_t* typelenp)
 {
     int stat = NC_NOERR;
     nc_type nctype = NC_NAT;
-    int typelen = 0;
+    size_t typelen = 0;
     void* match = NULL;
 
     NC_UNUSED(purezarr);
@@ -721,7 +721,7 @@ ncz3_dtype2nctype(const char* dtype, int purezarr, nc_type* nctypep, int* typele
     if(!zdtypesinitialized) znamesv3init();
 
     /* Special case for r<n> == string */
-    if(1 == sscanf(dtype,"r%d",&typelen)) {
+    if(1 == sscanf(dtype,"r%zu",&typelen)) {
 	nctype = NC_STRING;	
 	if((typelen % 8) != 0) goto zerr;
 	typelen = typelen / 8; /* convert bits to bytes */
@@ -1318,7 +1318,7 @@ splitfqn(const char* fqn0, NClist* segments)
     assert(fqn0 != NULL && fqn0[0] == '/');
     fqn = strdup(fqn0);
     start = fqn+1; /* leave off the leading '/' */
-    count = 0;
+    if(strlen(start) > 0) count=1; else count = 0;
     /* Break fqn into pieces at occurrences of '/' */
     for(p=start;*p;) {
 	switch(*p) {
@@ -1341,6 +1341,7 @@ splitfqn(const char* fqn0, NClist* segments)
 	char* descaped = NCZ_deescape(p);
 	nclistpush(segments,descaped);
     }
+    nullfree(fqn);
     return stat;
 }
 

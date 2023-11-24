@@ -108,16 +108,34 @@ Inserted into any .zattrs ? or should it go into the container?
 /*
 Inserted into group zarr.json:
 _nczarr_superblock: {
-<TBD>
+    version: 3.0.0,    
+    format: 3,
+    root: { // the topmost dictionary node represents the root group
+        dimensions: {name: <dimname>, size: <integer>, unlimited: 1|0},
+        arrays: [{name: <name>},...],
+        children: [
+                {name: <name>,
+                dimensions: {name: <dimname>, size: <integer>, unlimited: 1|0},
+                arrays: [{name: <name>},...],
+                children: [{name: <name>, subgrps: [...]},{name: <name>, subgrps: [...]},...]
+                },
+                ...
+        ],
+    }
 },
+
+Optionally Inserted into any group zarr.json:
+"_nczarr_group": "{
+\"attributes\": [{\"name\": \"attr1\", \"configuration\": {\"type\": \"<i4\"}}, ...]
+}"
 
 Inserted into any array zarr.json:
 "_nczarr_array": "{
-\"dimensions\": [\"/g1/g2/d1\", \"/d2\",...]
+\"dimensions\": [\"/g1/g2/d1\", \"/d2\",...],
+\"attributes\": [{\"name\": \"attr1\", \"configuration\": {\"type\": \"<i4\"}}, ...],
 \"storage\": \"scalar\"|\"contiguous\"|\"compact\"|\"chunked\"
-\"attributetypes\": {\"attr1\": \"<i4\", \"attr2\": \"<i1\",...}
 }"
-In v3, the attributes are in a dictionary under the key name "attributes",
+
 }
 */
 
@@ -192,7 +210,7 @@ typedef struct NCZ_FILE_INFO {
     } zarr;
     int creating; /* 1=> created 0=>open */
     int native_endianness; /* NC_ENDIAN_LITTLE | NC_ENDIAN_BIG */
-    int default_maxstrlen; /* default max str size for variables of type string */
+    size_t default_maxstrlen; /* default max str size for variables of type string */
     NClist* urlcontrols; /* controls specified by the file url fragment */
     size64_t flags;
 #		define FLAG_PUREZARR    1
@@ -218,7 +236,11 @@ typedef struct  NCZ_ATT_INFO {
 /* Struct to hold ZARR-specific info for a group. */
 typedef struct NCZ_GRP_INFO {
     NCZcommon common;
-    NCjson* grpsuper; /* Corresponding info from the superblock */
+    NCjson* jsuper; /* Corresponding info from the superblock */
+    /* We need the key for accessing the grp's attributes since
+       they may be in several places depending on the format. */
+    char* attributespath;
+    NCjson* jatts; /* JSON encoding of the attributes */
 } NCZ_GRP_INFO_T;
 
 /* Struct to hold ZARR-specific info for a variable. */
@@ -232,7 +254,9 @@ typedef struct NCZ_VAR_INFO {
     struct NClist* xarray; /* names from _ARRAY_DIMENSIONS */
     char dimension_separator; /* '.' | '/' */
     NClist* incompletefilters;
-    int maxstrlen; /* max length of strings for this variable */
+    size_t maxstrlen; /* max length of strings for this variable */
+    char* varpath; /* Path to the variable */
+    NCjson* jatts; /* JSON encoding of the attributes */
 } NCZ_VAR_INFO_T;
 
 /* Struct to hold ZARR-specific info for a field. */

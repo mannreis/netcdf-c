@@ -338,12 +338,12 @@ clean-local:
 	rm -fr testdir_* testset_*
 	rm -fr tmp_*.nc tmp_*.zarr tst_quantize*.zarr tmp*.file results.file results.s3 results.zip
 	rm -fr rcmiscdir ref_power_901_constants.file 
+if ENABLE_S3_TESTALL
+	bash ${abs_top_builddir}/s3cleanup.sh
+endif
 
 if ENABLE_S3_TESTALL
 check-local:
-	bash ${abs_top_builddir}/s3cleanup.sh
-
-clean-local:
 	bash ${abs_top_builddir}/s3cleanup.sh
 endif
 

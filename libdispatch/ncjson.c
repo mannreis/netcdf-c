@@ -132,7 +132,8 @@ static int bytesappendc(NCJbuf* bufp, const char c);
 OPTSTATIC int
 NCJparse(const char* text, unsigned flags, NCjson** jsonp)
 {
-    return NCJparsen(strlen(text),text,flags,jsonp);
+    size_t textlen = strlen(text);
+    return NCJparsen(textlen,text,flags,jsonp);
 }
 
 OPTSTATIC int

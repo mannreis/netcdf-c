@@ -39,7 +39,7 @@ static int NCZ_decodeints(NCjson* jshape, size64_t* shapes);
 static int NCZ_computeattrinfo(const char* name, NClist* atypes, nc_type typehint, int purezarr, NCjson* values, nc_type* typeidp, size_t* typelenp, size_t* lenp, void** datap);
 static int NCZ_computeattrdata(nc_type typehint, nc_type* typeidp, NCjson* values, size_t* typelenp, size_t* countp, void** datap);
 static int NCZ_computedimrefs(NC_FILE_INFO_T* file, NCZ_FILE_INFO_T* zinfo, NCZMAP* map, NC_VAR_INFO_T* var, int ndims, NClist* dimnames, size64_t* shapes, NC_DIM_INFO_T** dims);
-static int NCZ_load_jatts(NCZMAP* map, NC_OBJ* container, NCjson** jattrsp, NClist** atypesp);
+static int NCZ_load_jatts(NCZMAP* map, NC_OBJ* container, char** attrpath, NCjson** jattrsp, NClist** atypesp);
 static int NCZ_json_convention_read(NCjson* json, NCjson** jtextp);
 static int NCZ_attr_convert(NCjson* src, nc_type typeid, size_t typelen, int* countp, NCbytes* dst);
 static int NCZ_parsedimrefs(NC_FILE_INFO_T* file, NClist* dimnames, size64_t* shape, NC_DIM_INFO_T** dims, int create);
@@ -213,9 +213,9 @@ read_grp(NC_FILE_INFO_T* file, NCZ_FILE_INFO_T* zinfo, NCZMAP* map, NC_GRP_INFO_
     
     purezarr = (zinfo->flags & FLAG_PUREZARR);
 
-    /* Construct grp path */
-    if((stat = NCZ_grpkey(grp,&fullpath)))
-	goto done;
+    /* Construct grp path and stash a copy*/
+    if((stat = NCZ_grpkey(grp,&fullpath))) goto done;
+    zgrp->grppath = strdup(fullpath);
 
     if(purezarr) {
 	if((stat = NCZ_parse_group_content_pure(zinfo,grp,varnames,subgrps)))
@@ -296,6 +296,348 @@ done:
     return ZUNTRACE(THROW(stat));
 }
 
+/**    
+ * @internal Materialize vars into memory;    
+ * Take xarray and purezarr into account.    
+ *    
+ * @param file Pointer to file info struct.    
+ * @param grp Pointer to grp info struct.    
+ * @param varnames List of names of variables in this group    
+ *    
+ * @return ::NC_NOERR No error.    
+ * @author Dennis Heimbigner    
+ */    
+static int    
+read_var1(NC_FILE_INFO_T* file, NCZ_FILE_INFO_T* zfile, NCZMAP* map, NC_GRP_INFO_T* grp, const char* varname)    
+{    
+    int stat = NC_NOERR;    
+    int i,j;    
+    int purezarr = 0;    
+    NC_VAR_INFO_T* var = NULL;    
+    NCZ_VAR_INFO_T* zvar = NULL;    
+    NCjson* jvar = NULL;    
+    NCjson* jncvar = NULL;    
+    NCjson* jdimrefs = NULL;    
+    NCjson* jvalue = NULL;    
+    char* varpath = NULL;    
+    char* key = NULL;    
+    const char* varname = NULL;    
+    size64_t* shapes = NULL;    
+    NClist* dimnames = NULL;    
+    int suppress = 0; /* Abort processing of this variable */    
+    nc_type vtype = NC_NAT;    
+    size_t vtypelen = 0;    
+    int rank = 0;    
+    int zarr_rank = 0; /* Need to watch out for scalars */    
+#ifdef ENABLE_NCZARR_FILTERS    
+    int varsized = 0;    
+    NCjson* jfilter = NULL;    
+    int chainindex = 0;    
+#endif    
+
+    ZTRACE(3,"file=%s grp=%s varname=%s",file->controller->path,grp->hdr.name,varname);    
+
+    if(zfile->flags & FLAG_PUREZARR) purezarr = 1;    
+
+    dimnames = nclistnew();    
+
+    if((stat = nc4_var_list_add2(grp, varname, &var))) goto done;    
+
+    /* And its annotation */    
+    if((zvar = calloc(1,sizeof(NCZ_VAR_INFO_T)))==NULL)    
+        {stat = NC_ENOMEM; goto done;}    
+    var->format_var_info = zvar;    
+    zvar->common.file = file;    
+
+    /* pretend it was created */    
+    var->created = 1;    
+
+    /* Indicate we do not have quantizer yet */    
+    var->quantize_mode = -1;    
+
+    /* Construct var path */    
+    if((stat = NCZ_varkey(var,&varpath)))    
+        goto done;    
+
+    /* Construct the path to the zarray object */    
+    if((stat = nczm_concat(varpath,Z2ARRAY,&key)))    
+        goto done;    
+    /* Download the zarray object */    
+    if((stat=NCZ_readdict(map,key,&jvar)))    
+        goto done;    
+    nullfree(key); key = NULL;    
+    assert(NCJsort(jvar) == NCJ_DICT);    
+
+    /* Extract the .zarray info from jvar */    
+
+    /* Verify the format */    
+    {    
+        int version;    
+        if((stat = NCJdictget(jvar,"zarr_format",&jvalue))) goto done;    
+        sscanf(NCJstring(jvalue),"%d",&version);    
+        if(version != zfile->zarr.zarr_format)    
+            {stat = (THROW(NC_ENCZARR)); goto done;}    
+    }    
+    /* Set the type and endianness of the variable */    
+    {    
+        int endianness;    
+        if((stat = NCJdictget(jvar,"dtype",&jvalue))) goto done;    
+        /* Convert dtype to nc_type + endianness */    
+        if((stat = ncz2_dtype2nctype(NCJstring(jvalue),NC_NAT,purezarr,&vtype,&endianness,&vtypelen)))    
+            goto done;    
+        if(vtype > NC_NAT && vtype <= NC_MAX_ATOMIC_TYPE) {    
+            /* Locate the NC_TYPE_INFO_T object */    
+            if((stat = ncz_gettype(file,grp,vtype,&var->type_info)))    
+                goto done;    
+        } else {stat = NC_EBADTYPE; goto done;}    
+        var->endianness = endianness;    
+        var->type_info->endianness = var->endianness; /* Propagate */    
+        if(vtype == NC_STRING) {    
+            zvar->maxstrlen = vtypelen;    
+            vtypelen = sizeof(char*); /* in-memory len */    
+            if(zvar->maxstrlen <= 0) zvar->maxstrlen = NCZ_get_maxstrlen((NC_OBJ*)var);    
+        }    
+    }    
+
+    if(!purezarr) {    
+        /* Extract the NCZARRAY values */    
+        /* Do this first so we know about storage esp. scalar */    
+        /* Construct the path to the zarray object */    
+        if((stat = nczm_concat(varpath,NCZARRAY,&key)))    
+            goto done;    
+        /* Download the nczarray object */    
+        if((stat=NCZ_readdict(map,key,&jncvar)))    
+            goto done;    
+        nullfree(key); key = NULL;    
+        if(jncvar == NULL) {stat = NC_ENCZARR; goto done;}    
+        assert((NCJsort(jncvar) == NCJ_DICT));    
+        /* Extract scalar flag */    
+        if((stat = NCJdictget(jncvar,"scalar",&jvalue)))    
+            goto done;    
+        if(jvalue != NULL) {    
+            var->storage = NC_CHUNKED;    
+            zvar->scalar = 1;    
+        }    
+        /* Extract storage flag */    
+        if((stat = NCJdictget(jncvar,"storage",&jvalue)))    
+            goto done;    
+        if(jvalue != NULL) {    
+            var->storage = NC_CHUNKED;    
+        }    
+        /* Extract dimrefs list  */    
+        switch ((stat = NCJdictget(jncvar,"dimrefs",&jdimrefs))) {    
+        case NC_NOERR: /* Extract the dimref names */    
+            assert((NCJsort(jdimrefs) == NCJ_ARRAY));    
+            if(zvar->scalar) {    
+                assert(NCJlength(jdimrefs) == 0);                  
+            } else {    
+                rank = NCJlength(jdimrefs);    
+                for(j=0;j<rank;j++) {    
+                    const NCjson* dimpath = NCJith(jdimrefs,j);    
+                    assert(NCJsort(dimpath) == NCJ_STRING);    
+                    nclistpush(dimnames,strdup(NCJstring(dimpath)));    
+                }    
+            }    
+            jdimrefs = NULL; /* avoid double free */    
+            break;    
+        case NC_EEMPTY: /* will simulate it from the shape of the variable */    
+            stat = NC_NOERR;    
+            break;    
+        default: goto done;    
+        }    
+        jdimrefs = NULL;    
+    }    
+
+    /* shape */    
+    {    
+        if((stat = NCJdictget(jvar,"shape",&jvalue))) goto done;    
+        if(NCJsort(jvalue) != NCJ_ARRAY) {stat = (THROW(NC_ENCZARR)); goto done;}    
+
+        /* Process the rank */    
+        zarr_rank = NCJlength(jvalue);    
+        if(zarr_rank == 0) {    
+            /* suppress variable */    
+            ZLOG(NCLOGWARN,"Empty shape for variable %s suppressed",var->hdr.name);    
+            suppress = 1;    
+            goto suppressvar;    
+        }    
+
+        if(zvar->scalar) {    
+            rank = 0;    
+            zarr_rank = 1; /* Zarr does not support scalars */    
+        } else     
+            rank = (zarr_rank = NCJlength(jvalue));    
+
+        if(zarr_rank > 0) {    
+            /* Save the rank of the variable */    
+            if((stat = nc4_var_set_ndims(var, rank))) goto done;    
+            /* extract the shapes */    
+            if((shapes = (size64_t*)malloc(sizeof(size64_t)*zarr_rank)) == NULL)    
+                {stat = (THROW(NC_ENOMEM)); goto done;}    
+            if((stat = NCZ_decodeints(jvalue, shapes))) goto done;    
+        }    
+    }    
+
+    /* Capture dimension_separator (must precede chunk cache creation) */    
+    {    
+        NCglobalstate* ngs = NC_getglobalstate();    
+        assert(ngs != NULL);    
+        zvar->dimension_separator = 0;    
+        if((stat = NCJdictget(jvar,"dimension_separator",&jvalue))) goto done;    
+        if(jvalue != NULL) {    
+            /* Verify its value */    
+            if(NCJisatomic(jvalue) && NCJstring(jvalue) != NULL && strlen(NCJstring(jvalue)) == 1)    
+               zvar->dimension_separator = NCJstring(jvalue)[0];    
+        }    
+        /* If value is invalid, then use global default */    
+        if(!islegaldimsep(zvar->dimension_separator))    
+            zvar->dimension_separator = ngs->zarr.dimension_separator; /* use global value */    
+        assert(islegaldimsep(zvar->dimension_separator)); /* we are hosed */    
+    }    
+
+    /* fill_value; must precede calls to adjust cache */    
+    {    
+        if((stat = NCJdictget(jvar,"fill_value",&jvalue))) goto done;    
+        if(jvalue == NULL || NCJsort(jvalue) == NCJ_NULL)    
+            var->no_fill = 1;    
+        else {    
+            size_t fvlen;    
+            nc_type atypeid = vtype;    
+            var->no_fill = 0;    
+            if((stat = NCZ_computeattrdata(var->type_info->hdr.id, &atypeid, jvalue, NULL, &fvlen, &var->fill_value)))    
+                goto done;    
+            assert(atypeid == vtype);    
+            /* Note that we do not create the _FillValue    
+               attribute here to avoid having to read all    
+               the attributes and thus foiling lazy read.*/    
+        }    
+    }    
+
+    /* chunks */    
+    {    
+        size64_t chunks[NC_MAX_VAR_DIMS];    
+        if((stat = NCJdictget(jvar,"chunks",&jvalue))) goto done;    
+        if(jvalue != NULL && NCJsort(jvalue) != NCJ_ARRAY)    
+            {stat = (THROW(NC_ENCZARR)); goto done;}    
+        /* Verify the rank */    
+        if(zvar->scalar || zarr_rank == 0) {    
+            if(var->ndims != 0)    
+                {stat = (THROW(NC_ENCZARR)); goto done;}    
+            zvar->chunkproduct = 1;    
+            zvar->chunksize = zvar->chunkproduct * var->type_info->size;    
+            /* Create the cache */    
+            if((stat = NCZ_create_chunk_cache(var,var->type_info->size*zvar->chunkproduct,zvar->dimension_separator,&zvar->cache)))    
+                goto done;    
+        } else {/* !zvar->scalar */    
+            if(zarr_rank == 0) {stat = NC_ENCZARR; goto done;}    
+            var->storage = NC_CHUNKED;    
+            if(var->ndims != rank)    
+                {stat = (THROW(NC_ENCZARR)); goto done;}    
+            if((var->chunksizes = malloc(sizeof(size_t)*zarr_rank)) == NULL)    
+                {stat = NC_ENOMEM; goto done;}    
+            if((stat = NCZ_decodeints(jvalue, chunks))) goto done;    
+            /* validate the chunk sizes */    
+            zvar->chunkproduct = 1;    
+            for(j=0;j<rank;j++) {    
+                if(chunks[j] == 0)    
+                    {stat = (THROW(NC_ENCZARR)); goto done;}    
+                var->chunksizes[j] = (size_t)chunks[j];    
+                zvar->chunkproduct *= chunks[j];    
+            }    
+            zvar->chunksize = zvar->chunkproduct * var->type_info->size;    
+            /* Create the cache */    
+            if((stat = NCZ_create_chunk_cache(var,var->type_info->size*zvar->chunkproduct,zvar->dimension_separator,&zvar->cache)))    
+                goto done;    
+        }    
+        if((stat = NCZ_adjust_var_cache(var))) goto done;    
+    }    
+    /* Capture row vs column major; currently, column major not used*/    
+    {    
+        if((stat = NCJdictget(jvar,"order",&jvalue))) goto done;    
+        if(strcmp(NCJstring(jvalue),"C")==1)    
+            ((NCZ_VAR_INFO_T*)var->format_var_info)->order = 1;    
+        else ((NCZ_VAR_INFO_T*)var->format_var_info)->order = 0;    
+    }    
+    /* filters key */    
+    /* From V2 Spec: A list of JSON objects providing codec configurations,    
+       or null if no filters are to be applied. Each codec configuration    
+       object MUST contain a "id" key identifying the codec to be used. */    
+    /* Do filters key before compressor key so final filter chain is in correct order */    
+    {    
+#ifdef ENABLE_NCZARR_FILTERS    
+        if(var->filters == NULL) var->filters = (void*)nclistnew();    
+        if(zvar->incompletefilters == NULL) zvar->incompletefilters = (void*)nclistnew();    
+        chainindex = 0; /* track location of filter in the chain */    
+        if((stat = NCZ_filter_initialize())) goto done;    
+        if((stat = NCJdictget(jvar,"filters",&jvalue))) goto done;    
+        if(jvalue != NULL && NCJsort(jvalue) != NCJ_NULL) {    
+            int k;    
+            if(NCJsort(jvalue) != NCJ_ARRAY) {stat = NC_EFILTER; goto done;}    
+            for(k=0;;k++) {    
+                jfilter = NULL;    
+                jfilter = NCJith(jvalue,k);    
+                if(jfilter == NULL) break; /* done */    
+                if(NCJsort(jfilter) != NCJ_DICT) {stat = NC_EFILTER; goto done;}    
+                if((stat = NCZ_filter_build(file,var,jfilter,chainindex++))) goto done;    
+            }    
+        }    
+#endif    
+    }    
+
+    /* compressor key */    
+    /* From V2 Spec: A JSON object identifying the primary compression codec and providing    
+       configuration parameters, or ``null`` if no compressor is to be used. */    
+#ifdef ENABLE_NCZARR_FILTERS    
+    {     
+        if(var->filters == NULL) var->filters = (void*)nclistnew();    
+        if((stat = NCZ_filter_initialize())) goto done;    
+        if((stat = NCJdictget(jvar,"compressor",&jfilter))) goto done;    
+        if(jfilter != NULL && NCJsort(jfilter) != NCJ_NULL) {    
+            if(NCJsort(jfilter) != NCJ_DICT) {stat = NC_EFILTER; goto done;}    
+            if((stat = NCZ_filter_build(file,var,jfilter,chainindex++))) goto done;    
+        }    
+    }    
+    /* Suppress variable if there are filters and var is not fixed-size */    
+    if(varsized && nclistlength((NClist*)var->filters) > 0)    
+        suppress = 1;    
+#endif    
+    if(zarr_rank > 0) {    
+        if((stat = NCZ_computedimrefs(file, zfile, map, var, rank, dimnames, shapes, var->dim)))    
+            goto done;    
+        if(!zvar->scalar) {    
+            /* Extract the dimids */    
+            for(j=0;j<rank;j++)    
+                var->dimids[j] = var->dim[j]->hdr.id;    
+        }    
+    }    
+
+#ifdef ENABLE_NCZARR_FILTERS    
+    if(!suppress) {    
+        /* At this point, we can finalize the filters */    
+        if((stat = NCZ_filter_setup(var))) goto done;    
+    }    
+#endif    
+
+suppressvar:    
+    if(suppress) {    
+        /* Reclaim NCZarr variable specific info */    
+        (void)NCZ_zclose_var1(var);    
+        /* Remove from list of variables and reclaim the top level var object */    
+        (void)nc4_var_list_del(grp, var);    
+        var = NULL;    
+    }    
+
+done:    
+    /* Clean up */    
+    nclistfreeall(dimnames);
+    nullfree(varpath);
+    nullfree(shapes);
+    nullfree(key); 
+    NCJreclaim(jncvar);
+    NCJreclaim(jvar);
+    return ZUNTRACE(THROW(stat));    
+}    
+
 /**
  * @internal Materialize vars into memory;
  * Take xarray and purezarr into account.
@@ -316,333 +658,13 @@ read_vars(NC_FILE_INFO_T* file, NCZ_FILE_INFO_T* zfile, NCZMAP* map, NC_GRP_INFO
 
     ZTRACE(3,"file=%s grp=%s |varnames|=%u",file->controller->path,grp->hdr.name,nclistlength(varnames));
 
-    if(zfile->flags & FLAG_PUREZARR) purezarr = 1;
 
     /* Load each var in turn */
     for(i = 0; i < nclistlength(varnames); i++) {
-	/* per-variable info */
-        NC_VAR_INFO_T* var = NULL;
-        NCZ_VAR_INFO_T* zvar = NULL;
-        NCjson* jvar = NULL;
-        NCjson* jncvar = NULL;
-        NCjson* jdimrefs = NULL;
-        NCjson* jvalue = NULL;
-        char* varpath = NULL;
-        char* key = NULL;
-	const char* varname = NULL;
-        size64_t* shapes = NULL;
-        NClist* dimnames = NULL;
-        int suppress = 0; /* Abort processing of this variable */
-        nc_type vtype = NC_NAT;
-        int vtypelen = 0;
-        int rank = 0;
-        int zarr_rank = 0; /* Need to watch out for scalars */
-#ifdef ENABLE_NCZARR_FILTERS
-        int varsized = 0;
-        NCjson* jfilter = NULL;
-        int chainindex = 0;
-#endif
-
-	varname = nclistget(varnames,i);
-        dimnames = nclistnew();
-
-	if((stat = nc4_var_list_add2(grp, varname, &var)))
-	    goto done;
-
-	/* And its annotation */
-	if((zvar = calloc(1,sizeof(NCZ_VAR_INFO_T)))==NULL)
-	    {stat = NC_ENOMEM; goto done;}
-	var->format_var_info = zvar;
-	zvar->common.file = file;
-
-        /* pretend it was created */
-	var->created = 1;
-
-	/* Indicate we do not have quantizer yet */
-	var->quantize_mode = -1;
-
-	/* Construct var path */
-	if((stat = NCZ_varkey(var,&varpath)))
-	    goto done;
-
-	/* Construct the path to the zarray object */
-	if((stat = nczm_concat(varpath,Z2ARRAY,&key)))
-	    goto done;
-	/* Download the zarray object */
-	if((stat=NCZ_readdict(map,key,&jvar)))
-	    goto done;
-	nullfree(key); key = NULL;
-	assert(NCJsort(jvar) == NCJ_DICT);
-
-        /* Extract the .zarray info from jvar */
-
-	/* Verify the format */
-	{
-	    int version;
-	    if((stat = NCJdictget(jvar,"zarr_format",&jvalue))) goto done;
-	    sscanf(NCJstring(jvalue),"%d",&version);
-	    if(version != zfile->zarr.zarr_format)
-		{stat = (THROW(NC_ENCZARR)); goto done;}
-	}
-	/* Set the type and endianness of the variable */
-	{
-	    int endianness;
-	    if((stat = NCJdictget(jvar,"dtype",&jvalue))) goto done;
-	    /* Convert dtype to nc_type + endianness */
-	    if((stat = ncz2_dtype2nctype(NCJstring(jvalue),NC_NAT,purezarr,&vtype,&endianness,&vtypelen)))
-		goto done;
-	    if(vtype > NC_NAT && vtype <= NC_MAX_ATOMIC_TYPE) {
-		/* Locate the NC_TYPE_INFO_T object */
-		if((stat = ncz_gettype(file,grp,vtype,&var->type_info)))
-		    goto done;
-	    } else {stat = NC_EBADTYPE; goto done;}
-	    var->endianness = endianness;
-	    var->type_info->endianness = var->endianness; /* Propagate */
-	    if(vtype == NC_STRING) {
-		zvar->maxstrlen = vtypelen;
-		vtypelen = sizeof(char*); /* in-memory len */
-		if(zvar->maxstrlen <= 0) zvar->maxstrlen = NCZ_get_maxstrlen((NC_OBJ*)var);
-	    }
-	}
-
-	if(!purezarr) {
-  	    /* Extract the NCZARRAY values */
-	    /* Do this first so we know about storage esp. scalar */
-	    /* Construct the path to the zarray object */
-	    if((stat = nczm_concat(varpath,NCZARRAY,&key)))
-		goto done;
-	    /* Download the nczarray object */
-	    if((stat=NCZ_readdict(map,key,&jncvar)))
-		goto done;
-	    nullfree(key); key = NULL;
-	    if(jncvar == NULL) {stat = NC_ENCZARR; goto done;}
-   	    assert((NCJsort(jncvar) == NCJ_DICT));
-	    /* Extract scalar flag */
-	    if((stat = NCJdictget(jncvar,"scalar",&jvalue)))
-		goto done;
-	    if(jvalue != NULL) {
-	        var->storage = NC_CHUNKED;
-		zvar->scalar = 1;
-	    }
-	    /* Extract storage flag */
-	    if((stat = NCJdictget(jncvar,"storage",&jvalue)))
-		goto done;
-	    if(jvalue != NULL) {
-		var->storage = NC_CHUNKED;
-	    }
-	    /* Extract dimrefs list  */
-	    switch ((stat = NCJdictget(jncvar,"dimrefs",&jdimrefs))) {
-	    case NC_NOERR: /* Extract the dimref names */
-		assert((NCJsort(jdimrefs) == NCJ_ARRAY));
-		if(zvar->scalar) {
-	   	    assert(NCJlength(jdimrefs) == 0);		   
-		} else {
-		    rank = NCJlength(jdimrefs);
-		    for(j=0;j<rank;j++) {
-		        const NCjson* dimpath = NCJith(jdimrefs,j);
-		        assert(NCJsort(dimpath) == NCJ_STRING);
-		        nclistpush(dimnames,strdup(NCJstring(dimpath)));
-		    }
-		}
-		jdimrefs = NULL; /* avoid double free */
-		break;
-	    case NC_EEMPTY: /* will simulate it from the shape of the variable */
-		stat = NC_NOERR;
-		break;
-	    default: goto done;
-	    }
-	    jdimrefs = NULL;
-	}
-
-	/* shape */
-	{
-	    if((stat = NCJdictget(jvar,"shape",&jvalue))) goto done;
-	    if(NCJsort(jvalue) != NCJ_ARRAY) {stat = (THROW(NC_ENCZARR)); goto done;}
-
-	    /* Process the rank */
-	    zarr_rank = NCJlength(jvalue);
-	    if(zarr_rank == 0) {
-		/* suppress variable */
-		ZLOG(NCLOGWARN,"Empty shape for variable %s suppressed",var->hdr.name);
-		suppress = 1;
-		goto suppressvar;
-	    }
-
-            if(zvar->scalar) {
-	        rank = 0;
-		zarr_rank = 1; /* Zarr does not support scalars */
-	    } else 
-		rank = (zarr_rank = NCJlength(jvalue));
-
-	    if(zarr_rank > 0) {
-	        /* Save the rank of the variable */
-	        if((stat = nc4_var_set_ndims(var, rank))) goto done;
-	        /* extract the shapes */
-	        if((shapes = (size64_t*)malloc(sizeof(size64_t)*zarr_rank)) == NULL)
-	            {stat = (THROW(NC_ENOMEM)); goto done;}
-	        if((stat = NCZ_decodeints(jvalue, shapes))) goto done;
-	    }
-	}
-
-	/* Capture dimension_separator (must precede chunk cache creation) */
-	{
-	    NCglobalstate* ngs = NC_getglobalstate();
-	    assert(ngs != NULL);
-	    zvar->dimension_separator = 0;
-	    if((stat = NCJdictget(jvar,"dimension_separator",&jvalue))) goto done;
-	    if(jvalue != NULL) {
-	        /* Verify its value */
-		if(NCJisatomic(jvalue) && NCJstring(jvalue) != NULL && strlen(NCJstring(jvalue)) == 1)
-		   zvar->dimension_separator = NCJstring(jvalue)[0];
-	    }
-	    /* If value is invalid, then use global default */
-	    if(!islegaldimsep(zvar->dimension_separator))
-	        zvar->dimension_separator = ngs->zarr.dimension_separator; /* use global value */
-	    assert(islegaldimsep(zvar->dimension_separator)); /* we are hosed */
-	}
-
-	/* fill_value; must precede calls to adjust cache */
-	{
-	    if((stat = NCJdictget(jvar,"fill_value",&jvalue))) goto done;
-	    if(jvalue == NULL || NCJsort(jvalue) == NCJ_NULL)
-		var->no_fill = 1;
-	    else {
-		size_t fvlen;
-		nc_type atypeid = vtype;
-		var->no_fill = 0;
-		if((stat = NCZ_computeattrdata(var->type_info->hdr.id, &atypeid, jvalue, NULL, &fvlen, &var->fill_value)))
-		    goto done;
-		assert(atypeid == vtype);
-		/* Note that we do not create the _FillValue
-		   attribute here to avoid having to read all
-		   the attributes and thus foiling lazy read.*/
-	    }
-	}
-
-	/* chunks */
-	{
-	    size64_t chunks[NC_MAX_VAR_DIMS];
-	    if((stat = NCJdictget(jvar,"chunks",&jvalue))) goto done;
-	    if(jvalue != NULL && NCJsort(jvalue) != NCJ_ARRAY)
-		{stat = (THROW(NC_ENCZARR)); goto done;}
-	    /* Verify the rank */
-	    if(zvar->scalar || zarr_rank == 0) {
-		if(var->ndims != 0)
-		    {stat = (THROW(NC_ENCZARR)); goto done;}
-		zvar->chunkproduct = 1;
-		zvar->chunksize = zvar->chunkproduct * var->type_info->size;
-		/* Create the cache */
-		if((stat = NCZ_create_chunk_cache(var,var->type_info->size*zvar->chunkproduct,zvar->dimension_separator,&zvar->cache)))
-		    goto done;
-	    } else {/* !zvar->scalar */
-		if(zarr_rank == 0) {stat = NC_ENCZARR; goto done;}
-		var->storage = NC_CHUNKED;
-		if(var->ndims != rank)
-		    {stat = (THROW(NC_ENCZARR)); goto done;}
-		if((var->chunksizes = malloc(sizeof(size_t)*zarr_rank)) == NULL)
-		    {stat = NC_ENOMEM; goto done;}
-		if((stat = NCZ_decodeints(jvalue, chunks))) goto done;
-		/* validate the chunk sizes */
-		zvar->chunkproduct = 1;
-		for(j=0;j<rank;j++) {
-		    if(chunks[j] == 0)
-			{stat = (THROW(NC_ENCZARR)); goto done;}
-		    var->chunksizes[j] = (size_t)chunks[j];
-		    zvar->chunkproduct *= chunks[j];
-		}
-		zvar->chunksize = zvar->chunkproduct * var->type_info->size;
-		/* Create the cache */
-		if((stat = NCZ_create_chunk_cache(var,var->type_info->size*zvar->chunkproduct,zvar->dimension_separator,&zvar->cache)))
-		    goto done;
-	    }
-    	    if((stat = NCZ_adjust_var_cache(var))) goto done;
-	}
-	/* Capture row vs column major; currently, column major not used*/
-	{
-	    if((stat = NCJdictget(jvar,"order",&jvalue))) goto done;
-	    if(strcmp(NCJstring(jvalue),"C")==1)
-		((NCZ_VAR_INFO_T*)var->format_var_info)->order = 1;
-	    else ((NCZ_VAR_INFO_T*)var->format_var_info)->order = 0;
-	}
-        /* filters key */
-        /* From V2 Spec: A list of JSON objects providing codec configurations,
-           or null if no filters are to be applied. Each codec configuration
-           object MUST contain a "id" key identifying the codec to be used. */
-	/* Do filters key before compressor key so final filter chain is in correct order */
-	{
-#ifdef ENABLE_NCZARR_FILTERS
-	    if(var->filters == NULL) var->filters = (void*)nclistnew();
-   	    if(zvar->incompletefilters == NULL) zvar->incompletefilters = (void*)nclistnew();
-	    chainindex = 0; /* track location of filter in the chain */
-	    if((stat = NCZ_filter_initialize())) goto done;
-	    if((stat = NCJdictget(jvar,"filters",&jvalue))) goto done;
-	    if(jvalue != NULL && NCJsort(jvalue) != NCJ_NULL) {
-	        int k;
-	        if(NCJsort(jvalue) != NCJ_ARRAY) {stat = NC_EFILTER; goto done;}
-		for(k=0;;k++) {
-		    jfilter = NULL;
-		    jfilter = NCJith(jvalue,k);
-		    if(jfilter == NULL) break; /* done */
-		    if(NCJsort(jfilter) != NCJ_DICT) {stat = NC_EFILTER; goto done;}
-		    if((stat = NCZ_filter_build(file,var,jfilter,chainindex++))) goto done;
-		}
-	    }
-#endif
-	}
-
-        /* compressor key */
-        /* From V2 Spec: A JSON object identifying the primary compression codec and providing
-           configuration parameters, or ``null`` if no compressor is to be used. */
-#ifdef ENABLE_NCZARR_FILTERS
-	{ 
-	    if(var->filters == NULL) var->filters = (void*)nclistnew();
-	    if((stat = NCZ_filter_initialize())) goto done;
-	    if((stat = NCJdictget(jvar,"compressor",&jfilter))) goto done;
-	    if(jfilter != NULL && NCJsort(jfilter) != NCJ_NULL) {
-	        if(NCJsort(jfilter) != NCJ_DICT) {stat = NC_EFILTER; goto done;}
-		if((stat = NCZ_filter_build(file,var,jfilter,chainindex++))) goto done;
-	    }
-	}
-	/* Suppress variable if there are filters and var is not fixed-size */
-	if(varsized && nclistlength((NClist*)var->filters) > 0)
-	    suppress = 1;
-#endif
-        if(zarr_rank > 0) {
-   	    if((stat = NCZ_computedimrefs(file, zfile, map, var, rank, dimnames, shapes, var->dim)))
-	        goto done;
-   	    if(!zvar->scalar) {
-	        /* Extract the dimids */
-	        for(j=0;j<rank;j++)
-	            var->dimids[j] = var->dim[j]->hdr.id;
-	    }
-        }
-
-#ifdef ENABLE_NCZARR_FILTERS
-	if(!suppress) {
-            /* At this point, we can finalize the filters */
-            if((stat = NCZ_filter_setup(var))) goto done;
-	}
-#endif
-
-suppressvar:
-        if(suppress) {
-	    /* Reclaim NCZarr variable specific info */
-	    (void)NCZ_zclose_var1(var);
-	    /* Remove from list of variables and reclaim the top level var object */
-	    (void)nc4_var_list_del(grp, var);
-	    var = NULL;
-	}
-
-	/* Clean up from last cycle */
-	nclistfreeall(dimnames); dimnames = nclistnew();
-        nullfree(varpath); varpath = NULL;
-        nullfree(shapes); shapes = NULL;
-        nullfree(key); key = NULL;
-        NCJreclaim(jncvar); jncvar = NULL;
-        NCJreclaim(jvar); jvar = NULL;
-        var = NULL;
+	const char* varname = nclistget(varnames,i);
+	if((stat = read_var1(file,zfile,map,grp,varname))) goto done;
     }
-
+    
 done:
     return ZUNTRACE(THROW(stat));
 }
@@ -708,17 +730,15 @@ ZF1_readattrs(NC_FILE_INFO_T* file, NC_OBJ* container)
 {
     int stat = NC_NOERR;
     int i;
-    char* fullpath = NULL;
     char* key = NULL;
     NCZ_FILE_INFO_T* zinfo = NULL;
     NC_VAR_INFO_T* var = NULL;
     NCZ_VAR_INFO_T* zvar = NULL;
     NC_GRP_INFO_T* grp = NULL;
-    NCZMAP* map = NULL;
     NC_ATT_INFO_T* att = NULL;
     NCindex* attlist = NULL;
-    NCjson* jattrs = NULL;
     NClist* atypes = NULL;
+    char* attrpath = NULL;
     nc_type typeid;
     size_t len, typelen;
     void* data = NULL;
@@ -729,7 +749,6 @@ ZF1_readattrs(NC_FILE_INFO_T* file, NC_OBJ* container)
     ZTRACE(3,"file=%s container=%s",file->controller->path,container->name);
 
     zinfo = file->format_file_info;
-    map = zinfo->map;
 
     purezarr = (zinfo->flags & FLAG_PUREZARR)?1:0;
  
@@ -742,7 +761,7 @@ ZF1_readattrs(NC_FILE_INFO_T* file, NC_OBJ* container)
 	attlist =  var->att;
     }
 
-    switch ((stat = NCZ_load_jatts(map, container, &jattrs, &atypes))) {
+    switch ((stat = NCZ_load_jatts(map, container, &attrpath, &jattrs))) {
     case NC_NOERR: break;
     case NC_EEMPTY:  /* container has no attributes */
         stat = NC_NOERR;
@@ -750,6 +769,15 @@ ZF1_readattrs(NC_FILE_INFO_T* file, NC_OBJ* container)
     default: goto done; /* true error */
     }
 
+    /* Stash for when we process the attributes */
+    if(attrpath != NULL) {/* stash for later */
+	zvar->attributespath = attrpath; attrpath = NULL;
+    }
+    if(jattrs != NULL) {/* stash for later */
+	zvar->jatts = jattrs; jattrs = NULL;
+    }
+
+#if 0
     if(jattrs != NULL) {
 	/* Iterate over the attributes to create the in-memory attributes */
 	/* Watch for special cases: _FillValue and  _ARRAY_DIMENSIONS (xarray), etc. */
@@ -827,13 +855,14 @@ ZF1_readattrs(NC_FILE_INFO_T* file, NC_OBJ* container)
 	((NC_VAR_INFO_T*)container)->atts_read = 1;
     else
 	((NC_GRP_INFO_T*)container)->atts_read = 1;
+#endif /*0*/
 
 done:
     if(data != NULL)
         stat = NC_reclaim_data(file->controller,att->nc_typeid,data,len);
     NCJreclaim(jattrs);
     nclistfreeall(atypes);
-    nullfree(fullpath);
+    nullfree(attrpath);
     nullfree(key);
     return ZUNTRACE(THROW(stat));
 }
@@ -982,7 +1011,7 @@ NCZ_read_atts(NC_FILE_INFO_T* file, NCZ_FILE_INFO_T* zinfo, NCZMAP* map, NC_OBJ*
 	attlist =  var->att;
     }
 
-    switch ((stat = NCZ_load_jatts(map, container, &jattrs, &atypes))) {
+    switch ((stat = NCZ_load_jatts(map, container, &attrpath, &jattrs))) {
     case NC_NOERR: break;
     case NC_EEMPTY:  /* container has no attributes */
         stat = NC_NOERR;
@@ -1333,7 +1362,7 @@ the corresponding NCjson dict.
 @author Dennis Heimbigner
 */
 static int
-NCZ_load_jatts(NCZMAP* map, NC_OBJ* container, NCjson** jattrsp, NClist** atypesp)
+NCZ_load_jatts(NCZMAP* map, NC_OBJ* container, char** attrpath, NCjson** jattrsp, NClist** atypesp)
 {
     int stat = NC_NOERR;
     char* fullpath = NULL;

@@ -67,9 +67,9 @@ EXTERNL int NCZ_readarray(NCZMAP* zmap, const char* key, NCjson** jsonp);
 EXTERNL int ncz_nctypedecode(const char* snctype, nc_type* nctypep);
 
 EXTERNL int ncz2_nctype2dtype(nc_type nctype, int endianness, int purezarr,int len, char** dnamep);
-EXTERNL int ncz2_dtype2nctype(const char* dtype, nc_type typehint, int purezarr, nc_type* nctypep, int* endianp, int* typelenp);
+EXTERNL int ncz2_dtype2nctype(const char* dtype, nc_type typehint, int purezarr, nc_type* nctypep, int* endianp, size_t* typelenp);
 EXTERNL int ncz3_nctype2dtype(nc_type nctype, int purezarr, int strlen, char** dnamep);
-EXTERNL int ncz3_dtype2nctype(const char* dtype, int purezarr, nc_type* nctypep, int* typelenp);
+EXTERNL int ncz3_dtype2nctype(const char* dtype, int purezarr, nc_type* nctypep, size_t* typelenp);
 
 EXTERNL int NCZ_inferattrtype(NCjson* value, nc_type typehint, nc_type* typeidp);
 EXTERNL int NCZ_inferinttype(unsigned long long u64, int negative);

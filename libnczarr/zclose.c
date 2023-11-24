@@ -103,7 +103,10 @@ zclose_group(NC_GRP_INFO_T *grp)
 
     /* Close the zgroup. */
     zgrp = grp->format_grp_info;
-    LOG((4, "%s: closing group %s", __func__, grp->hdr.name));
+    NCjsonreclaim(zgrp->jsuper);
+    nullfree(zgrp->grppath);
+    NCJreclaim(zgrp->jatts);
+    
     nullfree(zgrp);
     grp->format_grp_info = NULL; /* avoid memory errors */
 
@@ -174,6 +177,11 @@ NCZ_zclose_var1(NC_VAR_INFO_T* var)
     if(zvar->cache) NCZ_free_chunk_cache(zvar->cache);
     /* reclaim xarray */
     if(zvar->xarray) nclistfreeall(zvar->xarray);
+    /* Reclaim misc. fields */
+    NCJreclaim(zvar->jatts);
+    nullfree(zvar->varpath);
+    
+    /* Reclaim the object */
     nullfree(zvar);
     var->format_var_info = NULL; /* avoid memory errors */
     return stat;
