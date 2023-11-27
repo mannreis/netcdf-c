@@ -662,28 +662,28 @@ write_atts(NC_FILE_INFO_T* file, NCZ_FILE_INFO_T* zfile, NCZMAP* map, NC_OBJ* co
 		        break;
 		    }
 	        }
-                if(dimsinroot) {
-                    /* Walk the dimensions and capture the names */
-                    for(i=0;i<var->ndims;i++) {
-                        char* dimname;
-                        NC_DIM_INFO_T* dim = var->dim[i];
-                        dimname = strdup(dim->hdr.name);
-                        if(dimname == NULL) {stat = NC_ENOMEM; goto done;}
-                        NCJaddstring(jdimrefs,NCJ_STRING,dimname);
-                        nullfree(dimname); dimname = NULL;
-                    }
-		    /* Add the _ARRAY_DIMENSIONS attribute */
-                    if((stat = NCJinsert(jatts,NC_XARRAY_DIMS,jdimrefs))) goto done;
-                    jdimrefs = NULL;
-                    /* And a fake type */
-                    if(!purezarr) {
-                        NCJnewstring(NCJ_STRING,">S1",&jtype);
-                        if((stat = NCJinsert(jtypes,NC_XARRAY_DIMS,jtype))) goto done; /* add {name: type} */
-                        jtype = NULL;
-                    }
-	        }
 	    }
-	}
+            if(dimsinroot) {
+                /* Walk the dimensions and capture the names */
+                for(i=0;i<var->ndims;i++) {
+                    char* dimname;
+                    NC_DIM_INFO_T* dim = var->dim[i];
+                    dimname = strdup(dim->hdr.name);
+                    if(dimname == NULL) {stat = NC_ENOMEM; goto done;}
+                    NCJaddstring(jdimrefs,NCJ_STRING,dimname);
+                    nullfree(dimname); dimname = NULL;
+                }
+                /* Add the _ARRAY_DIMENSIONS attribute */
+                if((stat = NCJinsert(jatts,NC_XARRAY_DIMS,jdimrefs))) goto done;
+                jdimrefs = NULL;
+                /* And a fake type */
+                if(!purezarr) {
+                    NCJnewstring(NCJ_STRING,">S1",&jtype);
+                    if((stat = NCJinsert(jtypes,NC_XARRAY_DIMS,jtype))) goto done; /* add {name: type} */
+                    jtype = NULL;
+                }
+            }
+        }
         /* Add Quantize Attribute */
         if(container->sort == NCVAR && var && var->quantize_mode > 0) {
             char mode[64];
