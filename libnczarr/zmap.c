@@ -187,7 +187,7 @@ nczmap_search(NCZMAP* map, const char* prefix, NClist* matches)
 {
     int stat = NC_NOERR;
     if((stat = map->api->search(map, prefix, matches)) == NC_NOERR) {
-        if((stat = NCZ_sort(nclistcontents(matches),nclistlength(matches),NULL))) goto done; /* sort the list */
+        if((stat = NCZ_sortstringlist(nclistcontents(matches),nclistlength(matches)))) goto done; /* sort the list */
     }
 done:
     return stat;
@@ -500,13 +500,6 @@ done:
     return THROW(stat);    
 }
 
-/* bubble sort a list of strings */
-void
-nczm_sortlist(NClist* l)
-{
-    nczm_sortenvv(nclistlength(l),(char**)nclistcontents(l));
-}
-
 static int
 nczm_compare(const void* arg1, const void* arg2)
 {
@@ -515,18 +508,20 @@ nczm_compare(const void* arg1, const void* arg2)
     return strcmp(n1,n2);
 }
 
+/* sort a list of strings */
+void
+nczm_sortlist(NClist* l)
+{
+    if(l == NULL || nclistlength(l) == 0) return;
+    nczm_sortenvv(nclistlength(l),(char**)nclistcontents(l));
+}
+
 /* quick sort a list of strings */
 void
 nczm_sortenvv(int n, char** envv)
 {
     if(n <= 1) return;
     qsort(envv, n, sizeof(char*), nczm_compare);
-#if 0
-{int i;
-for(i=0;i<n;i++)
-fprintf(stderr,">>> sorted: [%d] %s\n",i,(const char*)envv[i]);
-}
-#endif
 }
 
 void

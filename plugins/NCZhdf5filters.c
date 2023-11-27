@@ -127,7 +127,7 @@ NCZ_raw_codec_to_hdf5(const NCproplist* env, const char* codec, int* idp, size_t
     nparams = (unsigned)jc.ival;
 
     /* Validate nparams */
-    if(NCJlength(jdict) != 2* (nparams + 2)) {stat = NC_EFILTER; goto done;}
+    if(NCJdictlength(jdict) != (nparams + 2)) {stat = NC_EFILTER; goto done;}
 
     if(nparams == 0) goto setvalues;
     

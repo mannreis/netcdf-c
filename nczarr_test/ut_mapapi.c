@@ -94,7 +94,7 @@ simplecreate(void)
     
     printf("Pass: create: create: %s\n",url);
 
-    truekey = makekey(NCZMETAROOT);
+    truekey = makekey(Z2METAROOT);
     if((stat = nczmap_write(map, truekey, 0, NULL)))
 	goto done;
     printf("Pass: create: defineobj: %s\n",truekey);
@@ -179,7 +179,7 @@ simplemeta(void)
     report(PASS,"open",map);
 	
     /* Make sure .nczarr exists (from simplecreate) */
-    truekey = makekey(NCZMETAROOT);
+    truekey = makekey(Z2METAROOT);
     if((stat = nczmap_exists(map,truekey)))
 	goto done;
     report(PASS,".nczarr: exists",map);
@@ -194,7 +194,7 @@ simplemeta(void)
     report(PASS,".zarray: def",map);
     free(truekey); truekey = NULL;
 
-    truekey = makekey(NCZMETAROOT);
+    truekey = makekey(Z2METAROOT);
     if((stat = nczmap_write(map, truekey, strlen(metadata1), metadata1)))
 	goto done;
     report(PASS,".nczarr: writemetadata",map);
@@ -220,7 +220,7 @@ simplemeta(void)
     report(PASS,"re-open",map);
 
     /* Read previously written */
-    truekey = makekey(NCZMETAROOT);
+    truekey = makekey(Z2METAROOT);
     if((stat = nczmap_exists(map, truekey)))
 	goto done;
     report(PASS,".nczarr: exists",map);

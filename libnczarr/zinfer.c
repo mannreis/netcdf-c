@@ -6,6 +6,7 @@
 /**
 Given various pieces of information and a map,
 infer the format to be used.
+Note that format1 (the oldest NCZarr format is now disallowed).
 
 The current rules are as follows.
 
@@ -16,7 +17,6 @@ Creation:
 4. Use pure zarr if mode has "zarr" or "xarray" or "noxarray" tag.
 
 Read:
-1. If root contains ".nczarr", then NCZarr format is V1 and Zarr format is V2.
 2. If root contains ".zgroup", then
 2.1 Zarr version is 2, and is verified by the .zgroup key "format".
 2.2 If .zgroup contains key "_nczarr_superblock" then NCZarr version is 2.0.0 and can be verified by key "version".
@@ -27,7 +27,6 @@ Read:
 4. If Zarr version is still unknown, then it defaults to 2.
 5. If NCZarr version is still unknown then the NCZarr version is NULL (i.e. pure zarr).
 */
-
 
 #include "zincludes.h"
 #include "ncrc.h"
@@ -114,19 +113,11 @@ infer_open_format(NC_FILE_INFO_T* file, NCZ_FILE_INFO_T* zfile, NCZMAP* map, int
     int stat = NC_NOERR;
     int zarrformat = 0;
     int nczarrformat = 0;
-    char ignore[2];
     NCjson* json = NULL;
     NCjson* jtmp = NULL;
     struct TagParam param;
 
     /* Probe the map for tell-tale objects and dict keys */
-
-    /* Look for /.nczarr object: may not exist if not NCZarr V1 */
-    switch ((stat=nczmap_read(map,NCZMETAROOT,0,1,ignore))) {
-    case NC_NOERR: zarrformat = ZARRFORMAT2; nczarrformat = NCZARRFORMAT1; break;
-    case NC_EEMPTY: stat = NC_NOERR; break; /* did not exist */
-    default: goto done; /* failure */
-    }
 
     if(zarrformat == 0) {
         /* We need to search subtree for a V2 or V3 tag */
@@ -141,10 +132,6 @@ infer_open_format(NC_FILE_INFO_T* file, NCZ_FILE_INFO_T* zfile, NCZMAP* map, int
 	    switch(param.zarrformat) {
 	    case ZARRFORMAT2: case ZARRFORMAT3: zarrformat = param.zarrformat; break;
 	    default: stat = NC_ENOTZARR; goto done;
-	    }
-	    switch(param.nczarrformat) {
-	    case NCZARRFORMAT1: nczarrformat = NCZARRFORMAT1; break;
-	    default: stat = NC_NOERR; break; /* will have to search actual object contents */
 	    }
 	    break;
         default: stat = NC_ENOTZARR; goto done;
@@ -224,16 +211,6 @@ tagsearch(NCZMAP* map, const char* prefix, const char* segment, void* param)
        || strcasecmp(segment,Z2ARRAY)==0
        || strcasecmp(segment,Z2ATTRS)==0) {
 	formats->zarrformat = ZARRFORMAT2;
-	return NC_EOBJECT; /* V2 object found */
-    }
-    if(strcasecmp(segment,NCZMETAROOT)==0
-       || strcasecmp(segment,NCZGROUP)==0
-       || strcasecmp(segment,NCZARRAY)==0
-       || strcasecmp(segment,NCZATTRS)==0
-       || strcasecmp(segment,NCZVARDEP)==0
-       || strcasecmp(segment,NCZATTRDEP)==0) {
-	formats->zarrformat = ZARRFORMAT2;
-	formats->nczarrformat = NCZARRFORMAT1;
 	return NC_EOBJECT; /* V2 object found */
     }
     return NC_NOERR; /* Keep looking */
@@ -389,7 +366,6 @@ NCZ_get_formatter(NC_FILE_INFO_T* file, const NCZ_Formatter** formatterp)
        so use the zarr format instead. */
     if(nczarr_format != 0) {
         switch(nczarr_format) {
-        case 1: formatter = NCZ_formatter1; break;
         case 2: formatter = NCZ_formatter2; break;
         case 3: formatter = NCZ_formatter3; break;
         default: stat = NC_ENCZARR; goto done;

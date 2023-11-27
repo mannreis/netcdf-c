@@ -27,7 +27,6 @@
 /* Define the possible NCZarr format versions */
 /* These are independent of the Zarr specification version */
 #define NCZARRFORMAT0 0 /* if this is a pure zarr dataset */
-#define NCZARRFORMAT1 1 
 #define NCZARRFORMAT2 2
 #define NCZARRFORMAT3 3
 
@@ -56,15 +55,6 @@
 #    define NC_MAX_PATH 4096
 #  endif
 #endif
-
-/* V1 reserved objects */
-#define NCZMETAROOT "/.nczarr"
-#define NCZGROUP ".nczgroup"
-#define NCZARRAY ".nczarray"
-#define NCZATTRS ".nczattrs"
-/* Deprecated */
-#define NCZVARDEP ".nczvar"
-#define NCZATTRDEP ".nczattr"
 
 /* V2 Reserved Objects */
 #define Z2METAROOT "/.zgroup"
@@ -144,12 +134,6 @@ Inserted into any array zarr.json:
 #define NCZ_V2_ARRAY   "_nczarr_array"
 #define NCZ_V2_ATTR    NC_NCZARR_ATTR
 
-/* Deprecated */
-#define NCZ_V2_SUPERBLOCK_UC "_NCZARR_SUPERBLOCK"
-#define NCZ_V2_GROUP_UC   "_NCZARR_GROUP"
-#define NCZ_V2_ARRAY_UC   "_NCZARR_ARRAY"
-#define NCZ_V2_ATTR_UC    NC_NCZARR_ATTR_UC
-
 #define NCZ_V3_SUPERBLOCK "_nczarr_superblock"
 #define NCZ_V3_GROUP  NCZ_V2_GROUP
 #define NCZ_V3_ARRAY  NCZ_V2_ARRAY
@@ -217,7 +201,6 @@ typedef struct NCZ_FILE_INFO {
 #		define FLAG_SHOWFETCH   2
 #		define FLAG_LOGGING     4
 #		define FLAG_XARRAYDIMS  8
-#		define FLAG_NCZARR_V1   16
     NCZM_IMPL mapimpl;
     NCjson* superblock; /* Only used by NCZarr 3.0.0 and later */
     struct NCZ_Formatter* dispatcher;
@@ -239,7 +222,7 @@ typedef struct NCZ_GRP_INFO {
     NCjson* jsuper; /* Corresponding info from the superblock */
     /* We need the key for accessing the grp's attributes since
        they may be in several places depending on the format. */
-    char* attributespath;
+    char* grppath;
     NCjson* jatts; /* JSON encoding of the attributes */
 } NCZ_GRP_INFO_T;
 
@@ -274,6 +257,13 @@ struct NCZ_DimInfo {
     char* path;
     size64_t dimlen;
     int unlimited;
+};
+
+/* Parsed Attribute info */
+struct NCZ_AttrInfo {
+    char* name;
+    nc_type nctype;
+    NCjson* values;
 };
 
 
@@ -331,6 +321,11 @@ int NCZ_zclose_var1(NC_VAR_INFO_T* var);
 int ncz_getattlist(NC_GRP_INFO_T *grp, int varid, NC_VAR_INFO_T **varp, NCindex **attlist);
 int ncz_create_fillvalue(NC_VAR_INFO_T* var);
 int ncz_makeattr(NC_OBJ*, NCindex* attlist, const char* name, nc_type typid, size_t len, void* values, NC_ATT_INFO_T**);
+int NCZ_computeattrinfo(const char* name, nc_type atype, nc_type typehint, int purezarr, NCjson* values, nc_type* typeidp, size_t* typelenp, size_t* lenp, void** datap);
+int NCZ_computeattrdata(nc_type typehint, nc_type* typeidp, NCjson* values, size_t* typelenp, size_t* countp, void** datap);
+int NCZ_read_attrs(NC_FILE_INFO_T* file, NC_OBJ* container);
+int NCZ_attr_convert(NCjson* src, nc_type typeid, size_t typelen, int* countp, NCbytes* dst);
+int NCZ_json_convention_read(NCjson* json, NCjson** jtextp);
 
 /* zvar.c */
 int ncz_gettype(NC_FILE_INFO_T*, NC_GRP_INFO_T*, int xtype, NC_TYPE_INFO_T** typep);

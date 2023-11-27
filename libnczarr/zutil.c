@@ -707,14 +707,12 @@ srchznamesv3(const void* a, const void* b)
 }
 
 int
-ncz3_dtype2nctype(const char* dtype, int purezarr, nc_type* nctypep, size_t* typelenp)
+ncz3_dtype2nctype(const char* dtype, nc_type* nctypep, size_t* typelenp)
 {
     int stat = NC_NOERR;
     nc_type nctype = NC_NAT;
     size_t typelen = 0;
     void* match = NULL;
-
-    NC_UNUSED(purezarr);
 
     if(nctypep) *nctypep = NC_NAT;
     if(dtype == NULL) goto zerr;
@@ -772,7 +770,7 @@ primarily on the first atomic value encountered
 recursively.
 */
 int
-NCZ_inferattrtype(NCjson* value, nc_type typehint, nc_type* typeidp)
+NCZ_inferattrtype(const NCjson* value, nc_type typehint, nc_type* typeidp)
 {
     int i,stat = NC_NOERR;
     nc_type typeid;
@@ -781,7 +779,7 @@ NCZ_inferattrtype(NCjson* value, nc_type typehint, nc_type* typeidp)
     long long i64;
     int negative = 0;
 
-    if(NCJsort(value) == NCJ_ARRAY && NCJlength(value) == 0)
+    if(NCJsort(value) == NCJ_ARRAY && NCJarraylength(value) == 0)
         {typeid = NC_NAT; goto done;} /* Empty array is illegal */
 
     if(NCJsort(value) == NCJ_NULL)
@@ -792,7 +790,7 @@ NCZ_inferattrtype(NCjson* value, nc_type typehint, nc_type* typeidp)
 
     /* If an array, make sure all the elements are simple */
     if(value->sort == NCJ_ARRAY) {
-	for(i=0;i<NCJlength(value);i++) {
+	for(i=0;i<NCJarraylength(value);i++) {
 	    j=NCJith(value,i);
 	    if(!NCJisatomic(j))
 	        {typeid = NC_NAT; goto done;}
@@ -1184,7 +1182,7 @@ checksimplejson(NCjson* json, int depth)
     switch (NCJsort(json)) {
     case NCJ_ARRAY:
 	if(depth > 0) return 0;  /* e.g. [...,[...],...]  or [...,{...},...] */
-	for(i=0;i < NCJlength(json);i++) {
+	for(i=0;i < NCJarraylength(json);i++) {
 	    NCjson* j = NCJith(json,i);
 	    if(!checksimplejson(j,depth+1)) return 0;
         }
@@ -1210,7 +1208,7 @@ NCZ_iscomplexjson(NCjson* json, nc_type typehint)
 	/* If the typehint is NC_CHAR, then always treat it as complex */
 	if(typehint == NC_CHAR) {stat = 1; goto done;}
 	/* Otherwise see if it is a simple vector of atomic values */
-	for(i=0;i < NCJlength(json);i++) {
+	for(i=0;i < NCJarraylength(json);i++) {
 	    NCjson* j = NCJith(json,i);
 	    if(!NCJisatomic(j)) {stat = 1; goto done;}
         }
@@ -1406,12 +1404,43 @@ cmp_strings(const void* a1, const void* a2)
 }
 
 int
-NCZ_sort(void* vec, size_t count, int (*compare)(const void*, const void*))
+NCZ_sortstringlist(void* vec, size_t count)
 {
-    if(compare == NULL) compare = cmp_strings; /* default comparator */
     if(vec != NULL && count > 0) {
-        qsort(vec, count, sizeof(void*), compare);
+        qsort(vec, count, sizeof(void*), cmp_strings);
     }
     return NC_NOERR;
 }
 
+#if 0
+/* Define a static qsort comparator for JSON dict (key,value) pairs */
+static int
+cmp_ncjson(const void* a1, const void* a2)
+{
+    const NCjson** j1 = (const NCjson**)a1;
+    const NCjson** j2 = (const NCjson**)a2;
+    return strcmp(NCJstring(*j1),NCJstring(*j2));
+}
+
+int
+NCZ_sortpairlist(void* vec, size_t count)
+{
+    if(vec != NULL && count > 0) {
+        qsort(vec, count, 2*sizeof(void*), cmp_ncjson);
+    }
+    return NC_NOERR;
+}
+#endif
+
+void
+NCZ_freeAttrInfoVec(struct NCZ_AttrInfo* ainfo)
+{
+    size_t i;
+    struct NCZ_AttrInfo* ap = NULL;
+    if(ainfo == NULL) return;
+    for(ap=ainfo,i=0;ap->name;i++,ap++) {
+	nullfree(ap->name);
+	NCJreclaim(ap->values);
+    }
+    free(ainfo);
+}

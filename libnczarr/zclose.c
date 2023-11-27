@@ -103,7 +103,7 @@ zclose_group(NC_GRP_INFO_T *grp)
 
     /* Close the zgroup. */
     zgrp = grp->format_grp_info;
-    NCjsonreclaim(zgrp->jsuper);
+    NCJreclaim(zgrp->jsuper);
     nullfree(zgrp->grppath);
     NCJreclaim(zgrp->jatts);
     

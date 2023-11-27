@@ -69,9 +69,9 @@ EXTERNL int ncz_nctypedecode(const char* snctype, nc_type* nctypep);
 EXTERNL int ncz2_nctype2dtype(nc_type nctype, int endianness, int purezarr,int len, char** dnamep);
 EXTERNL int ncz2_dtype2nctype(const char* dtype, nc_type typehint, int purezarr, nc_type* nctypep, int* endianp, size_t* typelenp);
 EXTERNL int ncz3_nctype2dtype(nc_type nctype, int purezarr, int strlen, char** dnamep);
-EXTERNL int ncz3_dtype2nctype(const char* dtype, int purezarr, nc_type* nctypep, size_t* typelenp);
+EXTERNL int ncz3_dtype2nctype(const char* dtype, nc_type* nctypep, size_t* typelenp);
 
-EXTERNL int NCZ_inferattrtype(NCjson* value, nc_type typehint, nc_type* typeidp);
+EXTERNL int NCZ_inferattrtype(const NCjson* value, nc_type typehint, nc_type* typeidp);
 EXTERNL int NCZ_inferinttype(unsigned long long u64, int negative);
 EXTERNL int ncz_fill_value_sort(nc_type nctype, int*);
 EXTERNL int NCZ_createobject(NCZMAP* zmap, const char* key, size64_t size);
@@ -97,7 +97,9 @@ EXTERNL int NCZ_makeFQN(NC_GRP_INFO_T* parent, NC_OBJ* object, NCbytes* fqn);
 EXTERNL int NCZ_locateFQN(NC_GRP_INFO_T* parent, const char* fqn, NC_SORT sort, NC_OBJ** objectp);
 EXTERNL char* NCZ_deescape(const char* s);
 EXTERNL char* NCZ_backslashescape(const char* s);
-EXTERNL int NCZ_sort(void* vec, size_t count, int (*compare)(const void*, const void*));
+EXTERNL int NCZ_sortstringlist(void* vec, size_t count);
+EXTERNL int NCZ_sortpairlist(void* vec, size_t count);
+EXTERNL void NCZ_freeAttrInfoVec(struct NCZ_AttrInfo* ainfo);
 
 /* zwalk.c */
 EXTERNL int NCZ_read_chunk(int ncid, int varid, size64_t* zindices, void* chunkdata);

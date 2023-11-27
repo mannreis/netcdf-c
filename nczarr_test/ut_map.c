@@ -91,7 +91,7 @@ simplecreate(void)
     if((stat = nczmap_create(impl,url,0,0,NULL,&map)))
 	goto done;
 
-    if((stat=nczm_concat(NULL,NCZMETAROOT,&path)))
+    if((stat=nczm_concat(NULL,Z2METAROOT,&path)))
 	goto done;
 
     /* Write empty metadata content */
@@ -154,7 +154,7 @@ writemeta2(void)
     if((stat = nczmap_open(impl,url,NC_WRITE,0,NULL,&map)))
 	goto done;
 
-    if((stat=nczm_concat(META2,NCZARRAY,&path)))
+    if((stat=nczm_concat(META2,Z2ARRAY,&path)))
 	goto done;
     if((stat = nczmap_write(map, path, strlen(metadata2), metadata2)))
 	goto done;
@@ -224,7 +224,7 @@ readmeta2(void)
     if((stat = nczmap_open(impl,url,0,0,NULL,&map)))
 	goto done;
 
-    if((stat = readkey(map,META2,NCZARRAY)))
+    if((stat = readkey(map,META2,Z2ARRAY)))
         goto done;
 
 done:

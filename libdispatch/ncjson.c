@@ -614,7 +614,7 @@ NCJdictget(const NCjson* dict, const char* key, NCjson** valuep)
     if(dict == NULL || dict->sort != NCJ_DICT)
         {stat = NCJTHROW(NCJ_ERR); goto done;}
     if(valuep) {*valuep = NULL;}
-    for(i=0;i<NCJlength(dict);i+=2) {
+    for(i=0;i<NCJarraylength(dict);i+=2) {
 	NCjson* jkey = NCJith(dict,i);
 	if(jkey->string != NULL && strcmp(jkey->string,key)==0) {
 	    if(valuep) {*valuep = NCJith(dict,i+1); break;}
@@ -844,7 +844,7 @@ NCJcloneArray(const NCjson* array, NCjson** clonep)
     int i, stat=NCJ_OK;
     NCjson* clone = NULL;
     if((stat=NCJnew(NCJ_ARRAY,&clone))==NCJ_ERR) goto done;
-    for(i=0;i<NCJlength(array);i++) {
+    for(i=0;i<NCJarraylength(array);i++) {
 	NCjson* elem = NCJith(array,i);
 	NCjson* elemclone = NULL;
 	if((stat=NCJclone(elem,&elemclone))==NCJ_ERR) goto done;
@@ -862,7 +862,7 @@ NCJcloneDict(const NCjson* dict, NCjson** clonep)
     int i, stat=NCJ_OK;
     NCjson* clone = NULL;
     if((stat=NCJnew(NCJ_DICT,&clone))==NCJ_ERR) goto done;
-    for(i=0;i<NCJlength(dict);i++) {
+    for(i=0;i<NCJarraylength(dict);i++) {
 	NCjson* elem = NCJith(dict,i);
 	NCjson* elemclone = NULL;
 	if((stat=NCJclone(elem,&elemclone))==NCJ_ERR) goto done;
@@ -1129,6 +1129,21 @@ NCJdump(const NCjson* json, unsigned flags, FILE* out)
     fflush(out);
 }
 
+static int
+pairsort(const void* a, const void* b)
+{
+    const NCjson** j1 = (const NCjson**)a;
+    const NCjson** j2 = (const NCjson**)b;
+    return strcmp(NCJstring(*j1),NCJstring(*j2));
+}
+
+OPTSTATIC void
+NCJdictsort(NCjson* jdict)
+{
+    assert(NCJsort(jdict) == NCJ_DICT);
+    qsort((void*)NCJcontents(jdict),NCJdictlength(jdict),2*sizeof(NCjson*),pairsort);
+}
+
 /* Hack to avoid static unused warning */
 static void
 netcdf_supresswarnings(void)
@@ -1151,5 +1166,6 @@ netcdf_supresswarnings(void)
     ignore = (void*)NCJunparse;
     ignore = (void*)NCJclone;
     ignore = (void*)NCJdump;
+    ignore = (void*)NCJdictsort;
     ignore = ignore;
 }
