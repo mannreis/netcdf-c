@@ -119,4 +119,4 @@ while test "x$REM" != x ; do
         aws s3api delete-objects --bucket ${S3TESTBUCKET} --delete "file://s3gc.json"
     fi
 done
-#rm -f s3gc.json
+rm -f s3gc.json
