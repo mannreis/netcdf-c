@@ -159,5 +159,8 @@ OPTEXPORT void NCJdictsort(NCjson* jdict);
 #define NCJisatomic(j) ((j)->sort != NCJ_ARRAY && (j)->sort != NCJ_DICT && (j)->sort != NCJ_NULL && (j)->sort != NCJ_UNDEF)
 
 /**************************************************/
+/* Error detection helper */
+#define NCJcheck(expr) do{if((expr) < 0) abort();}while(0)
+/**************************************************/
 
 #endif /*!NCJSON_H!*/ /* Leave the ! as a tag for sed */

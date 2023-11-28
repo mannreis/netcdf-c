@@ -335,7 +335,7 @@ NCZ_createdict(NCZMAP* zmap, const char* key, NCjson** jsonp)
 	goto done;
     }
     /* Create the empty dictionary */
-    NCJnew(NCJ_DICT,&json);
+    NCJcheck(NCJnew(NCJ_DICT,&json));
     if(jsonp) {*jsonp = json; json = NULL;}
 done:
     NCJreclaim(json);

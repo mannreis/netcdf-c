@@ -159,6 +159,9 @@ OPTEXPORT void NCJdictsort(NCjson* jdict);
 #define NCJisatomic(j) ((j)->sort != NCJ_ARRAY && (j)->sort != NCJ_DICT && (j)->sort != NCJ_NULL && (j)->sort != NCJ_UNDEF)
 
 /**************************************************/
+/* Error detection helper */
+#define NCJcheck(expr) do{if((expr) < 0) abort();}while(0)
+/**************************************************/
 
 /* Copyright 2018, UCAR/Unidata.
    See the COPYRIGHT file for more information.
@@ -754,8 +757,7 @@ NCJnewstringn(int sort, size_t len, const char* value, NCjson** jsonp)
     if(jsonp) *jsonp = NULL;
     if(value == NULL)
         {stat = NCJTHROW(NCJ_ERR); goto done;}
-    if((stat = NCJnew(sort,&json))==NCJ_ERR)
-	goto done;
+    if((stat = NCJnew(sort,&json))==NCJ_ERR) goto done;
     if((json->string = (char*)malloc(len+1))==NULL)
         {stat = NCJTHROW(NCJ_ERR); goto done;}
     memcpy(json->string,value,len);

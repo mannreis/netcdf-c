@@ -593,8 +593,7 @@ NCJnewstringn(int sort, size_t len, const char* value, NCjson** jsonp)
     if(jsonp) *jsonp = NULL;
     if(value == NULL)
         {stat = NCJTHROW(NCJ_ERR); goto done;}
-    if((stat = NCJnew(sort,&json))==NCJ_ERR)
-	goto done;
+    if((stat = NCJnew(sort,&json))==NCJ_ERR) goto done;
     if((json->string = (char*)malloc(len+1))==NULL)
         {stat = NCJTHROW(NCJ_ERR); goto done;}
     memcpy(json->string,value,len);

@@ -160,7 +160,7 @@ nc_inq_var_filterx(int ncid, int varid, char** textp)
     /* Get the filters on this variable */
     if((stat = nc_inq_var_filterx_ids(ncid,varid,&text))) goto done;
     /* Parse it */
-    if((stat = NCJparse(text,0,&json))) goto done;
+    if(NCJparse(text,0,&json)<0) goto done;
     if(json->sort != NCJ_ARRAY)
         {stat = NC_EFILTER; goto done;}
     if(NCJlength(json) == 0 || NCJcontents(json) == NULL)
