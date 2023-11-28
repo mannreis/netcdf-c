@@ -145,7 +145,7 @@ infer_open_format(NC_FILE_INFO_T* file, NCZ_FILE_INFO_T* zfile, NCZMAP* map, int
 	    if(NCJsort(json) != NCJ_DICT) {stat = NC_ENOTZARR; goto done;}
 	    /* Look for the _nczarr_superblock tag */
 	    NCJreclaim(jtmp);
-	    stat = NCJdictget(json,"_nczarr_superblock",&jtmp);
+	    NCJdictget(json,"_nczarr_superblock",&jtmp);
 	    if(jtmp == NULL) 
 	        nczarrformat = NCZARRFORMAT0; /* Pure zarr V2 file */
 	    else
@@ -166,7 +166,7 @@ infer_open_format(NC_FILE_INFO_T* file, NCZ_FILE_INFO_T* zfile, NCZMAP* map, int
 	    if(NCJsort(json) != NCJ_DICT) {stat = NC_ENOTZARR; goto done;}
 	    /* Look for the _nczarr_superblock tag */
 	    NCJreclaim(jtmp);
-	    stat = NCJdictget(json,"_nczarr_superblock",&jtmp);
+	    NCJdictget(json,"_nczarr_superblock",&jtmp);
 	    if(jtmp == NULL)
 	        nczarrformat = NCZARRFORMAT0;  /* Pure zarr V3 file */
 	    else

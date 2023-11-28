@@ -1394,15 +1394,15 @@ NCZ_charify(NCjson* src, NCbytes* buf)
     struct NCJconst jstr = NCJconst_empty;
 
     if(NCJsort(src) != NCJ_ARRAY) { /* singleton */
-	if((stat = NCJcvt(src, NCJ_STRING, &jstr))) goto done;
+	NCJcvt(src, NCJ_STRING, &jstr);
 	ncbytescat(buf,jstr.sval);
     } else for(i=0;i<NCJarraylength(src);i++) {
 	NCjson* value = NCJith(src,i);
-	if((stat = NCJcvt(value, NCJ_STRING, &jstr))) goto done;
+	NCJcvt(value, NCJ_STRING, &jstr);
 	ncbytescat(buf,jstr.sval);
 	nullfree(jstr.sval);jstr.sval = NULL;
     }
-done:
+
     nullfree(jstr.sval);
     return stat;
 }

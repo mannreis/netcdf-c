@@ -399,7 +399,7 @@ ncz_unload_jatts(NCZ_FILE_INFO_T* zinfo, NC_OBJ* container, NCjson* jattrs, NCjs
 
     if(!(zinfo->flags & FLAG_PUREZARR)) {
         /* Insert the jtypes into the set of attributes */
-         if((stat = NCJinsert(jattrs,NCZ_V2_ATTRS,jtypes))) goto done;
+         NCJinsert(jattrs,NCZ_V2_ATTRS,jtypes);
     }
 
     /* Upload the .zattrs object */
