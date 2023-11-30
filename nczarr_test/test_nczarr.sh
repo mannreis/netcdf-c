@@ -16,13 +16,15 @@ if test "x$NCZARR_S3_TEST_BUCKET" = x ; then
 fi
 export NCZARR_S3_TEST_URL="https://${NCZARR_S3_TEST_HOST}/${NCZARR_S3_TEST_BUCKET}"
 
-ZMD="${execdir}/${DL}zmapio"
-S3UTIL="${execdir}/${DL}s3util"
+# Fix execdir
+EXECDIR="${execdir}/../nczarr_test"
 
-if test "x$VALGRIND" != x ; then
-    ZMD="valgrind --leak-check=full $ZMD"
-    S3UTIL="valgrind --leak-check=full $S3UTIL"
-fi
+ZMD="${EXECDIR}/${DL}zmapio"
+S3UTIL="${EXECDIR}/${DL}s3util"
+ZS3PARSE="${EXECDIR}/${DL}zs3parse"
+NCDUMPCHUNKS="${EXECDIR}/${DL}ncdumpchunks"
+ZHEX="${EXECDIR}/${DL}zhex"
+ZISJSON="${EXECDIR}/${DL}zisjson"
 
 # Check settings
 checksetting() {
@@ -66,14 +68,14 @@ deletemap() {
     case "$1" in
     file) rm -fr $2;;
     zip) rm -f $2;;
-    s3) S3KEY=`${execdir}/zs3parse -k $2`; s3sdkdelete $S3KEY ;;
+    s3) S3KEY=`${ZS3PARSE} -k $2`; s3sdkdelete $S3KEY ;;
     *) echo "unknown kind: $1" ; exit 1;;
     esac
 }
 
 mapstillexists() {
     mapstillexists=0
-    if "${execdir}/zmapio $fileurl" &> /dev/null ; then
+    if "${ZMD} $fileurl" &> /dev/null ; then
       echo "delete failed: $1"
       mapstillexists=1
     fi
@@ -88,9 +90,9 @@ fileargs() {
     S3PATH="${NCZARR_S3_TEST_URL}/${S3ISOPATH}"
     fileurl="${S3PATH}/${f}#${frag}"
     file=$fileurl
-    S3HOST=`${execdir}/zs3parse -h $S3PATH`
-    S3BUCKET=`${execdir}/zs3parse -b $S3PATH`
-    S3PREFIX=`${execdir}/zs3parse -k $S3PATH`
+    S3HOST=`${ZS3PARSE} -h $S3PATH`
+    S3BUCKET=`${ZS3PARSE} -b $S3PATH`
+    S3PREFIX=`${ZS3PARSE} -k $S3PATH`
     ;;
   *)
     file="${f}.$zext"
@@ -103,7 +105,7 @@ dumpmap() {
     zext=$1
     zbase=`basename $2 ".$zext"`
     fileargs $zbase
-    ${execdir}/zmapio -t int -x objdump $fileurl > $3
+    ${ZMD} -t int -x objdump $fileurl > $3
 }
 
 # Function to remove selected -s attributes from file;

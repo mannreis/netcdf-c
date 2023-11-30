@@ -11,7 +11,7 @@ if test "x$srcdir" = x ; then srcdir=`pwd`; fi
 set -e
 
 if test "x$TESTNCZARR" = x1 ; then
-. "$srcdir/test_nczarr.sh"
+. "$srcdir/../nczarr_test/test_nczarr.sh"
 s3isolate "testdir_specific_filters"
 THISDIR=`pwd`
 cd $ISOPATH

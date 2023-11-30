@@ -8,7 +8,7 @@ THISDIR=`pwd`
 cd $ISOPATH
 
 if test "x$TESTNCZARR" = x1 ; then
-. "$srcdir/test_nczarr.sh"
+. "$srcdir/../nczarr_test/test_nczarr.sh"
 s3isolate
 fi
 

@@ -2369,20 +2369,10 @@ ENDIF()
 
 IF(ENABLE_NCZARR)
   ADD_SUBDIRECTORY(libnczarr)
-  FILE(COPY ${netCDF_SOURCE_DIR}/unit_test/timer_utils.h
-       DESTINATION ${netCDF_BINARY_DIR}/nczarr_test/)
-  FILE(COPY ${netCDF_SOURCE_DIR}/unit_test/timer_utils.c
-       DESTINATION ${netCDF_BINARY_DIR}/nczarr_test/)
-  FILE(COPY ${netCDF_SOURCE_DIR}/nc_test4/test_filter.c
-       DESTINATION ${netCDF_BINARY_DIR}/nczarr_test/)
-  FILE(COPY ${netCDF_SOURCE_DIR}/nc_test4/test_filter_misc.c
-       DESTINATION ${netCDF_BINARY_DIR}/nczarr_test/)
-  FILE(COPY ${netCDF_SOURCE_DIR}/nc_test4/test_filter_repeat.c
-       DESTINATION ${netCDF_BINARY_DIR}/nczarr_test/)
-  FILE(COPY ${netCDF_SOURCE_DIR}/nc_test4/test_filter_order.c
-       DESTINATION ${netCDF_BINARY_DIR}/nczarr_test/)
-  FILE(COPY ${netCDF_SOURCE_DIR}/nc_test4/tst_multifilter.c
-       DESTINATION ${netCDF_BINARY_DIR}/nczarr_test/)
+  FOR(CH unit_test/timer_utils.h unit_test/timer_utils.c nc_test4/test_filter.c nc_test4/test_filter_misc.c nc_test4/test_filter_repeat.c nc_test4/test_filter_order.c nc_test4/tst_multifilter.c)
+    FILE(COPY ${netCDF_SOURCE_DIR}/${CH} DESTINATION ${netCDF_BINARY_DIR}/nczarr_test)
+    FILE(COPY ${netCDF_SOURCE_DIR}/${CH} DESTINATION ${netCDF_BINARY_DIR}/nczarr_v3_test)
+  ENDFOREACH()
 ENDIF()
 
 add_subdirectory(liblib)
@@ -2433,6 +2423,7 @@ IF(ENABLE_TESTS)
   ENDIF(ENABLE_UNIT_TESTS)
   IF(ENABLE_NCZARR)
     ADD_SUBDIRECTORY(nczarr_test)
+    ADD_SUBDIRECTORY(nczarr_v3_test)
   ENDIF()
 ENDIF()
 
@@ -2715,10 +2706,9 @@ configure_file(${CMAKE_CURRENT_SOURCE_DIR}/s3gc.in ${CMAKE_CURRENT_BINARY_DIR}/s
 #####
 # Build and copy nc_test4/findplugin.sh to various places
 #####
-configure_file(${CMAKE_CURRENT_SOURCE_DIR}/nc_test4/findplugin.in ${CMAKE_CURRENT_BINARY_DIR}/nc_test4/findplugin.sh @ONLY NEWLINE_STYLE LF)
-configure_file(${CMAKE_CURRENT_SOURCE_DIR}/nc_test4/findplugin.in ${CMAKE_CURRENT_BINARY_DIR}/nczarr_test/findplugin.sh @ONLY NEWLINE_STYLE LF)
-configure_file(${CMAKE_CURRENT_SOURCE_DIR}/nc_test4/findplugin.in ${CMAKE_CURRENT_BINARY_DIR}/plugins/findplugin.sh @ONLY NEWLINE_STYLE LF)
-configure_file(${CMAKE_CURRENT_SOURCE_DIR}/nc_test4/findplugin.in ${CMAKE_CURRENT_BINARY_DIR}/examples/C/findplugin.sh @ONLY NEWLINE_STYLE LF)
+FOR(CC nc_test4 nczarr_test nczarr_v3_test plugins examples/C)
+    configure_file(${CMAKE_CURRENT_SOURCE_DIR}/nc_test4/findplugin.in ${CMAKE_CURRENT_BINARY_DIR}/${CC}/findplugin.sh @ONLY NEWLINE_STYLE LF)
+ENDFOREACH()
 
 IF(ENABLE_BENCHMARKS)
   IF(ENABLE_PARALLEL4)
