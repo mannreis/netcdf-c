@@ -92,14 +92,6 @@ EXTERNL int NC_testpathmode(const char* path, const char* tag);
 EXTERNL int NC_split_delim(const char* path, char delim, NClist* segments);
 EXTERNL int NC_join(struct NClist* segments, char** pathp);
 
-/* From ds3util.c */
-/* S3 profiles */
-EXTERNL int NC_getactives3profile(NCURI* uri, const char** profilep);
-EXTERNL int NC_s3profilelookup(const char* profile, const char* key, const char** valuep);
-EXTERNL int NC_authgets3profile(const char* profile, struct AWSprofile** profilep);
-EXTERNL int NC_iss3(NCURI* uri, enum NCS3SVC* svcp);
-EXTERNL int NC_s3urlrebuild(NCURI* url, struct NCS3INFO* s3, NCURI** newurlp);
-
 #if defined(__cplusplus)
 }
 #endif
