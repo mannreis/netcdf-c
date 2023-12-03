@@ -33,16 +33,6 @@ typedef struct NCRCentry {
         char* value;
 } NCRCentry;
 
-struct AWSentry {
-    char* key;
-    char* value;
-};
-
-struct AWSprofile {
-    char* name;
-    NClist* entries; /* NClist<struct AWSentry*> */
-};
-
 /* collect all the relevant info around the rc file and AWS */
 typedef struct NCRCinfo {
 	int ignore; /* if 1, then do not use any rc file */

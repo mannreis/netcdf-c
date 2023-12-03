@@ -22,17 +22,27 @@
 #endif
 
 #include "netcdf.h"
+#include "nc4internal.h"
 #include "ncuri.h"
 #include "nclist.h"
+#include "ncbytes.h"
 #include "ncrc.h"
+#include "nclog.h"
 #include "ncs3sdk.h"
 
 #undef AWSDEBUG
 
+/* Alternate .aws directory location */
+#define NC_TEST_AWS_DIR "NC_TEST_AWS_DIR"
+
 enum URLFORMAT {UF_NONE=0, UF_VIRTUAL=1, UF_PATH=2, UF_S3=3, UF_OTHER=4};
+
+/* Read these files in order and later overriding earlier */
+static const char* awsconfigfiles[] = {".aws/config",".aws/credentials",NULL};
 
 /* Forward */
 static int endswith(const char* s, const char* suffix);
+static void freeprofile(struct AWSprofile* profile);
 
 /**************************************************/
 /* Generic S3 Utilities */
@@ -562,7 +572,7 @@ awsparse(const char* text, NClist* profiles)
     len = strlen(text);
     parser->text = (char*)malloc(len+1+1+1); /* double nul term plus leading EOL */
     if(parser->text == NULL)
-	{stat = (NCTHROW(NC_EINVAL)); goto done;}
+	{stat = NC_EINVAL; goto done;}
     parser->pos = parser->text;
     parser->pos[0] = '\n'; /* So we can test for comment unconditionally */
     parser->pos++;
@@ -580,17 +590,17 @@ awsparse(const char* text, NClist* profiles)
         token = awslex(parser); /* make token always be defined */
 	if(token ==  AWS_EOF) break; /* finished */
 	if(token ==  AWS_EOL) {continue;} /* blank line */
-	if(token != LBR) {stat = NCTHROW(NC_EINVAL); goto done;}
+	if(token != LBR) {stat = NC_EINVAL; goto done;}
 	/* parse [profile name] */
         token = awslex(parser);
-	if(token != AWS_WORD) {stat = NCTHROW(NC_EINVAL); goto done;}
+	if(token != AWS_WORD) {stat = NC_EINVAL; goto done;}
 	assert(profile == NULL);
 	if((profile = (struct AWSprofile*)calloc(1,sizeof(struct AWSprofile)))==NULL)
 	    {stat = NC_ENOMEM; goto done;}
 	profile->name = ncbytesextract(parser->yytext);
 	profile->entries = nclistnew();
         token = awslex(parser);
-	if(token != RBR) {stat = NCTHROW(NC_EINVAL); goto done;}
+	if(token != RBR) {stat = NC_EINVAL; goto done;}
 #ifdef PARSEDEBUG
 fprintf(stderr,">>> parse: profile=%s\n",profile->name);
 #endif
@@ -608,9 +618,9 @@ fprintf(stderr,">>> parse: profile=%s\n",profile->name);
 	    } else if(token ==  AWS_WORD) {
 	    	key = ncbytesextract(parser->yytext);
 		token = awslex(parser);
-	        if(token != '=') {stat = NCTHROW(NC_EINVAL); goto done;}
+	        if(token != '=') {stat = NC_EINVAL; goto done;}
 	        token = awslex(parser);
-		if(token != AWS_EOL && token != AWS_WORD) {stat = NCTHROW(NC_EINVAL); goto done;}
+		if(token != AWS_EOL && token != AWS_WORD) {stat = NC_EINVAL; goto done;}
 	        value = ncbytesextract(parser->yytext);
 	        if((entry = (struct AWSentry*)calloc(1,sizeof(struct AWSentry)))==NULL)
 	            {stat = NC_ENOMEM; goto done;}
@@ -622,7 +632,7 @@ fprintf(stderr,">>> parse: entry=(%s,%s)\n",entry->key,entry->value);
 		nclistpush(profile->entries,entry); entry = NULL;
 		if(token == AWS_WORD) token = awslex(parser); /* finish the line */
 	    } else
-	        {stat = NCTHROW(NC_EINVAL); goto done;}
+	        {stat = NC_EINVAL; goto done;}
 	}
 
 	/* If this profile already exists, then replace old one */
@@ -683,8 +693,8 @@ fprintf(stderr,">>> freeprofile: %s\n",profile->name);
     }
 }
 
-static void
-freeprofilelist(NClist* profiles)
+void
+NC_s3freeprofilelist(NClist* profiles)
 {
     if(profiles) {
 	int i;
@@ -697,8 +707,8 @@ freeprofilelist(NClist* profiles)
 }
 
 /* Find, load, and parse the aws config &/or credentials file */
-static int
-aws_load_credentials(NCglobalstate* gstate)
+int
+NC_aws_load_credentials(NCglobalstate* gstate)
 {
     int stat = NC_NOERR;
     NClist* profiles = nclistnew();
@@ -743,7 +753,7 @@ aws_load_credentials(NCglobalstate* gstate)
     }
 
     if(gstate->rcinfo->s3profiles)
-        freeprofilelist(gstate->rcinfo->s3profiles);
+        NC_s3freeprofilelist(gstate->rcinfo->s3profiles);
     gstate->rcinfo->s3profiles = profiles; profiles = NULL;
 
 #ifdef AWSDEBUG
@@ -767,7 +777,7 @@ aws_load_credentials(NCglobalstate* gstate)
 
 done:
     ncbytesfree(buf);
-    freeprofilelist(profiles);
+    NC_s3freeprofilelist(profiles);
     return stat;
 }
 

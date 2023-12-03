@@ -15,6 +15,9 @@ typedef enum NCS3SVC {NCS3UNK=0, /* unknown */
 		 NCS3GS=0   /* storage.googleapis.com */
 } NCS3SVC;
 
+/* Opaque Handles */
+struct NClist;
+
 typedef struct NCS3INFO {
     char* host; /* non-null if other*/
     char* region; /* region */
@@ -23,6 +26,19 @@ typedef struct NCS3INFO {
     char* profile;
     NCS3SVC svc;
 } NCS3INFO;
+
+struct AWSentry {
+    char* key;
+    char* value;
+};
+
+struct AWSprofile {
+    char* name;
+    struct NClist* entries; /* NClist<struct AWSentry*> */
+};
+
+/*Opaque Handles*/
+struct NCglobalstate;
 
 #ifdef __cplusplus
 extern "C" {

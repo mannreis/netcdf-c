@@ -31,16 +31,12 @@ See COPYRIGHT for license information.
 #undef DRCDEBUG
 #undef LEXDEBUG
 #undef PARSEDEBUG
-#undef AWSDEBUG
 
 #define RTAG ']'
 #define LTAG '['
 
 #undef MEMCHECK
 #define MEMCHECK(x) if((x)==NULL) {goto nomem;} else {}
-
-/* Alternate .aws directory location */
-#define NC_TEST_AWS_DIR "NC_TEST_AWS_DIR"
 
 /* Forward */
 static int NC_rcload(void);
@@ -57,15 +53,9 @@ static void rcfreeentry(NCRCentry* t);
 #ifdef DRCDEBUG
 static void storedump(char* msg, NClist* entrys);
 #endif
-static int aws_load_credentials(NCglobalstate*);
-static void freeprofile(struct AWSprofile* profile);
-static void freeprofilelist(NClist* profiles);
 
 /* Define default rc files and aliases, also defines load order*/
 static const char* rcfilenames[] = {".ncrc", ".daprc", ".dodsrc", NULL};
-
-/* Read these files in order and later overriding earlier */
-static const char* awsconfigfiles[] = {".aws/config",".aws/credentials",NULL};
 
 static int NCRCinitialized = 0;
 
@@ -158,7 +148,7 @@ ncrc_initialize(void)
         nclog(NCLOGWARN,".rc loading failed");
     }
     /* Load .aws/config &/ credentials */
-    if((stat = aws_load_credentials(ncg))) {
+    if((stat = NC_aws_load_credentials(ncg))) {
         nclog(NCLOGWARN,"AWS config file not loaded");
     }
 #endif
@@ -187,8 +177,7 @@ NC_rcclear(NCRCinfo* info)
     nullfree(info->rcfile);
     nullfree(info->rchome);
     rcfreeentries(info->entries);
-    freeprofilelist(info->s3profiles);
-
+    NC_s3freeprofilelist(info->s3profiles);
 }
 
 static void
