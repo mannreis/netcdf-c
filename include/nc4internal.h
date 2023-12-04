@@ -333,6 +333,13 @@ typedef struct NCglobalstate {
 	char dimension_separator;
 	int default_zarrformat;
     } zarr;
+    struct GlobalAWS { /* AWS S3 specific parameters/defaults */
+	char* default_region;
+	char* config_file;
+	char* profile;
+	char* access_key_id;
+	char* secret_access_key;
+    } aws;
     struct Alignment { /* H5Pset_alignment parameters */
         int defined; /* 1 => threshold and alignment explicitly set */
 	int threshold;

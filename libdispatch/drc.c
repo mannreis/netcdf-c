@@ -19,11 +19,11 @@ See COPYRIGHT for license information.
 #include "ncbytes.h"
 #include "ncuri.h"
 #include "ncrc.h"
-#include "ncs3sdk.h"
 #include "nclog.h"
 #include "ncauth.h"
 #include "ncpathmgr.h"
 #include "nc4internal.h"
+#include "ncs3sdk.h"
 #include "ncdispatch.h"
 
 #undef NOREAD

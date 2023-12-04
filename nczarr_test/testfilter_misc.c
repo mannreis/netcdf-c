@@ -33,7 +33,7 @@
 
 #define MAXPARAMS 32
 
-static unsigned int baseline[NPARAMS];
+static unsigned int baselineparams[NPARAMS];
 
 static const char* testfile = NULL;
 
@@ -161,7 +161,7 @@ setchunking(void)
 static void
 setvarfilter(void)
 {
-    CHECK(nc_def_var_filter(ncid,varid,TEST_ID,NPARAMS,baseline));
+    CHECK(nc_def_var_filter(ncid,varid,TEST_ID,NPARAMS,baselineparams));
     verifyparams();
 }
 
@@ -173,7 +173,7 @@ verifyparams(void)
     if(filterid != TEST_ID) REPORT("id mismatch");
     if(nparams != NPARAMS) REPORT("nparams mismatch");
     for(i=0;i<nparams;i++) {
-        if(params[i] != baseline[i])
+        if(params[i] != baselineparams[i])
             REPORT("param mismatch");
     }
 }
@@ -204,7 +204,7 @@ openfile(void)
         size_t i;
         fprintf(stderr,"nparams  mismatch\n");
         for(nerrs=0,i=0;i<nparams;i++) {
-            if(params[i] != baseline[i]) {
+            if(params[i] != baselineparams[i]) {
                 fprintf(stderr,"open: testparam mismatch: %ld\n",(unsigned long)i);
                 nerrs++;
             }
@@ -327,35 +327,36 @@ insert(int index, void* src, size_t size)
     case 1:
 	b = *((unsigned char*)src);
         u.param[0] = (unsigned)b;
-	baseline[index+0] = u.param[0];
+	baselineparams[index+0] = u.param[0];
 	break;
     case 2:
 	s = *((unsigned short*)src);
         u.param[0] = (unsigned)s;
-	baseline[index+0] = u.param[0];
+	baselineparams[index+0] = u.param[0];
 	break;
     case 4:
 	i = *((unsigned int*)src);
         u.param[0] = (unsigned)i;
-	baseline[index+0] = u.param[0];
+	baselineparams[index+0] = u.param[0];
 	break;
     case 8:
 	memcpy(u.src8,src,size);
 	ncaux_h5filterspec_fix8(u.src8,0);
-	baseline[index+0] = u.param[0];
-	baseline[index+1] = u.param[1];
+	baselineparams[index+0] = u.param[0];
+	baselineparams[index+1] = u.param[1];
 	break;
     default: fprintf(stderr,"insert: unexpected size: %u\n",(unsigned)size); abort();
     }
 }
 
 static void
-buildbaseline(unsigned int testcasenumber)
+buildbaselineparams(unsigned int testcasenumber)
 {
-    memset(baseline,0,sizeof(baseline));
-    baseline[0] = testcasenumber;
+    memset(baselineparams,0,sizeof(baselineparams));
+    baselineparams[0] = testcasenumber;
     switch (testcasenumber) {
     case TC_PARAMS:
+    case TC_EXPANDED:
 	insert(1,&spec.tbyte,sizeof(spec.tbyte));
 	insert(2,&spec.tubyte,sizeof(spec.tubyte));
 	insert(3,&spec.tshort,sizeof(spec.tshort));
@@ -368,8 +369,6 @@ buildbaseline(unsigned int testcasenumber)
 	insert(12,&spec.tfloat64,sizeof(spec.tfloat64)); /*size=8*/
 	break;
     case TC_ODDSIZE:
-    case TC_EXPANDED:
-    	break;
     default:
 	fprintf(stderr,"Unknown testcase number: %d\n",testcasenumber);
 	abort();
@@ -384,7 +383,7 @@ test_test1(void)
 
     reset();
 
-    buildbaseline(TC_PARAMS);
+    buildbaselineparams(TC_PARAMS);
 
     fprintf(stderr,"test1: compression.\n");
     create();
@@ -414,7 +413,7 @@ test_test2(void)
 
     reset();
 
-    buildbaseline(TC_ODDSIZE);
+    buildbaselineparams(TC_ODDSIZE);
 
     fprintf(stderr,"test2: dimsize %% chunksize != 0: compress.\n");
     create();
@@ -446,7 +445,7 @@ test_test3(void)
 
     reset();
 
-    buildbaseline(TC_EXPANDED);
+    buildbaselineparams(TC_EXPANDED);
 
     fprintf(stderr,"test3: buffer expansion != 0: compress.\n");
     create();
