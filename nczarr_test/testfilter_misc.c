@@ -369,6 +369,7 @@ buildbaselineparams(unsigned int testcasenumber)
 	insert(12,&spec.tfloat64,sizeof(spec.tfloat64)); /*size=8*/
 	break;
     case TC_ODDSIZE:
+	break;
     default:
 	fprintf(stderr,"Unknown testcase number: %d\n",testcasenumber);
 	abort();

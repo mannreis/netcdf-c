@@ -2274,7 +2274,7 @@ AC_CONFIG_FILES([nc-config], [chmod 755 nc-config])
 
 # Config and copy into nczarr_[v3_]test
 AC_CONFIG_FILES(nczarr_test/findplugin.sh:nc_test4/findplugin.in, [chmod ugo+x nczarr_test/findplugin.sh])
-AC_CONFIG_FILES(nczarr_v3_test/findplugin.sh:nc_test4/findplugin.in, [chmod ugo+x nczarr_v3_test/findplugin.sh])
+AC_CONFIG_FILES(v3_nczarr_test/findplugin.sh:nc_test4/findplugin.in, [chmod ugo+x v3_nczarr_test/findplugin.sh])
 for fp in unit_test/timer_utils.h unit_test/timer_utils.h unit_test/timer_utils.c nc_test4/test_filter.c nc_test4/test_filter_misc.c nc_test4/tst_multifilter.c nc_test4/test_filter_repeat.c nc_test4/test_filter_order.c ; do
   FN=`basename $fp`
   AC_CONFIG_FILES(nczarr_test/${FN}:${fp})
@@ -2324,7 +2324,7 @@ AC_CONFIG_FILES([Makefile
                  dap4_test/Makefile
                  plugins/Makefile
 		 nczarr_test/Makefile
- 		 nczarr_v3_test/Makefile
+ 		 v3_nczarr_test/Makefile
                  ])
 AC_OUTPUT()
 
