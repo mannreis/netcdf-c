@@ -16,6 +16,13 @@ if test "x$NCZARR_S3_TEST_BUCKET" = x ; then
 fi
 export NCZARR_S3_TEST_URL="https://${NCZARR_S3_TEST_HOST}/${NCZARR_S3_TEST_BUCKET}"
 
+# TAG for zarr format to use; uses the environment variable NCZARRFORMAT
+if test "x${NCZARRFORMAT}" ; then
+    export ZDF="_v3"
+else
+    export ZDF=""
+fi
+
 # Fix execdir
 EXECDIR="${execdir}/../nczarr_test"
 
@@ -190,14 +197,12 @@ fi
 
 # Create an isolation path for S3; build on the isolation directory
 s3isolate() {
-  if test "x$S3ISOPATH" = x ; then
-    if test "x$ISOPATH" = x ; then isolate "$1"; fi
-    S3ISODIR="$ISODIR"
-    # Need s3 isolation path to include the test directory
+  if test "x${S3ISOPATH}" = x ; then
+    if test "x${ISOPATH}" = x ; then isolate "$1"; fi
+    # Need isolation path to include the test directory
     BNAME=`basename $srcdir`
-    S3ISOTESTSET="${S3TESTSUBTREE}/${BNAME}_"
-    if test "x$NOISOPATH" = x ; then S3ISOTESTSET="${S3ISOTESTSET}${TESTUID}"; fi    
-    S3ISOPATH="${S3ISOTESTSET}/$S3ISODIR"
+    S3ISODIR="${BNAME}_${TESTUID}/${ISODIR}"
+    S3ISOPATH="${S3TESTSUBTREE}/${S3ISODIR}"
   fi
 }
 

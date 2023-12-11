@@ -77,15 +77,18 @@ done < s3gc.keys
 captureuid() {
     PFX="$1"
     # Capture the uid for this key         
-    s3uid=`echo $key | sed -e "s|$S3TESTSUBTREE/${PFX}_\([0-9][0-9]*\)/.*|\1|"`
+    s3uid1=`echo $key | sed -e "s|$S3TESTSUBTREE/${PFX}_\([0-9][0-9]*\)/.*|\1|"`
+    # also check the obsolete path
+    s3uid2=`echo $key | sed -e "s|$S3TESTSUBTREE/testset_\([0-9][0-9]*\)/.*|\1|"`
     # check that we got a uid       
+    if test "x$s3uid1" != x ; then s3uid="$s3uid1"; else s3uid="$s3uid2"; fi
     if test "x$s3uid" != x ; then
-    # Test age of the uid
-    if test $((s3uid < lastdate)) = 1; then
-    MATCHKEYS="${MATCHKEYS} $key"
-    fi
+        # Test age of the uid
+        if test $((s3uid < lastdate)) = 1; then
+          MATCHKEYS="${MATCHKEYS} $key"
+        fi
     else
-    if test "x$VERBOSE" = x1 ; then echo "Excluding \"$key\""; fi
+        if test "x$VERBOSE" = x1 ; then echo "Excluding \"$key\""; fi
     fi
 }
 
@@ -93,8 +96,9 @@ captureuid() {
 unset MATCHKEYS
 for key in $ALLKEYS ; do
     case "$key" in
-        "$S3TESTSUBTREE/nczarr_test_"*) captureid "nczarr_test" ;;
-        "$S3TESTSUBTREE/v3_nczarr_test_"*) captureid "v3_nczarr_test" ;;
+        "$S3TESTSUBTREE/nczarr_test_"*) captureuid "nczarr_test" ;;
+        "$S3TESTSUBTREE/v3_nczarr_test_"*) captureuid "v3_nczarr_test" ;;
+        "$S3TESTSUBTREE/testset_"*) captureuid "testset" ;;
         *) if test "x$VERBOSE" = x1; then echo "Ignoring \"$key\""; fi ;;
     esac
 done

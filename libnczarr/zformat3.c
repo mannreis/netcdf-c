@@ -1002,6 +1002,7 @@ static int
 parse_dims(NC_FILE_INFO_T* file, NC_GRP_INFO_T* grp)
 {
     int i,stat = NC_NOERR;
+    NCZ_FILE_INFO_T* zfile = (NCZ_FILE_INFO_T*)file->format_file_info;
     NCZ_GRP_INFO_T* zgrp = (NCZ_GRP_INFO_T*)grp->format_grp_info;
     NCjson* jdims = NULL;
     NCjson* jdim = NULL;
@@ -1009,8 +1010,13 @@ parse_dims(NC_FILE_INFO_T* file, NC_GRP_INFO_T* grp)
     NCjson* jsize = NULL;
     NCjson* junlim = NULL;
     NCjson* jcfg = NULL;
+    int purezarr = 0;
     
     ZTRACE(3,"file=%s grp=%s |diminfo|=%u",file->controller->path,grp->hdr.name,nclistlength(diminfo));
+
+    purezarr = (zfile->flags & FLAG_PUREZARR)?1:0;
+
+    if(purezarr) goto done; /* Dims will be created as needed */
 
     /* Get dim defs for this group */
     NCJcheck(NCJdictget(zgrp->jsuper,"dimensions",&jdims));
@@ -1021,7 +1027,6 @@ parse_dims(NC_FILE_INFO_T* file, NC_GRP_INFO_T* grp)
         NC_DIM_INFO_T* dim = NULL;
         size64_t dimlen = 0;
         int isunlim = 0;
-    
         /* Extract info */
         jdim = NCJith(jdims,i);
         assert(NCJsort(jdim) == NCJ_DICT);
@@ -1032,7 +1037,6 @@ parse_dims(NC_FILE_INFO_T* file, NC_GRP_INFO_T* grp)
         NCJcheck(NCJdictget(jcfg,"size",&jsize));
         assert(jsize != NULL);
         NCJcheck(NCJdictget(jcfg,"unlimited",&junlim)); /* might be null */
-        
         /* Create the NC_DIM_INFO_T object */
         {
             const char* name = NCJstring(jname);
@@ -1274,9 +1278,10 @@ read_vars(NC_FILE_INFO_T* file, NC_GRP_INFO_T* grp, NClist* varnames)
                 if((stat = NCZ_computeattrdata(var->type_info->hdr.id, &atypeid, jvalue, NULL, &fvlen, &var->fill_value)))
                     goto done;
                 assert(atypeid == vtype);
-                /* Note that we do not create the _FillValue
-                   attribute here to avoid having to read all
-                   the attributes and thus foiling lazy read.*/
+		if(var->fill_value != NULL) {
+		    /* It is ok to create this attribute because it comes from the var metadata */
+		    if((stat = ncz_create_fillvalue(var))) goto done;
+		}
             }
         }
 

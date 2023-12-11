@@ -43,7 +43,7 @@ FEATURE_NCZARR=@HAS_NCZARR@
 FEATURE_S3TESTS=@ENABLE_S3_TESTING@
 FEATURE_NCZARR_ZIP=@DO_NCZARR_ZIP_TESTS@
 FEATURE_LARGE_TESTS=@DO_LARGE_TESTS@
-FEATURE_NCZARR_FORMAT=@NCZARR_DEFAULT_FORMAT@
+FEATURE_ZARRDFALTFORMAT=@NCZARR_DEFAULT_FORMAT@
 
 # Thredds-test server is currently disabled
 #FEATURE_THREDDSTEST=1
@@ -220,11 +220,11 @@ cd $builddir
 # Process ID was not used because of the small but real chance of collision.
 
 isolate() {
-  if test "x$ISOPATH" = x ; then
-      ISOTESTSET="${builddir}/testset_"
-      if test "x$NOISOPATH" = x ; then ISOTESTSET="${ISOTESTSET}${TESTUID}"; fi    
+  if test "x${ISOPATH}" = x ; then
       ISODIR="$1"
-      ISOPATH="${ISOTESTSET}/$ISODIR"
+      ISOPATH="${builddir}"
+      if test "x$NOISOPATH" = x ; then ISOPATH="${ISOPATH}_${TESTUID}"; fi    
+      ISOPATH="${ISOPATH}/${ISODIR}"
       rm -fr $ISOPATH
       mkdir -p $ISOPATH
   fi

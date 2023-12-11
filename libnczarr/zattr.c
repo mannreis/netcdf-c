@@ -994,7 +994,7 @@ ncz_create_fillvalue(NC_VAR_INFO_T* var)
         /* Make sure _FillValue does not exist */
 	for(i=0;i<ncindexsize(var->att);i++) {
 	    fv = (NC_ATT_INFO_T*)ncindexith(var->att,i);
-	    if(strcmp(fv->hdr.name,_FillValue)==0) break;
+	    if(strcmp(fv->hdr.name,NC_ATT_FILLVALUE)==0) break;
 	    fv = NULL;
         }
 	if(fv == NULL) {
@@ -1158,13 +1158,15 @@ NCZ_read_attrs(NC_FILE_INFO_T* file, NC_OBJ* container)
             if(isdfaltmaxstrlen && att->nc_typeid == NC_INT)
                 zfile->default_maxstrlen = ((int*)att->data)[0];
         }
-    
-        /* If we have not read a _FillValue, then go ahead and create it */
-        if(fillvalueatt == NULL && container->sort == NCVAR) {
-            if((stat = ncz_create_fillvalue((NC_VAR_INFO_T*)container))) goto done;
-        }
     }
     
+    /* Some attributes can be computed from the variable's metadata */    
+
+    /* Create _FillValue from the Variable's metadata */
+    if(fillvalueatt == NULL && container->sort == NCVAR) {
+        /* If we have not read a _FillValue, then go ahead and create it */
+       if((stat = ncz_create_fillvalue((NC_VAR_INFO_T*)container))) goto done;
+    }
     /* Remember that we have read the atts for this var or group. */
     if(container->sort == NCVAR)
         ((NC_VAR_INFO_T*)container)->atts_read = 1;
