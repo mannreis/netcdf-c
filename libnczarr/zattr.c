@@ -15,7 +15,7 @@
 #undef ADEBUG
 
 /* Forward */
-static int NCZ_charify(NCjson* src, NCbytes* buf);
+static int NCZ_charify(const NCjson* src, NCbytes* buf);
 
 /**
  * @internal Get the attribute list for either a varid or NC_GLOBAL
@@ -1184,7 +1184,7 @@ done:
 Extract type and data for an attribute
 */
 int
-NCZ_computeattrinfo(const char* name, nc_type typeid, nc_type typehint, int purezarr, NCjson* values,
+NCZ_computeattrinfo(const char* name, nc_type typeid, nc_type typehint, int purezarr, const NCjson* values,
 		nc_type* typeidp, size_t* typelenp, size_t* lenp, void** datap)
 {
     int stat = NC_NOERR;
@@ -1214,7 +1214,7 @@ done:
 Extract data for an attribute
 */
 int
-NCZ_computeattrdata(nc_type typehint, nc_type* typeidp, NCjson* values, size_t* typelenp, size_t* countp, void** datap)
+NCZ_computeattrdata(nc_type typehint, nc_type* typeidp, const NCjson* values, size_t* typelenp, size_t* countp, void** datap)
 {
     int stat = NC_NOERR;
     NCbytes* buf = ncbytesnew();
@@ -1257,7 +1257,7 @@ NCZ_computeattrdata(nc_type typehint, nc_type* typeidp, NCjson* values, size_t* 
 
 done:
     ncbytesfree(buf);
-    if(reclaimvalues) NCJreclaim(values); /* we created it */
+    if(reclaimvalues) NCJreclaim((NCjson*)values); /* we created it */
     return ZUNTRACEX(THROW(stat),"typelen=%d count=%u",(typelenp?*typelenp:0),(countp?*countp:-1));
 }
 
@@ -1334,7 +1334,7 @@ done:
 */
 
 int
-NCZ_attr_convert(NCjson* src, nc_type typeid, size_t typelen, int* countp, NCbytes* dst)
+NCZ_attr_convert(const NCjson* src, nc_type typeid, size_t typelen, int* countp, NCbytes* dst)
 {
     int stat = NC_NOERR;
     int i;
@@ -1390,7 +1390,7 @@ done:
 
 /* Convert a JSON singleton or array of strings to a single string */
 static int
-NCZ_charify(NCjson* src, NCbytes* buf)
+NCZ_charify(const NCjson* src, NCbytes* buf)
 {
     int i, stat = NC_NOERR;
     struct NCJconst jstr = NCJconst_empty;
@@ -1414,7 +1414,7 @@ Implement the JSON convention:
 Stringify it as the value and make the attribute be of type "char".
 */
 int
-NCZ_json_convention_read(NCjson* json, NCjson** jtextp)
+NCZ_json_convention_read(const NCjson* json, NCjson** jtextp)
 {
     int stat = NC_NOERR;
     NCjson* jtext = NULL;

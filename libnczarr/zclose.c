@@ -101,11 +101,10 @@ zclose_group(NC_GRP_INFO_T *grp)
     if ((stat = zclose_types(grp)))
         goto done;
 
-    /* Close the zgroup. */
+    /* Close the zarr.json. */
     zgrp = grp->format_grp_info;
-    NCJreclaim(zgrp->jsuper);
     nullfree(zgrp->grppath);
-    NCJreclaim(zgrp->jatts);
+    NCJreclaim(zgrp->jgroup);
     
     nullfree(zgrp);
     grp->format_grp_info = NULL; /* avoid memory errors */
@@ -177,9 +176,10 @@ NCZ_zclose_var1(NC_VAR_INFO_T* var)
     if(zvar->cache) NCZ_free_chunk_cache(zvar->cache);
     /* reclaim xarray */
     if(zvar->xarray) nclistfreeall(zvar->xarray);
+
     /* Reclaim misc. fields */
-    NCJreclaim(zvar->jatts);
     nullfree(zvar->varpath);
+    NCJreclaim(zvar->jarray);
     
     /* Reclaim the object */
     nullfree(zvar);

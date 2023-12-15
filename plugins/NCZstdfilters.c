@@ -83,8 +83,8 @@ NCZ_bzip2_codec_to_hdf5(const NCproplist* env, const char* codec_json, int* idp,
 {
     int stat = NC_NOERR;
     NCjson* jcodec = NULL;
-    NCjson* jdict = NULL;
-    NCjson* jtmp = NULL;
+    const NCjson* jdict = NULL;
+    const NCjson* jtmp = NULL;
     unsigned* params = NULL;
     struct NCJconst jc;
     uintptr_t zarrformat = 0;
@@ -177,8 +177,8 @@ NCZ_zstd_codec_to_hdf5(const NCproplist* env, const char* codec_json, int* idp, 
 {
     int stat = NC_NOERR;
     NCjson* jcodec = NULL;
-    NCjson* jdict = NULL;
-    NCjson* jtmp = NULL;
+    const NCjson* jdict = NULL;
+    const NCjson* jtmp = NULL;
     unsigned* params = NULL;
     struct NCJconst jc;
     uintptr_t zarrformat = 0;
@@ -379,8 +379,8 @@ NCZ_blosc_codec_to_hdf5(const NCproplist* env, const char* codec_json, int* idp,
 {
     int stat = NC_NOERR;
     NCjson* jcodec = NULL;
-    NCjson* jdict = NULL;
-    NCjson* jtmp = NULL;
+    const NCjson* jdict = NULL;
+    const NCjson* jtmp = NULL;
     unsigned* params = NULL;
     struct NCJconst jc = {0,0,0,NULL};
     int compcode;

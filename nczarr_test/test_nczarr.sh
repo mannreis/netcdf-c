@@ -17,7 +17,7 @@ fi
 export NCZARR_S3_TEST_URL="https://${NCZARR_S3_TEST_HOST}/${NCZARR_S3_TEST_BUCKET}"
 
 # TAG for zarr format to use; uses the environment variable NCZARRFORMAT
-if test "x${NCZARRFORMAT}" ; then
+if test "x${NCZARRFORMAT}" = x3 ; then
     export ZDF="_v3"
 else
     export ZDF=""

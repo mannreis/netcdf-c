@@ -1196,7 +1196,7 @@ checksimplejson(NCjson* json, int depth)
 
 /* Return 1 if the attribute will be stored as a complex JSON valued attribute; return 0 otherwise */
 int
-NCZ_iscomplexjson(NCjson* json, nc_type typehint)
+NCZ_iscomplexjson(const NCjson* json, nc_type typehint)
 {
     int i, stat = 0;
 

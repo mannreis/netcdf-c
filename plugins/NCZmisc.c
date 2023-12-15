@@ -103,8 +103,8 @@ NCZ_misc_codec_to_hdf5(const NCproplist* env, const char* codec_json, int* idp, 
 {
     int stat = NC_NOERR;
     NCjson* jcodec = NULL;
-    NCjson* jparams = NULL;
-    NCjson* jtmp = NULL;
+    const NCjson* jparams = NULL;
+    const NCjson* jtmp = NULL;
     size_t i,nparams = 0;
     unsigned* params = NULL;
     int isv2 = 0;

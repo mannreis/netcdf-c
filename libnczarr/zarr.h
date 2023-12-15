@@ -41,8 +41,8 @@ EXTERNL int ncz_unload_jatts(NCZ_FILE_INFO_T*, NC_OBJ* container, NCjson* jattrs
 EXTERNL int ncz_close_file(NC_FILE_INFO_T* file, int abort);
 
 /* zcvt.c */
-EXTERNL int NCZ_json2cvt(NCjson* jsrc, struct ZCVT* zcvt, nc_type* typeidp);
-EXTERNL int NCZ_convert1(NCjson* jsrc, nc_type, NCbytes*);
+EXTERNL int NCZ_json2cvt(const NCjson* jsrc, struct ZCVT* zcvt, nc_type* typeidp);
+EXTERNL int NCZ_convert1(const NCjson* jsrc, nc_type, NCbytes*);
 EXTERNL int NCZ_stringconvert1(nc_type typid, char* src, NCjson* jvalue);
 EXTERNL int NCZ_stringconvert(nc_type typid, size_t len, void* data0, NCjson** jdatap);
 
@@ -92,7 +92,7 @@ EXTERNL int NCZ_get_maxstrlen(NC_OBJ* obj);
 EXTERNL int NCZ_fixed2char(const void* fixed, char** charp, size_t count, int maxstrlen);
 EXTERNL int NCZ_char2fixed(const char** charp, void* fixed, size_t count, int maxstrlen);
 EXTERNL int NCZ_copy_data(NC_FILE_INFO_T* file, NC_VAR_INFO_T* var, const void* memory, size_t count, int reading, void* copy);
-EXTERNL int NCZ_iscomplexjson(NCjson* value, nc_type typehint);
+EXTERNL int NCZ_iscomplexjson(const NCjson* value, nc_type typehint);
 EXTERNL int NCZ_makeFQN(NC_GRP_INFO_T* parent, NC_OBJ* object, NCbytes* fqn);
 EXTERNL int NCZ_locateFQN(NC_GRP_INFO_T* parent, const char* fqn, NC_SORT sort, NC_OBJ** objectp);
 EXTERNL char* NCZ_deescape(const char* s);

@@ -85,9 +85,9 @@ NCZ_raw_codec_to_hdf5(const NCproplist* env, const char* codec, int* idp, size_t
 {
     int i,stat = NC_NOERR;
     NCjson* jcodec = NULL;
-    NCjson* jname = NULL;
-    NCjson* jdict = NULL;
-    NCjson* jtmp = NULL;
+    const NCjson* jname = NULL;
+    const NCjson* jdict = NULL;
+    const NCjson* jtmp = NULL;
     const char* name = NULL;
     struct NCJconst jc;
     uintptr_t zarrformat = 0;
@@ -380,8 +380,8 @@ NCZ_deflate_codec_to_hdf5(const NCproplist* env, const char* codec_json, int* id
 {
     int stat = NC_NOERR;
     NCjson* jcodec = NULL;
-    NCjson* jtmp = NULL;
-    NCjson* jdict = NULL;
+    const NCjson* jtmp = NULL;
+    const NCjson* jdict = NULL;
     unsigned* params = NULL;
     struct NCJconst jc;
     uintptr_t zarrformat = 0;
@@ -479,8 +479,8 @@ NCZ_szip_codec_to_hdf5(const NCproplist* env, const char* codec_json, int* idp, 
     unsigned* params = NULL;
     size_t nparams = 2; /* No. of visible parameters */
     NCjson* json = NULL;
-    NCjson* jdict = NULL;
-    NCjson* jtmp = NULL;
+    const NCjson* jdict = NULL;
+    const NCjson* jtmp = NULL;
     struct NCJconst jc = {0,0,0,NULL};
     uintptr_t zarrformat = 0;
     

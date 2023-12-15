@@ -114,7 +114,7 @@ infer_open_format(NC_FILE_INFO_T* file, NCZ_FILE_INFO_T* zfile, NCZMAP* map, int
     int zarrformat = 0;
     int nczarrformat = 0;
     NCjson* json = NULL;
-    NCjson* jtmp = NULL;
+    const NCjson* jtmp = NULL;
     struct TagParam param;
 
     /* Probe the map for tell-tale objects and dict keys */
@@ -144,7 +144,7 @@ infer_open_format(NC_FILE_INFO_T* file, NCZ_FILE_INFO_T* zfile, NCZMAP* map, int
         case NC_NOERR:
 	    if(NCJsort(json) != NCJ_DICT) {stat = NC_ENOTZARR; goto done;}
 	    /* Look for the _nczarr_superblock tag */
-	    NCJreclaim(jtmp);
+	    jtmp = NULL;
 	    NCJdictget(json,"_nczarr_superblock",&jtmp);
 	    if(jtmp == NULL) 
 	        nczarrformat = NCZARRFORMAT0; /* Pure zarr V2 file */
@@ -165,7 +165,7 @@ infer_open_format(NC_FILE_INFO_T* file, NCZ_FILE_INFO_T* zfile, NCZMAP* map, int
         case NC_NOERR:
 	    if(NCJsort(json) != NCJ_DICT) {stat = NC_ENOTZARR; goto done;}
 	    /* Look for the _nczarr_superblock tag */
-	    NCJreclaim(jtmp);
+	    jtmp = NULL;
 	    NCJdictget(json,"_nczarr_superblock",&jtmp);
 	    if(jtmp == NULL)
 	        nczarrformat = NCZARRFORMAT0;  /* Pure zarr V3 file */
