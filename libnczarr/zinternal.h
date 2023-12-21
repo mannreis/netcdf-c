@@ -114,18 +114,17 @@ _nczarr_superblock: {
     }
 },
 
-Optionally Inserted into any group zarr.json:
-"_nczarr_group": "{
-\"attributes\": [{\"name\": \"attr1\", \"configuration\": {\"type\": \"<i4\"}}, ...]
-}"
+Optionally Inserted into any group zarr.json as an extra attribute.
+"_nczarr_attrs": [{\"name\": \"attr1\", \"configuration\": {\"type\": \"<i4\"}}, ...]
 
 Inserted into any array zarr.json:
 "_nczarr_array": "{
 \"dimensions\": [\"/g1/g2/d1\", \"/d2\",...],
-\"attributes\": [{\"name\": \"attr1\", \"configuration\": {\"type\": \"<i4\"}}, ...],
 \"storage\": \"scalar\"|\"contiguous\"|\"compact\"|\"chunked\"
 }"
 
+Optionally Inserted into any array zarr.json as an extra attribute.
+"_nczarr_attrs": [{\"name\": \"attr1\", \"configuration\": {\"type\": \"<i4\"}}, ...]
 }
 */
 
@@ -152,6 +151,10 @@ Inserted into any array zarr.json:
 #define DFALT_DIM_SEPARATOR_V3 '/'
 
 #define islegaldimsep(c) ((c) != '\0' && strchr(LEGAL_DIM_SEPARATORS,(c)) != NULL)
+
+/* Extend the type system */
+#define NC_JSON (NC_STRING+1)
+#define N_NCZARR_TYPES (NC_JSON+1)
 
 /* Default max string length for fixed length strings */
 #define NCZ_MAXSTR_DEFAULT 128
@@ -222,8 +225,6 @@ typedef struct NCZ_GRP_INFO {
     /* We need the key for accessing the grp's attributes since
        they may be in several places depending on the format. */
     char* grppath;
-    NCjson* jgroup; /* Zarr.json for the group; reclaim */
-    const NCjson* jzgroup; /* _nczarr_group; contains: attribute typing; do not reclaim */
     NCjson* jatts; /* JSON encoding of the attributes; do not reclaim */
 } NCZ_GRP_INFO_T;
 
@@ -326,9 +327,8 @@ int ncz_create_fillvalue(NC_VAR_INFO_T* var);
 int ncz_makeattr(NC_OBJ*, NCindex* attlist, const char* name, nc_type typid, size_t len, void* values, NC_ATT_INFO_T**);
 int NCZ_computeattrinfo(const char* name, nc_type atype, nc_type typehint, int purezarr, const NCjson* values, nc_type* typeidp, size_t* typelenp, size_t* lenp, void** datap);
 int NCZ_computeattrdata(nc_type typehint, nc_type* typeidp, const NCjson* values, size_t* typelenp, size_t* countp, void** datap);
-int NCZ_read_attrs(NC_FILE_INFO_T* file, NC_OBJ* container);
+int NCZ_read_attrs(NC_FILE_INFO_T* file, NC_OBJ* container, const NCjson* jatts);
 int NCZ_attr_convert(const NCjson* src, nc_type typeid, size_t typelen, int* countp, NCbytes* dst);
-int NCZ_json_convention_read(const NCjson* json, NCjson** jtextp);
 
 /* zvar.c */
 int ncz_gettype(NC_FILE_INFO_T*, NC_GRP_INFO_T*, int xtype, NC_TYPE_INFO_T** typep);

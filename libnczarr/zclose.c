@@ -104,7 +104,6 @@ zclose_group(NC_GRP_INFO_T *grp)
     /* Close the zarr.json. */
     zgrp = grp->format_grp_info;
     nullfree(zgrp->grppath);
-    NCJreclaim(zgrp->jgroup);
     
     nullfree(zgrp);
     grp->format_grp_info = NULL; /* avoid memory errors */

@@ -317,7 +317,7 @@ NCZ_inq(int ncid, int *ndimsp, int *nvarsp, int *nattsp, int *unlimdimidp)
     {
         /* Do we need to read the atts? */
         if (!grp->atts_read)
-            if ((stat = NCZ_read_attrs(file,(NC_OBJ*)grp)))
+            if ((stat = NCZ_read_attrs(file,(NC_OBJ*)grp,NULL)))
                 return stat;
 
         *nattsp = ncindexcount(grp->att);

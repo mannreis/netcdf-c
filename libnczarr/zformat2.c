@@ -17,7 +17,7 @@ static int ZF2_open(NC_FILE_INFO_T* file, NCURI* uri, NCZMAP* map);
 static int ZF2_close(NC_FILE_INFO_T* file);
 static int ZF2_writemeta(NC_FILE_INFO_T* file);
 static int ZF2_readmeta(NC_FILE_INFO_T* file);
-static int ZF2_readattrs(NC_FILE_INFO_T* file, NC_OBJ* container, struct NCZ_AttrInfo** ainfop);
+static int ZF2_readattrs(NC_FILE_INFO_T* file, NC_OBJ* container, const NCjson* jatts, struct NCZ_AttrInfo** ainfop);
 static int ZF2_buildchunkkey(size_t rank, const size64_t* chunkindices, char dimsep, char** keyp);
 #ifdef ENABLE_NCZARR_FILTERS
 static int ZF2_hdf2codec(const NC_FILE_INFO_T* file, const NC_VAR_INFO_T* var, NCZ_Filter* filter);
@@ -572,7 +572,7 @@ write_atts(NC_FILE_INFO_T* file, NCZ_FILE_INFO_T* zfile, NCZMAP* map, NC_OBJ* co
     int inrootgroup = 0;
     NC_VAR_INFO_T* var = NULL;
     NC_GRP_INFO_T* grp = NULL;
-    char* tname = NULL;
+    char* dtype = NULL;
     int endianness = (NC_isLittleEndian()?NC_ENDIAN_LITTLE:NC_ENDIAN_BIG);
 
     ZTRACE(3,"file=%s container=%s |attlist|=%u",file->controller->path,container->name,(unsigned)ncindexsize(attlist));
@@ -619,9 +619,9 @@ write_atts(NC_FILE_INFO_T* file, NCZ_FILE_INFO_T* zfile, NCZMAP* map, NC_OBJ* co
 
 	    /* Collect the corresponding dtype */
 	    if(!purezarr) {
-		if((stat = ncz2_nctype2dtype(a->nc_typeid,endianness,purezarr,typesize,&tname))) goto done;
-		NCJnewstring(NCJ_STRING,tname,&jtype);
-		nullfree(tname); tname = NULL;
+		if((stat = ncz2_nctype2dtype(a->nc_typeid,endianness,purezarr,typesize,&dtype))) goto done;
+		NCJnewstring(NCJ_STRING,dtype,&jtype);
+		nullfree(dtype); dtype = NULL;
 		NCJinsert(jtypes,a->hdr.name,jtype); /* add {name: type} */
 		jtype = NULL;
 	    }
@@ -732,7 +732,7 @@ done:
     nullfree(key);
     nullfree(content);
     nullfree(dimpath);
-    nullfree(tname);
+    nullfree(dtype);
     NCJreclaim(jatts);
     NCJreclaim(jtypes);
     NCJreclaim(jtype);
@@ -801,7 +801,7 @@ done:
 @author Dennis Heimbigner
 */
 static int
-ZF2_readattrs(NC_FILE_INFO_T* file, NC_OBJ* container, struct NCZ_AttrInfo** ainfop)
+ZF2_readattrs(NC_FILE_INFO_T* file, NC_OBJ* container, const NCjson* jatts, struct NCZ_AttrInfo** ainfop)
 {
     int stat = NC_NOERR;
     const char* fullpath = NULL;
@@ -816,6 +816,8 @@ ZF2_readattrs(NC_FILE_INFO_T* file, NC_OBJ* container, struct NCZ_AttrInfo** ain
     size_t natts = 0;
     size_t i;
 
+    assert(jatts == NULL);
+    
     ZTRACE(3,"map=%p container=%s nczarrv1=%d",map,container->name,nczarrv1);
 
     purezarr = (zfile->flags & FLAG_PUREZARR)?1:0;
@@ -1727,7 +1729,7 @@ NCZ_computedimrefs(NC_FILE_INFO_T* file, NCZ_FILE_INFO_T* zfile, NCZMAP* map, NC
         char zdimname[4096];
         if(zvar->xarray == NULL) {
             assert(nclistlength(dimnames) == 0);
-            if((stat = NCZ_read_attrs(file,(NC_OBJ*)var))) goto done;
+            if((stat = NCZ_read_attrs(file,(NC_OBJ*)var,NULL))) goto done;
         }
         if(zvar->xarray != NULL) {
             /* convert xarray to the dimnames */

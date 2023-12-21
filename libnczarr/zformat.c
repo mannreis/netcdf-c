@@ -99,16 +99,15 @@ NCZF_close(NC_FILE_INFO_T* file)
     return THROW(stat);
 }
 
-/* Support lazy read */
 int
-NCZF_readattrs(NC_FILE_INFO_T* file, NC_OBJ* container, struct NCZ_AttrInfo** attrp)
+NCZF_readattrs(NC_FILE_INFO_T* file, NC_OBJ* container, const NCjson* jatts, struct NCZ_AttrInfo** attrp)
 {
     int stat = NC_NOERR;
     NCZ_FILE_INFO_T* zfile = NULL;
 
     zfile = (NCZ_FILE_INFO_T*)file->format_file_info;
     assert(zfile != NULL);
-    stat = zfile->dispatcher->readattrs(file,container,attrp);
+    stat = zfile->dispatcher->readattrs(file,container,jatts,attrp);
     return THROW(stat);
 }
 

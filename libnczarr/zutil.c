@@ -15,68 +15,132 @@
 #undef DEBUG
 
 /**************************************************/
-/* Static zarr type name table */
+/**
+Type Issues:
 
-/* Table of nc_type X {Zarr,NCZarr} X endianness
-Issue: Need to distinquish NC_STRING && MAXSTRLEN==1 from NC_CHAR
-in a way that allows other Zarr implementations to read the data.
+There are (currently) two type issues that need special hacks.
+1. Need dtypes to distinquish NC_STRING && MAXSTRLEN==1
+   (assuming fixed size strings) from NC_CHAR in a way
+   that allows other Zarr implementations to read the data.
+2. Need a fake dtype to support the JSON convention allowing
+   an attribute's value to be a JSON value.
 
-Available info:
-Write: we have the netcdf type, so there is no ambiguity.
-Read: we have the variable type and also any attribute dtype,
-but those types are ambiguous.
-We also have the attribute vs variable type problem.
-For pure zarr, we have to infer the type of an attribute,
-so if we have "var:strattr = \"abcdef\"", then we need
-to decide how to infer the type: NC_STRING vs NC_CHAR.
-
-Solution:
-For variables and for NCZarr type attributes, distinquish by using:
+For issue 1, use these dtypes to distinquish NC_STRING && MAXSTRLEN==1 from NC_CHAR
 * ">S1" for NC_CHAR.
 * "|S1" for NC_STRING && MAXSTRLEN==1
 * "|Sn" for NC_STRING && MAXSTRLEN==n
-This is admittedly a bit of a hack, and the first case in particular
-will probably cause errors in some other Zarr implementations; the Zarr
-spec is unclear about what combinations are legal.
 Note that we could use "|U1", but since this is utf-16 or utf-32
 in python, it may cause problems when reading what amounts to utf-8.
 
-For attributes, we infer:
-* NC_CHAR if the hint is 0
-  - e.g. var:strattr = 'abcdef'" => NC_CHAR
-* NC_STRING if hint is NC_STRING.
-  - e.g. string var:strattr = \"abc\", \"def\"" => NC_STRING
+For issue 2, use this type to identify a JSON valued attribute.
+* "|J0"
 
-Note also that if we read a pure zarr file we will probably always
-see "|S1", so we will never see a variable of type NC_CHAR.
-We might however see an attribute of type string.
+These choices are admittedly a bit of a hack, and the first case in particular
+will probably cause errors in some other Zarr implementations; the Zarr spec
+is unclear about what combinations are legal. Issue 2 will only be interpreted by
+NCZarr code, so that choice is arbitrary.
+
+In the event that we are reading a pure Zarr file, we need to make
+inferences about the above issues but lacking any NCZarr hints.
+
+First, we need to define a rule to define what attribute values can be
+considered a "complex" json expression. So when we read the JSON
+value of an attribute, that value is classified as complex or simple.
+Simple valued attributes will be mapped to atomic-valued
+netcdf attributes.  Complex valued attributes are "unparsed" to a
+string and the attribute is stored as an NC_CHAR typed attribute.
+
+The current rule for defining a complex JSON valued attribute is defined
+by the function NCZ_iscomplexjson(). Basically the rule is as follows:
+1. If the attribute value is a single atomic value or NULL or a JSON array
+   of atomic values, then the attribute value is SIMPLE.
+2. Otherwise, the attribute value is COMPLEX.
+
+In the event that we want to write a complex JSON valued attribute,
+we use the following rules:
+1. The attribute type must be of type NC_CHAR.
+2. The first character of the value is "{" and the last
+   character is "}".
+3. The value, treated as a string, must be parseable to
+   a single JSON dictionary.
+
+Note that this means that only dictionaries can be stored as a JSON valued
+attributes. The reason is that we want to avoid parsing every NC_CHAR
+valued attribute, so we use a heuristic classifier (rule 2 above).
+
+Assuming the attribute value is not a complex JSON expression, we assume
+the value is a single atomic value or an array of atomic values.
+
+We infer the type -- see NCZ_inferattrtype() -- by looking at the
+first (possibly only) value of the attribute. The only tricky part of this
+occurs when we have a JSON string value. We need to decide if the type
+should be treated as NC_CHAR or as NC_STRING.
+The current rules are as follows:
+1. choose NC_CHAR if:
+    a. The value is a single value (not a JSON array) and NCJsort == NCJ_STRING
+    b. The value is an array and each element of the array
+       is a single character.
+2. else choose NC_STRING.
+
+So, for example:
+* "a" => NC_CHAR
+* "abcdef" => NC_CHAR
+* ["abcdef"] => NC_STRING
+* ["a","b","c","d","e","f"] => NC_CHAR
+* ["abc", "def"] => NC_STRING
+
 */
+
+/* Static zarr type name table */
+/* Used to convert nc_type <=> dtype */
 static const struct ZTYPESV2 {
-    const char* zarr[3];
-    const char* nczarr[3];
-} znamesv2[NUM_ATOMIC_TYPES] = {
-/* nc_type          Pure Zarr          NCZarr
-                   NE   LE     BE       NE    LE    BE*/
-/*NC_NAT*/	{{NULL,NULL,NULL},   {NULL,NULL,NULL}},
-/*NC_BYTE*/	{{"|i1","<i1",">i1"},{"|i1","<i1",">i1"}},
-/*NC_CHAR*/	{{">S1",">S1",">S1"},{">S1",">S1",">S1"}},
-/*NC_SHORT*/	{{"|i2","<i2",">i2"},{"|i2","<i2",">i2"}},
-/*NC_INT*/	{{"|i4","<i4",">i4"},{"|i4","<i4",">i4"}},
-/*NC_FLOAT*/	{{"|f4","<f4",">f4"},{"|f4","<f4",">f4"}},
-/*NC_DOUBLE*/	{{"|f8","<f8",">f8"},{"|f8","<f8",">f8"}},
-/*NC_UBYTE*/	{{"|u1","<u1",">u1"},{"|u1","<u1",">u1"}},
-/*NC_USHORT*/	{{"|u2","<u2",">u2"},{"|u2","<u2",">u2"}},
-/*NC_UINT*/	{{"|u4","<u4",">u4"},{"|u4","<u4",">u4"}},
-/*NC_INT64*/	{{"|i8","<i8",">i8"},{"|i8","<i8",">i8"}},
-/*NC_UINT64*/	{{"|u8","<u8",">u8"},{"|u8","<u8",">u8"}},
-/*NC_STRING*/	{{"|S%d","|S%d","|S%d"},{"|S%d","|S%d","|S%d"}},
+    const char* dtype;
+    int typelen;    
+} znamesv2[N_NCZARR_TYPES] = {
+/* nc_type       dtype */
+/*NC_NAT*/	{NULL,0},
+/*NC_BYTE*/	{"|i1",1},
+/*NC_CHAR*/	{">S1",1},
+/*NC_SHORT*/	{"|i2",2},
+/*NC_INT*/	{"|i4",4},
+/*NC_FLOAT*/	{"|f4",4},
+/*NC_DOUBLE*/	{"|f8",8},
+/*NC_UBYTE*/	{"|u1",1},
+/*NC_USHORT*/	{"|u2",2},
+/*NC_UINT*/	{"|u4",4},
+/*NC_INT64*/	{"|i8",8},
+/*NC_UINT64*/	{"|u8",8},
+/*NC_STRING*/	{"|S%d",0},
+/*NC_JSON*/	{"|J0",0} /* NCZarr internal type */
+};
+
+static const struct ZTYPESV3 {
+    const char* zarr;
+    size_t typelen;
+    const char* nczarr_tag;
+} znamesv3[N_NCZARR_TYPES] = {
+/* nc_type      Pure Zarr	NCZarr */
+/*NC_NAT*/	{NULL,		0,	NULL},
+/*NC_BYTE*/	{"int8",	0,	NULL},
+/*NC_CHAR*/	{"uint8",	0,	"char"},
+/*NC_SHORT*/	{"int16",	0,	NULL},
+/*NC_INT*/	{"int32",	0,	NULL},
+/*NC_FLOAT*/	{"float32",	0,	NULL},
+/*NC_DOUBLE*/	{"float64",	0,	NULL},
+/*NC_UBYTE*/	{"uint8",	0,	NULL},
+/*NC_USHORT*/	{"uint16",	0,	NULL},
+/*NC_UINT*/	{"uint32",	0,	NULL},
+/*NC_INT64*/	{"int64",	0,	NULL},
+/*NC_UINT64*/	{"uint64",	0,	NULL},
+/*NC_STRING*/	{"r%u",		0,	"string"},
+/*NC_JSON*/	{"json",	0,	NULL} /* NCZarr internal type */
 };
 
 /* map nc_type -> NCJ_SORT */
-static int zjsonsort[NUM_ATOMIC_TYPES] = {
+static int zjsonsort[N_NCZARR_TYPES] = {
 NCJ_UNDEF, /*NC_NAT*/
 NCJ_INT, /*NC_BYTE*/
-NCJ_INT, /*NC_CHAR*/
+NCJ_STRING, /*NC_CHAR*/
 NCJ_INT, /*NC_SHORT*/
 NCJ_INT, /*NC_INT*/
 NCJ_DOUBLE, /*NC_FLOAT*/
@@ -87,40 +151,10 @@ NCJ_INT, /*NC_UINT*/
 NCJ_INT, /*NC_INT64*/
 NCJ_INT, /*NC_UINT64*/
 NCJ_STRING, /*NC_STRING*/
+NCJ_DICT, /*NC_JSON*/
 };
-
-static const struct ZTYPESV3 {
-    const char* zarr;
-    const char* nczarr;
-} znamesv3[NUM_ATOMIC_TYPES] = {
-/* nc_type      Pure Zarr	NCZarr */
-/*NC_NAT*/	{NULL,		NULL},
-/*NC_BYTE*/	{"int8",	"int8"},
-/*NC_CHAR*/	{"uint8",	"uint8"},
-/*NC_SHORT*/	{"int16",	"int16"},
-/*NC_INT*/	{"int32",	"int32"},
-/*NC_FLOAT*/	{"float32",	"float32"},
-/*NC_DOUBLE*/	{"float64",	"float64"},
-/*NC_UBYTE*/	{"uint8",	"uint8"},
-/*NC_USHORT*/	{"uint16",	"uint16"},
-/*NC_UINT*/	{"uint32",	"uint32"},
-/*NC_INT64*/	{"int64",	"int64"},
-/*NC_UINT64*/	{"uint64",	"uint64"},
-/*NC_STRING*/	{"r%u",		"r%u"},
-};
-
-/* Map dtypes to nctype */
-/* Keep sorted for binary search */
-static struct ZDTYPEV3 {
-    const char* dtype;
-    nc_type nctype;
-    size_t nctypelen;
-} zdtypesv3[NUM_ATOMIC_TYPES];
-static int zdtypesv3n = 0;
-static int zdtypesinitialized=0;
 
 /* Forward */
-static void znamesv3init(void);
 static int splitfqn(const char* fqn0, NClist* segments);
 
 /**************************************************/
@@ -438,7 +472,7 @@ default fill value as a string.
 int
 ncz_default_fill_value(nc_type nctype, const char** dfaltp)
 {
-    if(nctype <= 0 || nctype > NC_MAX_ATOMIC_TYPE) return NC_EINVAL;
+    if(nctype <= 0 || nctype > N_NCZARR_TYPES) return NC_EINVAL;
     if(dfaltp) *dfaltp = zfillvalue[nctype];
     return NC_NOERR;	        
 }
@@ -456,7 +490,7 @@ fill value JSON type
 int
 ncz_fill_value_sort(nc_type nctype, int* sortp)
 {
-    if(nctype <= 0 || nctype > NC_MAX_ATOMIC_TYPE) return NC_EINVAL;
+    if(nctype <= 0 || nctype > N_NCZARR_TYPES) return NC_EINVAL;
     if(sortp) *sortp = zjsonsort[nctype];
     return NC_NOERR;	        
 }
@@ -520,12 +554,12 @@ done:
 }
 
 /**
-@internal Given an nc_type+other, produce the corresponding Zarr v2 dtype string.
+@internal Zarr V2: Given an nc_type+endianness+purezarr+MAXSTRLEN, produce the corresponding Zarr dtype string.
 @param nctype     - [in] nc_type
 @param endianness - [in] endianness
 @param purezarr   - [in] 1=>pure zarr, 0 => nczarr
-@param strlen     - [in] max string length
-@param namep      - [out] pointer to hold pointer to the dtype; user frees
+@param len        - [in] max string length
+@param dnamep     - [out] pointer to hold pointer to the dtype; user frees
 @return NC_NOERR
 @return NC_EINVAL
 @author Dennis Heimbigner
@@ -535,14 +569,24 @@ int
 ncz2_nctype2dtype(nc_type nctype, int endianness, int purezarr, int len, char** dnamep)
 {
     char dname[64];
-    const char* format = NULL;
+    const char* dtype = NULL;
 
-    if(nctype <= NC_NAT || nctype > NC_MAX_ATOMIC_TYPE) return NC_EINVAL;
-    if(purezarr)
-        format = znamesv2[nctype].zarr[endianness];
-    else
-        format = znamesv2[nctype].nczarr[endianness];
-    snprintf(dname,sizeof(dname),format,len);
+    if(nctype <= NC_NAT || nctype > N_NCZARR_TYPES) return NC_EINVAL;
+    dtype = znamesv2[nctype].dtype;
+    snprintf(dname,sizeof(dname),dtype,len);
+    /* Set endianness */
+    switch (nctype) {
+    case NC_STRING:
+    case NC_CHAR:
+    case NC_JSON:
+	break;    
+    default:
+	switch (endianness) {
+	case NC_ENDIAN_LITTLE: dname[0] = '<'; break;
+	case NC_ENDIAN_BIG: dname[0] = '>'; break;
+	case NC_ENDIAN_NATIVE: default: break;
+	}
+    }
     if(dnamep) *dnamep = strdup(dname);
     return NC_NOERR;		
 }
@@ -550,7 +594,7 @@ ncz2_nctype2dtype(nc_type nctype, int endianness, int purezarr, int len, char** 
 /*
 @internal Convert a numcodecs Zarr v2 dtype spec to a corresponding nc_type.
 @param nctype   - [in] dtype the dtype to convert
-@param nctype   - [in] typehint help disambiguate char vs string
+@param nctype   - [in] typehint help disambiguate e.g. char vs string
 @param purezarr - [in] 1=>pure zarr, 0 => nczarr
 @param nctypep  - [out] hold corresponding type
 @param endianp  - [out] hold corresponding endianness
@@ -565,17 +609,16 @@ ncz2_dtype2nctype(const char* dtype, nc_type typehint, int purezarr, nc_type* nc
 {
     int stat = NC_NOERR;
     size_t typelen = 0;
-    int count;
     char tchar;
     nc_type nctype = NC_NAT;
     int endianness = -1;
     const char* p;
-    int n;
+    int n,count;
 
     if(endianp) *endianp = NC_ENDIAN_NATIVE;
     if(nctypep) *nctypep = NC_NAT;
 
-    if(dtype == NULL) goto zerr;
+    if(dtype == NULL) {stat = NC_ENCZARR; goto done;}
     p = dtype;
     switch (*p++) {
     case '<': endianness = NC_ENDIAN_LITTLE; break;
@@ -585,57 +628,54 @@ ncz2_dtype2nctype(const char* dtype, nc_type typehint, int purezarr, nc_type* nc
     }
     tchar = *p++; /* get the base type */
     /* Decode the type length */
-    count = sscanf(p,"%zu%n",&typelen,&n);
-    if(count == 0) goto zerr;
+    count = sscanf(p,"%zd%n",&typelen,&n);
+    if(count == 0) {stat = NC_ENCZARR; goto done;}
     p += n;
 
-    /* Short circuit fixed length strings */
-    if(tchar == 'S') {
+    /* Short circuit special cases */
+    if(tchar == 'J') {
+        nctype = NC_JSON;
+    } else if(tchar == 'S') {
 	/* Fixed length string */
-	switch (typelen) {
-	case 1:
-	    nctype = (endianness == NC_ENDIAN_BIG ? NC_CHAR : NC_STRING);
-	    if(purezarr) nctype = NC_STRING; /* Zarr has no NC_CHAR type */
-	    break;
-	default:
+	if(endianness == NC_ENDIAN_BIG && typelen == 1)
+	    nctype = NC_CHAR;
+	else
 	    nctype = NC_STRING;
-	    break;
-	}
 	/* String/char have no endianness */
 	endianness = NC_ENDIAN_NATIVE;
-    } else {
+    } else { /* Numeric cases */
 	switch(typelen) {
         case 1:
 	    switch (tchar) {
   	    case 'i': nctype = NC_BYTE; break;
    	    case 'u': nctype = NC_UBYTE; break;
-	    default: goto zerr;
+	    default: {stat = NC_ENCZARR; goto done;}
 	    }
 	    break;
         case 2:
-	switch (tchar) {
-	case 'i': nctype = NC_SHORT; break;
-	case 'u': nctype = NC_USHORT; break;
-	default: goto zerr;
-	}
-	break;
+  	    switch (tchar) {
+	    case 'i': nctype = NC_SHORT; break;
+	    case 'u': nctype = NC_USHORT; break;
+	    default: {stat = NC_ENCZARR; goto done;}
+	    }
+	    break;
         case 4:
-	switch (tchar) {
-	case 'i': nctype = NC_INT; break;
-	case 'u': nctype = NC_UINT; break;
-	case 'f': nctype = NC_FLOAT; break;
-	default: goto zerr;
-	}
-	break;
+	    switch (tchar) {
+	    case 'i': nctype = NC_INT; break;
+	    case 'u': nctype = NC_UINT; break;
+	    case 'f': nctype = NC_FLOAT; break;
+	    default: {stat = NC_ENCZARR; goto done;}
+	    }
+	    break;
         case 8:
-	switch (tchar) {
-	case 'i': nctype = NC_INT64; break;
-	case 'u': nctype = NC_UINT64; break;
-	case 'f': nctype = NC_DOUBLE; break;
-	default: goto zerr;
-	}
-	break;
-        default: goto zerr;
+	    switch (tchar) {
+	    case 'i': nctype = NC_INT64; break;
+	    case 'u': nctype = NC_UINT64; break;
+	    case 'f': nctype = NC_DOUBLE; break;
+	    default: {stat = NC_ENCZARR; goto done;}
+	    }
+	    break;
+        default: {stat = NC_ENCZARR; goto done;}
         }
     }
 
@@ -651,42 +691,40 @@ ncz2_dtype2nctype(const char* dtype, nc_type typehint, int purezarr, nc_type* nc
 
 done:
     return stat;
-zerr:
-    stat = NC_ENCZARR;
-    goto done;
 }
 
 /**
-@internal Given an nc_type+other, produce the corresponding Zarr v3 dtype string.
+@internal Given an nc_type+purezarr+MAXSTRLEN, produce the corresponding Zarr v3 dtype string.
 @param nctype     - [in] nc_type
 @param purezarr   - [in] 1=>pure zarr, 0 => nczarr
 @param strlen     - [in] max string length
 @param namep      - [out] pointer to hold pointer to the dtype; user frees
+@param tagp       - [out] pointer to hold pointer to the nczarr tag
 @return NC_NOERR
 @return NC_EINVAL
 @author Dennis Heimbigner
 */
 
 int
-ncz3_nctype2dtype(nc_type nctype, int purezarr, int strlen, char** dnamep)
+ncz3_nctype2dtype(nc_type nctype, int purezarr, int strlen, char** dnamep, const char** tagp)
 {
     char dname[64];
-    const char* format = NULL;
+    const char* dtype = NULL;
+    const char* tag = NULL;
 
-    if(nctype <= NC_NAT || nctype > NC_MAX_ATOMIC_TYPE) return NC_EINVAL;
-    if(purezarr)
-        format = znamesv3[nctype].zarr;
-    else
-        format = znamesv3[nctype].nczarr;
-    snprintf(dname,sizeof(dname),format,strlen*8);
+    if(nctype <= NC_NAT || nctype > N_NCZARR_TYPES) return NC_EINVAL;
+    dtype = znamesv3[nctype].zarr;
+    tag = znamesv3[nctype].nczarr_tag;
+    snprintf(dname,sizeof(dname),dtype,strlen*8);
     if(dnamep) *dnamep = strdup(dname);
+    if(tagp) *tagp = tag;
     return NC_NOERR;		
 }
 
 /*
 @internal Convert a Zarr v3 data_type spec to a corresponding nc_type.
 @param nctype   - [in] data_type the dtype to convert
-@param purezarr - [in] 1=>pure zarr, 0 => nczarr
+@param hint     - [in] nczarr_tag hint | NULL
 @param nctypep  - [out] hold corresponding type
 @param typelenp - [out] hold corresponding type size (for fixed length strings)
 @return NC_NOERR
@@ -694,131 +732,89 @@ ncz3_nctype2dtype(nc_type nctype, int purezarr, int strlen, char** dnamep)
 @author Dennis Heimbigner
 */
 
-/* Comparator for search */
-static int
-srchznamesv3(const void* a, const void* b)
-{
-    const char* key = (const char*)a;
-    const struct ZDTYPEV3* elem = (struct ZDTYPEV3*)b;
-    return strcasecmp(key,elem->dtype);
-}
-
 int
-ncz3_dtype2nctype(const char* dtype, nc_type* nctypep, size_t* typelenp)
+ncz3_dtype2nctype(const char* dtype, const char* hint, nc_type* nctypep, size_t* typelenp)
 {
     int stat = NC_NOERR;
     nc_type nctype = NC_NAT;
     size_t typelen = 0;
-    void* match = NULL;
 
     if(nctypep) *nctypep = NC_NAT;
-    if(dtype == NULL) goto zerr;
-    if(!zdtypesinitialized) znamesv3init();
+    if(dtype == NULL) {stat = NC_ENCZARR; goto done;}
 
     /* Special case for r<n> == string */
     if(1 == sscanf(dtype,"r%zu",&typelen)) {
 	nctype = NC_STRING;	
-	if((typelen % 8) != 0) goto zerr;
+	if((typelen % 8) != 0) {stat = NC_ENCZARR; goto done;}
 	typelen = typelen / 8; /* convert bits to bytes */
-	goto done;
+    } else {
+	int i;
+	for(i=0;i<N_NCZARR_TYPES;i++) {
+	    if(znamesv3[i].zarr == NULL) continue;
+	    if(strcmp(znamesv3[i].zarr,dtype)==0) {
+                nctype = i;
+                typelen = znamesv3[i].typelen;
+	    }
+	}
     }
-    match = bsearch((void*)dtype,(void*)zdtypesv3,zdtypesv3n,sizeof(struct ZDTYPEV3),srchznamesv3);
-    if(match == NULL) goto zerr;
-    nctype = ((struct ZDTYPEV3*)match)->nctype;
-    typelen = ((struct ZDTYPEV3*)match)->nctypelen;
-
-done:
     if(nctypep) *nctypep = nctype;
     if(typelenp) *typelenp = typelen;
-    return stat;
-zerr:
-    stat = NC_ENCZARR;
-    goto done;
+
+done:
+    return THROW(stat);
 }
 
-/* Comparator for sort */
-static int
-cmpznamesv3(const void* a, const void* b)
-{
-    struct ZDTYPEV3* za = (struct ZDTYPEV3*)a;
-    struct ZDTYPEV3* zb = (struct ZDTYPEV3*)b;
-    return strcasecmp(za->dtype,zb->dtype);
-}
-
-static void
-znamesv3init(void)
-{
-    uintptr_t i,j;
-    struct ZDTYPEV3 zt;
-    memset((void*)zdtypesv3,0,sizeof(zdtypesv3));
-    for(j=0,i=NC_BYTE;i<NC_STRING;i++) {
-	zt.dtype = znamesv3[i].zarr;
-	zt.nctype = i;
-	nc_inq_type(0,i,NULL,&zt.nctypelen);
-	zdtypesv3[j++] = zt;
-    }
-    zdtypesv3n = j;
-    qsort((void*)zdtypesv3,zdtypesv3n,sizeof(struct ZDTYPEV3),cmpznamesv3);
-    zdtypesinitialized = 1;
-}
-
-/* Infer the attribute's type based
-primarily on the first atomic value encountered
-recursively.
-*/
+/* Infer the attribute's type based on its value(s).*/
 int
-NCZ_inferattrtype(const NCjson* value, nc_type typehint, nc_type* typeidp)
+NCZ_inferattrtype(const NCjson* values, nc_type typehint, nc_type* typeidp)
 {
-    int i,stat = NC_NOERR;
+    int stat = NC_NOERR;
     nc_type typeid;
-    NCjson* j = NULL;
     unsigned long long u64;
     long long i64;
     int negative = 0;
+    int singleton = 0;
+    const NCjson* value = NULL;
 
-    if(NCJsort(value) == NCJ_ARRAY && NCJarraylength(value) == 0)
+    if(NCJsort(values) == NCJ_ARRAY && NCJarraylength(values) == 0)
         {typeid = NC_NAT; goto done;} /* Empty array is illegal */
 
-    if(NCJsort(value) == NCJ_NULL)
+    if(NCJsort(values) == NCJ_NULL)
         {typeid = NC_NAT; goto done;} /* NULL is also illegal */
 
-    if(NCJsort(value) == NCJ_DICT) /* Complex JSON expr -- a dictionary */
-        {typeid = NC_NAT; goto done;}
+    if(typehint == NC_JSON)
+        {typeid = NC_JSON; goto done;}
 
-    /* If an array, make sure all the elements are simple */
-    if(value->sort == NCJ_ARRAY) {
-	for(i=0;i<NCJarraylength(value);i++) {
-	    j=NCJith(value,i);
-	    if(!NCJisatomic(j))
-	        {typeid = NC_NAT; goto done;}
-	}
+    if(NCZ_iscomplexjson(values,typehint))
+        {typeid = NC_JSON; goto done;}
+
+    assert(NCJisatomic(values) || (NCJsort(values) == NCJ_ARRAY /*&& all i: NCJisatomic(NCJith(values)) == NCJ_ARRAY*/));
+
+    /* Get the first element */
+    if(NCJsort(values) == NCJ_ARRAY) {
+	value = NCJith(values,0);
+    } else if(NCJisatomic(values)) {
+        value = values; /*singleton*/
+	singleton = 1;
     }
 
-    /* Infer from first element */
-    if(value->sort == NCJ_ARRAY) {
-        j=NCJith(value,0);
-	return NCZ_inferattrtype(j,typehint,typeidp);
-    }
-
-    /* At this point, value is a primitive JSON Value */
-
+    /* Look at the first element */
     switch (NCJsort(value)) {
     case NCJ_NULL:
-        typeid = NC_NAT;
-	return NC_NOERR;
-    case NCJ_DICT:
-    	typeid = NC_CHAR;
-	goto done;
     case NCJ_UNDEF:
-	return NC_EINVAL;
-    default: /* atomic */
+	stat = NC_EINVAL;
+	goto done;
+    case NCJ_ARRAY:
+    case NCJ_DICT:
+    	typeid = NC_JSON;
+	goto done;
+    default: /* atomic type */
 	break;
     }
 
-    if(NCJstring(value) != NULL)
-        negative = (NCJstring(value)[0] == '-');
-    switch (value->sort) {
+    switch (NCJsort(value)) {
     case NCJ_INT:
+        if(NCJstring(value) != NULL) negative = (NCJstring(value)[0] == '-');
 	if(negative) {
 	    sscanf(NCJstring(value),"%lld",&i64);
 	    u64 = (unsigned long long)i64;
@@ -833,11 +829,28 @@ NCZ_inferattrtype(const NCjson* value, nc_type typehint, nc_type* typeidp)
 	typeid = NC_UBYTE;
 	break;
     case NCJ_STRING: /* requires special handling as an array of characters */
-	typeid = NC_CHAR;
+	typeid = NC_STRING;
 	break;
     default:
 	stat = NC_ENCZARR;
+	goto done;
     }
+
+    /* Infer NC_CHAR vs NC_STRING */
+    if(typeid == NC_STRING) {
+	if(singleton && NCJsort(value) == NCJ_STRING)
+	    typeid = NC_CHAR;
+	else if(NCJsort(values) == NCJ_ARRAY) {
+	    int ischar1;
+	    size_t i;
+	    for(ischar1=1,i=0;i<NCJarraylength(values);i++) {
+		NCjson* jelem = NCJith(values,i);
+		if(NCJsort(jelem) != NCJ_STRING || strlen(NCJstring(jelem)) != 1) {ischar1 = 0; break;}
+	    }
+	    if(ischar1) typeid = NC_CHAR;
+	}
+    }
+
 done:
     if(typeidp) *typeidp = typeid;
     return stat;

@@ -16,6 +16,7 @@
 
 /* Forward */
 static int NCZ_charify(const NCjson* src, NCbytes* buf);
+static int NCZ_json_convention_read(const NCjson* json, NCjson** jtextp);
 
 /**
  * @internal Get the attribute list for either a varid or NC_GLOBAL
@@ -43,7 +44,7 @@ ncz_getattlist(NC_GRP_INFO_T *grp, int varid, NC_VAR_INFO_T **varp, NCindex **at
     {
         /* Do we need to read the atts? */
         if (!grp->atts_read)
-            if ((retval = NCZ_read_attrs(file, (NC_OBJ*)grp)))
+            if ((retval = NCZ_read_attrs(file, (NC_OBJ*)grp, NULL)))
                 return retval;
 
         if (varp)
@@ -60,7 +61,7 @@ ncz_getattlist(NC_GRP_INFO_T *grp, int varid, NC_VAR_INFO_T **varp, NCindex **at
 
         /* Do we need to read the atts? */
         if (!var->atts_read)
-            if ((retval = NCZ_read_attrs(file, (NC_OBJ*)var)))
+            if ((retval = NCZ_read_attrs(file, (NC_OBJ*)var, NULL)))
                 return retval;
 
         if (varp)
@@ -1058,10 +1059,11 @@ Find the attributes and attrbute types in json form
 and then create them in the appropriate container.
 @param file
 @param container Group or Variable.
+@param jatts the Attributes in json format or NULL if needs retrieval.
 */
 
 int
-NCZ_read_attrs(NC_FILE_INFO_T* file, NC_OBJ* container)
+NCZ_read_attrs(NC_FILE_INFO_T* file, NC_OBJ* container, const NCjson* jatts)
 {
     int stat = NC_NOERR;
     size_t alen = 0;
@@ -1095,7 +1097,7 @@ NCZ_read_attrs(NC_FILE_INFO_T* file, NC_OBJ* container)
     }
 
     /* Read the attribute info */
-    if((stat=NCZF_readattrs(file,container,&ainfo))) goto done;
+    if((stat=NCZF_readattrs(file,container,jatts,&ainfo))) goto done;
 
     if(ainfo != NULL) {
         /* Create the attributes (watching out for special attributes) */
@@ -1196,7 +1198,7 @@ NCZ_computeattrinfo(const char* name, nc_type typeid, nc_type typehint, int pure
     /* Use the hint if given one */
     if(typeid == NC_NAT)
 	typeid = typehint;
-    assert(typeid > NC_NAT && typeid <= NC_MAX_ATOMIC_TYPE);
+    assert(typeid > NC_NAT && typeid <= N_NCZARR_TYPES);
 
     if((stat = NCZ_computeattrdata(typehint, &typeid, values, &typelen, &len, &data))) goto done;
 
@@ -1222,19 +1224,21 @@ NCZ_computeattrdata(nc_type typehint, nc_type* typeidp, const NCjson* values, si
     nc_type typeid = NC_NAT;
     NCjson* jtext = NULL;
     int reclaimvalues = 0;
-    int isjson = 0; /* 1 => attribute value is neither scalar nor array of scalars */
+    int isjson = 0; /* 1 => json valued attribute */
     int count = 0; /* no. of attribute values */
 
     ZTRACE(3,"typehint=%d typeid=%d values=|%s|",typehint,*typeidp,NCJtotext(values));
 
     /* Get assumed type */
     if(typeidp) typeid = *typeidp;
-    if(typeid == NC_NAT && !isjson) {
-	if((stat = NCZ_inferattrtype(values,typehint, &typeid))) goto done;
-    }
 
     /* See if this is a simple vector (or scalar) of atomic types */
     isjson = NCZ_iscomplexjson(values,typeid);
+
+    /* If we don't know, then infer the type */
+    if(typeid == NC_NAT && !isjson) {
+	if((stat = NCZ_inferattrtype(values,typehint, &typeid))) goto done;
+    }
 
     if(isjson) {
 	/* Apply the JSON attribute convention and convert to JSON string */
@@ -1413,7 +1417,7 @@ NCZ_charify(const NCjson* src, NCbytes* buf)
 Implement the JSON convention:
 Stringify it as the value and make the attribute be of type "char".
 */
-int
+static int
 NCZ_json_convention_read(const NCjson* json, NCjson** jtextp)
 {
     int stat = NC_NOERR;

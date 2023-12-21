@@ -101,7 +101,7 @@ ncz_open_file(const char *path, int mode, NClist* controls, int ncid)
 
     /* We must read in the attributes of the root group to get
        e.g. provenance and classic model attribute */
-    if((stat = NCZ_read_attrs(h5,(NC_OBJ*)h5->root_grp))) goto exit;
+    if((stat = NCZ_read_attrs(h5,(NC_OBJ*)h5->root_grp,NULL))) goto exit;
 
     /* Check for classic model attribute. */
     if ((stat = check_for_classic_model(h5->root_grp, &is_classic)))

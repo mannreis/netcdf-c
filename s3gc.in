@@ -3,7 +3,7 @@
 # Uncomment to get verbose output
 #VERBOSE=1
 
-if test "x$VERBOSE" = x1 ; then set -x; fi
+if test "x$VERBOSE" = x2 ; then set -x; fi
 
 # Constants passed in from configure.ac/CMakeLists
 abs_top_srcdir='@abs_top_srcdir@'

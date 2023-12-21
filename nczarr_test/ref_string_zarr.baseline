@@ -3,18 +3,18 @@ dimensions:
 	d2 = 2 ;
 	_scalar_ = 1 ;
 variables:
-	string c(d2) ;
+	char c(d2) ;
 	string truncated(_scalar_) ;
 		truncated:_nczarr_maxstrlen = 4 ;
 	string v(d2) ;
 
 // global attributes:
-		:stringattr = "[\"abc\",\"def\"]" ;
+		string :stringattr = "abc", "def" ;
 		:charattr = "ghijkl" ;
 		:_nczarr_default_maxstrlen = 6 ;
 data:
 
- c = "a", "b" ;
+ c = "ab" ;
 
  truncated = "0123" ;
 
