@@ -12,6 +12,9 @@ AC_PREREQ([2.59])
 # Initialize with name, version, and support email address.
 AC_INIT([netCDF],[4.9.3-development],[support-netcdf@unidata.ucar.edu],[netcdf-c])
 
+rm -f nczarr_test/v3_tests/Makefile.am
+cat nczarr_test/Makefile.am nczarr_test/v3_tests/Makefile.am.in > nczarr_test/v3_tests/Makefile.am 
+
 ##
 # Prefer an empty CFLAGS variable instead of the default -g -O2.
 # See:
@@ -2271,7 +2274,6 @@ AC_CONFIG_FILES([nc_perf/run_par_bm_test.sh], [chmod ugo+x nc_perf/run_par_bm_te
 AC_CONFIG_FILES([nc_perf/run_gfs_test.sh], [chmod ugo+x nc_perf/run_gfs_test.sh])
 AC_CONFIG_FILES([examples/C/run_par_test.sh], [chmod ugo+x examples/C/run_par_test.sh])
 AC_CONFIG_FILES([nc-config], [chmod 755 nc-config])
-
 # Config and copy into nczarr_test
 AC_CONFIG_FILES(nczarr_test/findplugin.sh:nc_test4/findplugin.in, [chmod ugo+x nczarr_test/findplugin.sh])
 for fp in unit_test/timer_utils.h unit_test/timer_utils.h unit_test/timer_utils.c nc_test4/test_filter.c nc_test4/test_filter_misc.c nc_test4/tst_multifilter.c nc_test4/test_filter_repeat.c nc_test4/test_filter_order.c ; do
@@ -2323,6 +2325,7 @@ AC_CONFIG_FILES([Makefile
                  dap4_test/Makefile
                  plugins/Makefile
 		 nczarr_test/Makefile
+ 		 nczarr_test/v3_tests/Makefile
                  ])
 AC_OUTPUT()
 

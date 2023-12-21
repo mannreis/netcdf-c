@@ -1,8 +1,6 @@
 ## This is a automake file, part of Unidata's netCDF package.
 # Copyright 2018, see the COPYRIGHT file for more information.
 
-# This file builds and runs DAP4 tests.
-
 # Put together AM_CPPFLAGS and AM_LDFLAGS.
 include $(top_srcdir)/lib_flags.am
 
@@ -341,27 +339,14 @@ clean-local: clean-v3
 	rm -fr testdir_* testset_*
 	rm -fr tmp_*.nc tmp_*.zarr tst_quantize*.zarr tmp*.file results.file results.s3 results.zip
 	rm -fr rcmiscdir ref_power_901_constants.file 
+	rm -fr v3_*.log v3_*.trs
 if ENABLE_S3_TESTALL
 	bash ${abs_top_builddir}/s3cleanup.sh
 endif
 
-clean-v3:
-	rm -fr v3_*.log v3_*.trs
-
-check-local: check-v3
-
-check-v3:
-	am__color_tests=no; \
-	am__enable_hard_errors=no; \
-	am__expect_failure=no; \
-	for t in $(TESTS) ; do \
-	    export NCZARRFORMAT=3; \
-	    V3T="v3_$$t"; \
-	    p="$${V3T}$(EXEEXT)"; \
-	$(am_check_pre) $(LOG_DRIVER) --test-name "$${V3T}" --log-file "$${V3T}.log" --trs-file "$${V3T}.trs" $(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) "${srcdir}/$$t" $(AM_TESTS_FD_REDIRECT) ;\
-	done
-
 DISTCLEANFILES = findplugin.sh ${BUILT_SOURCES}
+
+SUBDIRS = v3_tests
 
 # If valgrind is present, add valgrind targets.
 @VALGRIND_CHECK_RULES@
