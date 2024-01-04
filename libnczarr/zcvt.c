@@ -551,11 +551,9 @@ NCZ_stringconvert(nc_type typeid, size_t len, void* data0, NCjson** jdatap)
 
     /* Handle char type specially */
     if(typeid == NC_CHAR) {
-	/* Apply the JSON write convention */
-        if(NCJparsen(len,src,0,&jdata)<0) { /* !parseable */
-  	    /* Create a string valued json object */
-	    NCJnewstringn(NCJ_STRING,len,src,&jdata);
-	}
+        /* Not complex json */
+  	/* Create a string valued json object */
+	NCJnewstringn(NCJ_STRING,len,src,&jdata);
     } else if(len == 1) { /* create singleton */
 	NCJnew(jtype,&jdata);
         if((stat = NCZ_stringconvert1(typeid, src, jdata))) goto done;

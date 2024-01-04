@@ -570,6 +570,37 @@ NC_s3sdkclose(void* s3client0, NCS3INFO* info, int deleteit, char** errmsgp)
     return NCUNTRACE(stat);
 }
 
+EXTERNL int
+NC_s3sdktruncate(void* s3client0, const char* bucket, const char* prefix, char** errmsgp)
+{
+    int stat = NC_NOERR;
+    char* errmsg = NULL;
+    size_t nkeys;
+    char** keys = NULL;
+    NCS3CLIENT* s3client = (NCS3CLIENT*)s3client0;
+
+    NCTRACE(11,"info=%s",NC_s3dumps3info(info));
+
+    if((stat = NC_s3sdklistall(s3client0,bucket,prefix,&nkeys,&keys,&errmsg))) goto done;
+
+    if(nkeys > 0 && keys != NULL) {
+	size_t i;
+	/* Sort the list -- shortest first */
+	NC_sortenvv(nkeys,keys);
+	for(i=0;i<nkeys;i++) {
+	    if((stat = NC_s3sdkdeletekey(s3client, bucket, keys[i], NULL)))
+		goto done;
+        }
+    }
+
+    if(errmsgp) {*errmsgp = errmsg; errmsg = NULL;}
+
+done:
+    nullfree(errmsg);
+    NC_freeenvv(nkeys,keys);    
+    return NCUNTRACE(stat);
+}
+
 /*
 Return a list of names of legal objects immediately below a specified key.
 In theory, the returned list should be sorted in lexical order,
@@ -653,7 +684,7 @@ Return a list of full keys  of legal objects immediately below a specified key.
 Not necessarily sorted.
 */
 EXTERNL int
-NC_s3sdkgetkeys(void* s3client0, const char* bucket, const char* prefixkey0, size_t* nkeysp, char*** keysp, char** errmsgp)
+NC_s3sdklist(void* s3client0, const char* bucket, const char* prefixkey0, size_t* nkeysp, char*** keysp, char** errmsgp)
 {
     return getkeys(s3client0, bucket, prefixkey0, "/", nkeysp, keysp, errmsgp);
 }
@@ -663,7 +694,7 @@ Return a list of full keys  of legal objects immediately below a specified key.
 Not necessarily sorted.
 */
 EXTERNL int
-NC_s3sdksearch(void* s3client0, const char* bucket, const char* prefixkey0, size_t* nkeysp, char*** keysp, char** errmsgp)
+NC_s3sdklistall(void* s3client0, const char* bucket, const char* prefixkey0, size_t* nkeysp, char*** keysp, char** errmsgp)
 {
     return getkeys(s3client0, bucket, prefixkey0, NULL, nkeysp, keysp, errmsgp);
 }

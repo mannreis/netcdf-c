@@ -12,9 +12,6 @@ AC_PREREQ([2.59])
 # Initialize with name, version, and support email address.
 AC_INIT([netCDF],[4.9.3-development],[support-netcdf@unidata.ucar.edu],[netcdf-c])
 
-rm -f nczarr_test/v3_tests/Makefile.am
-cat nczarr_test/Makefile.am nczarr_test/v3_tests/Makefile.am.in > nczarr_test/v3_tests/Makefile.am 
-
 ##
 # Prefer an empty CFLAGS variable instead of the default -g -O2.
 # See:
@@ -2325,7 +2322,7 @@ AC_CONFIG_FILES([Makefile
                  dap4_test/Makefile
                  plugins/Makefile
 		 nczarr_test/Makefile
- 		 nczarr_test/v3_tests/Makefile
+ 		 v3_tests/Makefile
                  ])
 AC_OUTPUT()
 

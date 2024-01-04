@@ -253,7 +253,9 @@ s3io_close(ncio* nciop, int deleteit)
     assert(s3io != NULL);
 
     if(s3io->s3client && s3io->s3.bucket && s3io->s3.rootkey) {
-        NC_s3sdkclose(s3io->s3client, &s3io->s3, deleteit, &s3io->errmsg);
+	if(deleteit)
+	    NC_s3sdktruncate(s3io->s3client, s3io->s3.bucket, s3io->s3.rootkey, &s3io->errmsg);
+        NC_s3sdkclose(s3io->s3client, &s3io->errmsg);
     }
     s3io->s3client = NULL;
     NC_s3clear(&s3io->s3);

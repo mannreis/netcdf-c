@@ -162,7 +162,7 @@ NC_s3sdkcreateclient(NCS3INFO* info)
 done:
     nullfree(urlroot);
     if(stat && s3client) {
-        NC_s3sdkclose(s3client,info,0,NULL);
+        NC_s3sdkclose(s3client,NULL);
 	s3client = NULL;
     }
     NCNILTRACE(NC_NOERR);
@@ -300,28 +300,49 @@ done:
 }
 
 EXTERNL int
-NC_s3sdkclose(void* s3client0, NCS3INFO* info, int deleteit, char** errmsgp)
+NC_s3sdkclose(void* s3client0, char** errmsgp)
 {
     int stat = NC_NOERR;
     NCS3CLIENT* s3client = (NCS3CLIENT*)s3client0;
 
-    NCTRACE(11,"info=%s deleteit=%d",NC_s3dumps3info(info),deleteit);
-    
-    if(deleteit) {
-        /* Delete the root key; ok it if does not exist */
-        switch (stat = NC_s3sdkdeletekey(s3client0,info->bucket,info->rootkey,errmsgp)) {
-        case NC_NOERR: break;
-        case NC_EEMPTY: case NC_ENOTFOUND: stat = NC_NOERR; break;
-        default: break;
-        }
-    }
+    NCTRACE(11,"");
     s3client_destroy(s3client);
     return NCUNTRACE(stat);
 }
 
+EXTERNL int
+NC_s3sdktruncate(void* s3client0, const char* bucket, const char* prefix, char** errmsgp)
+{
+    int stat = NC_NOERR;
+    char* errmsg = NULL;
+    size_t nkeys;
+    char** keys = NULL;
+    NCS3CLIENT* s3client = (NCS3CLIENT*)s3client0;
+
+    NCTRACE(11,"bucket=%s prefix=%s",bucket,prefix);
+
+    if((stat = NC_s3sdklistall(s3client0,bucket,prefix,&nkeys,&keys,&errmsg))) goto done;
+
+    if(nkeys > 0 && keys != NULL) {
+	size_t i;
+	/* Sort the list -- shortest first */
+	NC_sortenvv(nkeys,keys);
+	for(i=0;i<nkeys;i++) {
+	    if((stat = NC_s3sdkdeletekey(s3client, bucket, keys[i], NULL))) goto done;
+        }
+    }
+
+    if(errmsgp) {*errmsgp = errmsg; errmsg = NULL;}
+
+done:
+    nullfree(errmsg);
+    NC_freeenvv(nkeys,keys);    
+    return NCUNTRACE(stat);
+}
+
 /*
-Common code for getkeys and searchkeys.
-Return a list of names of legal objects immediately below a specified key.
+Common code for list and listall.
+Return a list of names of legal objects immediately or anywhere below a specified key.
 In theory, the returned list should be sorted in lexical order,
 but it possible that it is not.
 */
@@ -399,19 +420,19 @@ In theory, the returned list should be sorted in lexical order,
 but it possible that it is not.
 */
 EXTERNL int
-NC_s3sdkgetkeys(void* s3client0, const char* bucket, const char* prefixkey0, size_t* nkeysp, char*** keysp, char** errmsgp)
+NC_s3sdklist(void* s3client0, const char* bucket, const char* prefixkey0, size_t* nkeysp, char*** keysp, char** errmsgp)
 {
     NCTRACE(11,"bucket=%s prefixkey0=%s",bucket,prefixkey0);
     return NCUNTRACE(getkeys(s3client0, bucket, prefixkey0, "/", nkeysp, keysp, errmsgp));
 }
 
 /*
-Return a list of full keys  of legal objects immediately below a specified key.
+Return a list of full keys  of legal objects below a specified key.
 Not necessarily sorted.
 Essentially same as getkeys, but with no delimiter.
 */
 EXTERNL int
-NC_s3sdksearch(void* s3client0, const char* bucket, const char* prefixkey0, size_t* nkeysp, char*** keysp, char** errmsgp)
+NC_s3sdklistall(void* s3client0, const char* bucket, const char* prefixkey0, size_t* nkeysp, char*** keysp, char** errmsgp)
 {
     NCTRACE(11,"bucket=%s prefixkey0=%s",bucket,prefixkey0);
     return NCUNTRACE(getkeys(s3client0, bucket, prefixkey0, NULL, nkeysp, keysp, errmsgp));
@@ -429,7 +450,11 @@ NC_s3sdkdeletekey(void* s3client0, const char* bucket, const char* pathkey, char
 
     if((stat = makes3fullpath(s3client->rooturl,bucket,pathkey,NULL,url))) goto done;
 
-    if((stat = NCH5_s3comms_s3r_deletekey(s3client->h5s3client, ncbytescontents(url), &httpcode))) goto done;
+    switch(stat = NCH5_s3comms_s3r_deletekey(s3client->h5s3client, ncbytescontents(url), &httpcode)) {
+    case NC_NOERR: break;
+    case NC_EEMPTY: stat = NC_NOERR; break; /* don't care */
+    default: goto done;
+    }
 
 done:
     ncbytesfree(url);

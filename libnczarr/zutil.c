@@ -25,6 +25,8 @@ There are (currently) two type issues that need special hacks.
 2. Need a fake dtype to support the JSON convention allowing
    an attribute's value to be a JSON value.
 
+Zarr Version 2:
+-------------------
 For issue 1, use these dtypes to distinquish NC_STRING && MAXSTRLEN==1 from NC_CHAR
 * ">S1" for NC_CHAR.
 * "|S1" for NC_STRING && MAXSTRLEN==1
@@ -39,6 +41,16 @@ These choices are admittedly a bit of a hack, and the first case in particular
 will probably cause errors in some other Zarr implementations; the Zarr spec
 is unclear about what combinations are legal. Issue 2 will only be interpreted by
 NCZarr code, so that choice is arbitrary.
+
+Zarr Version 3:
+-------------------
+For issues 1 and 2, we have the following table:
+| dtype | type_alias |
+| ----- | ---------- |
+| uint8 | char       |
+| rn    | string     |
+| uint8 | json       |
+
 
 In the event that we are reading a pure Zarr file, we need to make
 inferences about the above issues but lacking any NCZarr hints.
@@ -57,16 +69,15 @@ by the function NCZ_iscomplexjson(). Basically the rule is as follows:
 2. Otherwise, the attribute value is COMPLEX.
 
 In the event that we want to write a complex JSON valued attribute,
-we use the following rules:
-1. The attribute type must be of type NC_CHAR.
-2. The first character of the value is "{" and the last
-   character is "}".
-3. The value, treated as a string, must be parseable to
-   a single JSON dictionary.
+we use the following rules in order (see NCZ_iscomplexjsontext()):
+1. Attribute type is not of type NC_CHAR => not complex
+2. Attribute value contains no unescaped '[' and no unescaped '{' => not complex
+3. The value, treated as a string, is not JSON parseable => notcomplex
+4. else the value can be treated as a complex json value.
 
-Note that this means that only dictionaries can be stored as a JSON valued
-attributes. The reason is that we want to avoid parsing every NC_CHAR
-valued attribute, so we use a heuristic classifier (rule 2 above).
+This is admittedly a hack that uses rule 2 to delay parsing the
+attribute value as long as possible. Note the rules will change
+when/if structured types (e.g. compound, complex) are added.
 
 Assuming the attribute value is not a complex JSON expression, we assume
 the value is a single atomic value or an array of atomic values.
@@ -115,25 +126,25 @@ static const struct ZTYPESV2 {
 };
 
 static const struct ZTYPESV3 {
-    const char* zarr;
+    const char* zarr; /* Must be a legitimate Zarr V3 type */
     size_t typelen;
-    const char* nczarr_tag;
+    const char* type_alias;
 } znamesv3[N_NCZARR_TYPES] = {
-/* nc_type      Pure Zarr	NCZarr */
-/*NC_NAT*/	{NULL,		0,	NULL},
-/*NC_BYTE*/	{"int8",	0,	NULL},
-/*NC_CHAR*/	{"uint8",	0,	"char"},
-/*NC_SHORT*/	{"int16",	0,	NULL},
-/*NC_INT*/	{"int32",	0,	NULL},
-/*NC_FLOAT*/	{"float32",	0,	NULL},
-/*NC_DOUBLE*/	{"float64",	0,	NULL},
-/*NC_UBYTE*/	{"uint8",	0,	NULL},
-/*NC_USHORT*/	{"uint16",	0,	NULL},
-/*NC_UINT*/	{"uint32",	0,	NULL},
-/*NC_INT64*/	{"int64",	0,	NULL},
-/*NC_UINT64*/	{"uint64",	0,	NULL},
-/*NC_STRING*/	{"r%u",		0,	"string"},
-/*NC_JSON*/	{"json",	0,	NULL} /* NCZarr internal type */
+/* nc_type       Pure Zarr   typelen    NCZarr */
+/*NC_NAT*/      {NULL,          0,      NULL},
+/*NC_BYTE*/     {"int8",        0,      NULL},
+/*NC_CHAR*/     {"uint8",       0,      "char"},
+/*NC_SHORT*/    {"int16",       0,      NULL},
+/*NC_INT*/      {"int32",       0,      NULL},
+/*NC_FLOAT*/    {"float32",     0,      NULL},
+/*NC_DOUBLE*/   {"float64",     0,      NULL},
+/*NC_UBYTE*/    {"uint8",       0,      NULL},
+/*NC_USHORT*/   {"uint16",      0,      NULL},
+/*NC_UINT*/     {"uint32",      0,      NULL},
+/*NC_INT64*/    {"int64",       0,      NULL},
+/*NC_UINT64*/   {"uint64",      0,      NULL},
+/*NC_STRING*/   {"r%u",         0,      "string"},
+/*NC_JSON*/     {"uint8",       0,      "json"} /* NCZarr internal type */
 };
 
 /* map nc_type -> NCJ_SORT */
@@ -525,7 +536,7 @@ NCZ_subobjects(NCZMAP* map, const char* prefix, const char* tag, char dimsep, NC
     NCbytes* path = ncbytesnew();
 
     /* Get the list of names just below prefix */
-    if((stat = nczmap_search(map,prefix,matches))) goto done;
+    if((stat = nczmap_list(map,prefix,matches))) goto done;
     for(i=0;i<nclistlength(matches);i++) {
 	const char* name = nclistget(matches,i);
 	size_t namelen= strlen(name);	
@@ -617,6 +628,7 @@ ncz2_dtype2nctype(const char* dtype, nc_type typehint, int purezarr, nc_type* nc
 
     if(endianp) *endianp = NC_ENDIAN_NATIVE;
     if(nctypep) *nctypep = NC_NAT;
+    if(typelenp) *typelenp = 0;
 
     if(dtype == NULL) {stat = NC_ENCZARR; goto done;}
     p = dtype;
@@ -714,7 +726,7 @@ ncz3_nctype2dtype(nc_type nctype, int purezarr, int strlen, char** dnamep, const
 
     if(nctype <= NC_NAT || nctype > N_NCZARR_TYPES) return NC_EINVAL;
     dtype = znamesv3[nctype].zarr;
-    tag = znamesv3[nctype].nczarr_tag;
+    tag = znamesv3[nctype].type_alias;
     snprintf(dname,sizeof(dname),dtype,strlen*8);
     if(dnamep) *dnamep = strdup(dname);
     if(tagp) *tagp = tag;
@@ -723,8 +735,8 @@ ncz3_nctype2dtype(nc_type nctype, int purezarr, int strlen, char** dnamep, const
 
 /*
 @internal Convert a Zarr v3 data_type spec to a corresponding nc_type.
-@param nctype   - [in] data_type the dtype to convert
-@param hint     - [in] nczarr_tag hint | NULL
+@param dtype    - [in] dtype to convert
+@param dalias   - [in] alias of dtype
 @param nctypep  - [out] hold corresponding type
 @param typelenp - [out] hold corresponding type size (for fixed length strings)
 @return NC_NOERR
@@ -733,29 +745,52 @@ ncz3_nctype2dtype(nc_type nctype, int purezarr, int strlen, char** dnamep, const
 */
 
 int
-ncz3_dtype2nctype(const char* dtype, const char* hint, nc_type* nctypep, size_t* typelenp)
+ncz3_dtype2nctype(const char* dtype , const char* dalias, nc_type* nctypep, size_t* typelenp)
 {
     int stat = NC_NOERR;
     nc_type nctype = NC_NAT;
     size_t typelen = 0;
 
     if(nctypep) *nctypep = NC_NAT;
-    if(dtype == NULL) {stat = NC_ENCZARR; goto done;}
+    if(typelenp) *typelenp = 0;
 
-    /* Special case for r<n> == string */
-    if(1 == sscanf(dtype,"r%zu",&typelen)) {
-	nctype = NC_STRING;	
-	if((typelen % 8) != 0) {stat = NC_ENCZARR; goto done;}
-	typelen = typelen / 8; /* convert bits to bytes */
-    } else {
-	int i;
-	for(i=0;i<N_NCZARR_TYPES;i++) {
+    /* handle netcdf type aliases */
+    if(dalias != NULL) { 
+	if(strcmp(dalias,"string")==0) {
+	    nctype = NC_STRING;	    
+	    if(dtype != NULL) {
+	        if(1 != sscanf(dtype,"r%zu",&typelen)) {stat = NC_ENCZARR; goto done;}
+		if((typelen % 8) != 0) {stat = NC_ENCZARR; goto done;}
+		typelen = typelen / 8; /* convert bits to bytes */
+	    }
+	} else if(strcmp(dalias,"char")==0) {
+	    nctype = NC_CHAR;
+	    typelen = 1;
+	} else if(strcmp(dalias,"json")==0) {
+	    nctype = NC_JSON;
+	    typelen = 0;
+	} else
+	    {dtype = dalias;}
+    }
+    if(nctype == NC_NAT) {
+	int i, match;
+	assert(dtype != NULL);
+	/* short circuit handling of rn */
+	if(1 == sscanf(dtype,"r%zu",&typelen)) {
+	    nctype = NC_STRING;
+   	    if((typelen % 8) != 0) {stat = NC_ENCZARR; goto done;}
+	    typelen = typelen / 8; /* convert bits to bytes */
+	    match = 1;
+	} else for(match=0,i=0;i<N_NCZARR_TYPES;i++) {
 	    if(znamesv3[i].zarr == NULL) continue;
 	    if(strcmp(znamesv3[i].zarr,dtype)==0) {
                 nctype = i;
                 typelen = znamesv3[i].typelen;
+		match = 1;
+		break;
 	    }
 	}
+	if(!match) {stat = NC_ENOTZARR; goto done;}
     }
     if(nctypep) *nctypep = nctype;
     if(typelenp) *typelenp = typelen;
@@ -1215,8 +1250,8 @@ NCZ_iscomplexjson(const NCjson* json, nc_type typehint)
 
     switch (NCJsort(json)) {
     case NCJ_ARRAY:
-	/* If the typehint is NC_CHAR, then always treat it as complex */
-	if(typehint == NC_CHAR) {stat = 1; goto done;}
+	/* If the typehint is NC_JSON, then always treat it as complex */
+	if(typehint == NC_JSON) {stat = 1; goto done;}
 	/* Otherwise see if it is a simple vector of atomic values */
 	for(i=0;i < NCJarraylength(json);i++) {
 	    NCjson* j = NCJith(json,i);
@@ -1231,6 +1266,48 @@ NCZ_iscomplexjson(const NCjson* json, nc_type typehint)
     }
 done:
     return stat;
+}
+
+/* Return 1 if the attribute value as a string should be stored as complex json
+Assumes attribute type is NC_CHAR.
+See zutil.c documentation.
+@param text of the attribute as a string
+@param jsonp return the parsed json here (if parseable)
+@return 1 if is complex json
+*/
+int
+NCZ_iscomplexjsontext(size_t textlen, const char* text, NCjson** jsonp)
+{
+    NCjson* json = NULL;
+    const char* p;
+    int iscomplex, instring;
+    size_t i;
+
+    if(jsonp) *jsonp = NULL;
+    if(text == NULL || textlen < 2) return 0;
+
+    instring = 0;
+    iscomplex = 0;
+    for(i=0,p=text;i<textlen;i++,p++) {
+	switch (*p) {
+	case '\\': p++; break;
+	case '"': instring = (instring?0:1); break;
+	case '[': case '{': case ']': case '}':
+	    iscomplex=1;
+	    goto loopexit;
+	    break;
+	default: break;
+	}
+    }
+loopexit:
+    if(!iscomplex) return 0;
+    /* Final test: must be parseable */
+    if(NCJparsen(textlen,text,0,&json) < 0) /* not JSON parseable */
+        return 0;
+    if(json == NULL) return 0;
+    if(jsonp) {*jsonp = json; json = NULL;}
+    NCJreclaim(json);
+    return 1;
 }
 
 /* Caller must free return value */
@@ -1404,12 +1481,16 @@ NCZ_deescape(const char* esc)
     return s;
 }
 
-/* Define a static qsort comparator for strings for use with qsort */
+/* Define a static qsort comparator for strings for use with qsort.
+   It sorts by length and then content */
 static int
 cmp_strings(const void* a1, const void* a2)
 {
     const char** s1 = (const char**)a1;
     const char** s2 = (const char**)a2;
+    size_t slen1 = strlen(*s1);
+    size_t slen2 = strlen(*s2);
+    if(slen1 != slen2) return (slen1 - slen2);
     return strcmp(*s1,*s2);
 }
 
@@ -1445,12 +1526,6 @@ NCZ_sortpairlist(void* vec, size_t count)
 void
 NCZ_freeAttrInfoVec(struct NCZ_AttrInfo* ainfo)
 {
-    size_t i;
-    struct NCZ_AttrInfo* ap = NULL;
     if(ainfo == NULL) return;
-    for(ap=ainfo,i=0;ap->name;i++,ap++) {
-	nullfree(ap->name);
-	NCJreclaim(ap->values);
-    }
     free(ainfo);
 }

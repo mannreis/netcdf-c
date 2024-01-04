@@ -80,6 +80,7 @@ NCZ_initialize_internal(void)
     /* Build some common proplists */
     NCplistzarrv2 = ncplistnew();
     ncplistadd((NCproplist*)NCplistzarrv2,"zarrformat",(uintptr_t)2);
+    NCplistzarrv3 = ncplistnew();
     ncplistadd((NCproplist*)NCplistzarrv3,"zarrformat",(uintptr_t)3);
 
     return stat;

@@ -100,28 +100,35 @@ Inserted into group zarr.json:
 _nczarr_superblock: {
     version: 3.0.0,    
     format: 3,
-    root: { // the topmost dictionary node represents the root group
-        dimensions: {name: <dimname>, size: <integer>, unlimited: 1|0},
-        arrays: [{name: <name>},...],
-        children: [
-                {name: <name>,
-                dimensions: {name: <dimname>, size: <integer>, unlimited: 1|0},
-                arrays: [{name: <name>},...],
-                children: [{name: <name>, subgrps: [...]},{name: <name>, subgrps: [...]},...]
-                },
-                ...
-        ],
+    groups: { // Group+array skeleton
+	"/":        {arrays: [{name: <name>},...], subgroups: [{name: <name>},...]},
+	<groupFQN>: {arrays: [{name: <name>},...], subgroups: [{name: <name>},...]},
+	...
+	<groupFQN>: {arrays: [{name: <name>},...], subgroups: [{name: <name>},...]},
     }
-},
+}
 
 Optionally Inserted into any group zarr.json as an extra attribute.
 "_nczarr_attrs": [{\"name\": \"attr1\", \"configuration\": {\"type\": \"<i4\"}}, ...]
 
-Inserted into any array zarr.json:
-"_nczarr_array": "{
-\"dimensions\": [\"/g1/g2/d1\", \"/d2\",...],
-\"storage\": \"scalar\"|\"contiguous\"|\"compact\"|\"chunked\"
+Inserted into any group zarr.json as an attribute:
+"_nczarr_group": "{
+\"dimensions\": [{name: <dimname>, size: <integer>, unlimited: 1|0},...],
 }"
+
+Inserted into any array zarr.json as an attribute:
+"_nczarr_array": "{
+\"dimensions_references\": [\"/g1/g2/d1\", \"/d2\",...],
+\"type_alias\": "<string indicating special type aliasing>"
+}"
+
+The "netcdf-type key is used to signal ambiguous dtypes.
+Specifically, there are three current cases:
+| dtype | type_alias |
+| ----- | ---------- |
+| uint8 | char       |
+| rn    | string     |
+| uint8 | json       |
 
 Optionally Inserted into any array zarr.json as an extra attribute.
 "_nczarr_attrs": [{\"name\": \"attr1\", \"configuration\": {\"type\": \"<i4\"}}, ...]
@@ -265,9 +272,9 @@ struct NCZ_DimInfo {
 
 /* Parsed Attribute info */
 struct NCZ_AttrInfo {
-    char* name;
+    const char* name;
     nc_type nctype;
-    NCjson* values;
+    const NCjson* values;
 };
 
 

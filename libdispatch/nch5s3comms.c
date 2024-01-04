@@ -2792,11 +2792,14 @@ static int
 httptonc(long httpcode)
 {
     int stat = NC_NOERR;
-    if(httpcode <= 99) stat = NC_EINTERNAL; /* should never happen */
+    if(httpcode <= 99)
+        stat = NC_EINTERNAL; /* should never happen */
     else if(httpcode <= 199)
         stat = NC_NOERR; /* I guess */
     else if(httpcode <= 299) {
         switch (httpcode) {
+	case 200: stat = NC_NOERR; break;
+	case 204: stat = NC_EEMPTY; break;
         default: stat = NC_NOERR; break;
         }
     } else if(httpcode <= 399)

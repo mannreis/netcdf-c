@@ -83,6 +83,9 @@ EXTERNL int NC_addmodetag(NCURI* uri, const char* tag);
 EXTERNL int NC_split_delim(const char* path, char delim, NClist* segments);
 EXTERNL int NC_join(struct NClist* segments, char** pathp);
 EXTERNL int NC_joinwith(NClist* segments, const char* sep, const char* prefix, const char* suffix, char** pathp);
+EXTERNL void NC_sortenvv(size_t n, char** envv);
+EXTERNL void NC_sortlist(NClist* l);
+EXTERNL void NC_freeenvv(size_t n, char** envv);
 
 #if defined(__cplusplus)
 }

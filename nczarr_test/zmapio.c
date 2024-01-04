@@ -92,7 +92,7 @@ struct Dumpptions {
 static int objdump(void);
 static NCZM_IMPL implfor(const char* path);
 static void printcontent(size64_t len, const char* content, OBJKIND kind);
-static int breadthfirst(NCZMAP* map, const char*, NClist* stack);
+static int depthfirst(NCZMAP* map, const char*, NClist* stack);
 static char* rootpathfor(const char* path);
 static OBJKIND keykind(const char* key);
 static void sortlist(NClist* l);
@@ -331,7 +331,7 @@ objdump(void)
         goto done;
 
     /* Depth first walk all the groups to get all keys */
-    if((stat = breadthfirst(map,"/",stack))) goto done;
+    if((stat = depthfirst(map,"/",stack))) goto done;
 
     if(dumpoptions.debug) {
 	int i;
@@ -340,55 +340,46 @@ objdump(void)
             fprintf(stderr,"[%d] %s\n",i,(char*)nclistget(stack,i));
     }    
     for(depth=0;depth < nclistlength(stack);depth++) {
-        size64_t len = 0;
+	size64_t len = 0;
 	OBJKIND kind = 0;
-	int hascontent = 0;
+        size_t padlen;
 	nullfree(content); content = NULL;
 	obj = nclistget(stack,depth);
 	kind = keykind(obj);
 	/* Now print info for this obj key */
-        switch (stat=nczmap_len(map,obj,&len)) {
-	    case NC_NOERR: hascontent = 1; break;
-	    case NC_EEMPTY: /* fall thru */ /* this is not a content bearing key */
-	    case NC_EACCESS: hascontent = 0; len = 0; stat = NC_NOERR; break;
+	switch (stat=nczmap_len(map,obj,&len)) {
+	    case NC_NOERR: break;
+	    case NC_EEMPTY: len = 0; stat = NC_NOERR; break;
+	    case NC_EACCESS: /* fall thru */
 	    default: goto done;
 	}
-	if(!hascontent) continue; /* ignore it */
+        padlen = (len+dumpoptions.nctype->typesize);
+	if((content = calloc(1,padlen+1))==NULL) {stat = NC_ENOMEM; goto done;}
 	if(len > 0) {
-	    size_t padlen = (len+dumpoptions.nctype->typesize);
-	    content = calloc(1,padlen+1);
-  	    if((stat=nczmap_read(map,obj,0,len,content))) goto done;
-	    content[len] = '\0';
-	}
-	if(hascontent) {
-	    if(len > 0) {
-                assert(content != NULL);
-		if(kind == OK_CHUNK) {
-		    len = ceildiv(len,dumpoptions.nctype->typesize);
-		}
-                printf("[%d] %s : (%llu)",depth,obj,len);
-		if(kind == OK_CHUNK &&  dumpoptions.nctype->nctype != NC_STRING)
-                    printf(" (%s)",dumpoptions.nctype->typename);
-                printf(" |");
-                switch(kind) {
-		case OK_GROUP:
-		case OK_META:
-	            printcontent(len,content,kind);
-		    break;
-		case OK_CHUNK:
-	    	    if(dumpoptions.meta_only)
-			printf("...");
-		    else
-	                printcontent(len,content,kind);
-		    break;
-		default: break;
-		}
-	        printf("|\n");
-	    } else {
-	        printf("[%d] %s : (%llu) ||\n",depth,obj,len);
+	    if((stat=nczmap_read(map,obj,0,len,content))) goto done;
+	    assert(content != NULL);
+	    if(kind == OK_CHUNK)
+		len = ceildiv(len,dumpoptions.nctype->typesize);
+	    printf("[%d] %s : (%llu)",depth,obj,len);
+	    if(kind == OK_CHUNK &&  dumpoptions.nctype->nctype != NC_STRING)
+		printf(" (%s)",dumpoptions.nctype->typename);
+	    printf(" |");
+	    switch(kind) {
+	    case OK_GROUP:
+	    case OK_META:
+		printcontent(len,content,kind);
+		break;
+	    case OK_CHUNK:
+		if(dumpoptions.meta_only)
+		    printf("...");
+		else
+		    printcontent(len,content,kind);
+		break;
+	    default: break;
 	    }
+	    printf("|\n");
 	} else {
-	    printf("[%d] %s\n",depth,obj);
+	    printf("[%d] %s : (%llu) ||\n",depth,obj,len);
 	}
     }
 done:
@@ -400,38 +391,7 @@ done:
 
 /* Depth first walk all the groups to get all keys */
 static int
-breadthfirstR(NCZMAP* map, NCbytes* prefix, NClist* stack)
-{
-    int stat = NC_NOERR;
-    NClist* nextlevel = nclistnew();
-    size_t mark;
-    const char* content;
-    int isroot = 0;
-
-    content = ncbytescontents(prefix);
-    if(content[0] == '/' && content[1] == '\0') isroot = 1;
-    if((stat=nczmap_search(map,content,nextlevel))) goto done;
-    /* Sort nextlevel */
-    sortlist(nextlevel);
-    /* Push new names onto the stack and recurse */
-    mark = ncbyteslength(prefix); /* save this position */
-    while(nclistlength(nextlevel) > 0) {
-        char* subkey = nclistremove(nextlevel,0);
-	if(!isroot) ncbytescat(prefix,"/");
-	ncbytescat(prefix,subkey);
-	nullfree(subkey);
-        nclistpush(stack,ncbytesdup(prefix));
-	if((stat = breadthfirstR(map,prefix,stack))) goto done;
-	ncbytessetlength(prefix,mark); ncbytesnull(prefix);
-    }
-done:
-   nclistfreeall(nextlevel);
-   return stat;
-}
-
-/* Depth first walk all the groups to get all keys */
-static int
-breadthfirst(NCZMAP* map, const char* key, NClist* stack)
+depthfirst(NCZMAP* map, const char* key, NClist* stack)
 {
     int stat = NC_NOERR;
     NCbytes* prefix = ncbytesnew();
@@ -443,7 +403,10 @@ breadthfirst(NCZMAP* map, const char* key, NClist* stack)
         ncbytessetlength(prefix,ncbyteslength(prefix)-1); /* remove trailing '/' */
 	ncbytesnull(prefix);
     }
-    stat = breadthfirstR(map,prefix,stack);
+    if((stat = nczmap_listall(map,ncbytescontents(prefix),stack))) goto done;
+    sortlist(stack);
+    
+done:
     ncbytesfree(prefix);
     return stat;
 }
@@ -542,25 +505,22 @@ keykind(const char* key)
     return kind;
 }
 
-/* bubble sort a list of strings */
+
+/* Define a static qsort comparator for strings for use with qsort */
+static int
+cmp_strings(const void* a1, const void* a2)
+{
+    const char** s1 = (const char**)a1;
+    const char** s2 = (const char**)a2;
+    return strcmp(*s1,*s2);
+}
+
+/* quick sort a list of strings */
 static void
 sortlist(NClist* l)
 {
-    size_t i, switched;
-
     if(nclistlength(l) <= 1) return;
-    do {
-	switched = 0;
-        for(i=0;i<nclistlength(l)-1;i++) {
-	    char* ith = nclistget(l,i);
-	    char* ith1 = nclistget(l,i+1);
-	    if(strcmp(ith,ith1) > 0) {
-	        nclistset(l,i,ith1);
-    	        nclistset(l,i+1,ith);
-	        switched = 1;
-	    }
-	}
-    } while(switched);
+    qsort(nclistcontents(l),nclistlength(l),sizeof(char*),cmp_strings);
 #if 0
 for(i=0;i<nclistlength(l);i++)
 fprintf(stderr,"sorted: [%d] %s\n",i,(const char*)nclistget(l,i));

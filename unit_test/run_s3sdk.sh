@@ -14,7 +14,7 @@ isolate "testdir_uts3sdk"
 # Create an isolation path for S3; build on the isolation directory
 S3ISODIR="$ISODIR"
 S3ISOPATH="/${S3TESTSUBTREE}"
-S3ISOPATH="/${S3ISOPATH}/$S3ISODIR"
+S3ISOPATH="${S3ISOPATH}/$S3ISODIR"
 
 test_cleanup() {
 ${CMD} ${execdir}/../nczarr_test/s3util -u "${URL}" -k "${S3ISOPATH}" clear
@@ -47,7 +47,7 @@ ${CMD} ${execdir}/test_s3sdk -u "${URL}" -k "${S3ISOPATH}"                list
 echo "Status: $?"
 
 echo -e "\to Checking search command for ${URL}"
-${CMD} ${execdir}/test_s3sdk -u "${URL}" -k "${S3ISOPATH}"                search
+${CMD} ${execdir}/test_s3sdk -u "${URL}" -k "/object_store"               listall
 echo "Status: $?"
 
 echo -e "\to Checking delete command for ${URL}/test_s3sdk.txt"

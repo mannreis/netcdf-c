@@ -195,16 +195,22 @@ done:
 }
 
 static int
-tagsearch(NCZMAP* map, const char* prefix, const char* segment, void* param)
+tagsearch(NCZMAP* map, const char* prefix, const char* key, void* param)
 {
     struct TagParam* formats = (struct TagParam*)param;
-    size_t seglen;
+    const char* segment = NULL;
+    size_t seglen = 0;
 
+    /* Validate */
+    segment = strrchr(key,'/');
+    if(segment == NULL) segment = key; else segment++;
+    seglen = strlen(segment);
+    if(seglen == 0) return NC_NOERR;
+    
     if(strcasecmp(segment,"zarr.json")==0) {
         formats->zarrformat = ZARRFORMAT3;
 	return NC_EOBJECT; /* arbitrary error telling walker to stop */
     }
-    seglen = strlen(segment);
     if(seglen < 2) return NC_NOERR; /* keep looking */
     if(segment[0] != '.' || segment[1] != 'z') return NC_NOERR;
     if(strcasecmp(segment,Z2GROUP)==0

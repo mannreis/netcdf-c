@@ -495,7 +495,7 @@ done:
 }
 
 /*
-Return a list of full keys immediately under a specified prefix key.
+Return a list of all keys immediately under a specified prefix key.
 In theory, the returned list should be sorted in lexical order,
 but it possible that it is not.
 Note that for zip, it is not possible to get just the keys of length n+1,
@@ -504,7 +504,7 @@ so, this search must get all keys and process them one by one.
 @return NC_EXXX return true error
 */
 int
-zipsearch(NCZMAP* map, const char* prefix0, NClist* matches)
+ziplist(NCZMAP* map, const char* prefix0, NClist* matches)
 {
     int stat = NC_NOERR;
     ZZMAP* zzmap = (ZZMAP*)map;
@@ -609,6 +609,121 @@ zipsearch(NCZMAP* map, const char* prefix0, NClist* matches)
 
 done:
     nclistfreeall(tmp);
+    if(cache != NULL) freesearchcache(cache);
+    nullfree(trueprefix);
+    return ZUNTRACEX(stat,"|matches|=%d",(int)nclistlength(matches));
+}
+
+/*
+Return a list of all full keys under a specified prefix key.
+In theory, the returned list should be sorted in lexical order,
+but it possible that it is not.
+@return NC_NOERR if success, even if no keys returned.
+@return NC_EXXX return true error
+*/
+int
+ziplistall(NCZMAP* map, const char* prefix0, NClist* matches)
+{
+    int stat = NC_NOERR;
+    ZZMAP* zzmap = (ZZMAP*)map;
+    char* trueprefix = NULL;
+    size_t truelen;
+    zip_int64_t num_entries, i;
+    char** cache = NULL;
+    size_t prefixlen;
+
+    ZTRACE(6,"map=%s prefix0=%s",map->url,prefix0);
+
+    /* prefix constraints:
+       1. prefix is "/"
+       2. or prefix has leading '/' and no trailing '/'
+    */
+
+    /* Fix up the prefix; including adding the dataset name to the front */
+    if(prefix0 == NULL || strlen(prefix0)==0)
+        prefix0 = "/";
+    /* make sure that prefix0 has leading '/' */
+    if(prefix0[0] != '/')
+        {stat = NC_EINVAL; goto done;}
+    prefixlen = strlen(prefix0);
+    truelen = prefixlen+strlen(zzmap->dataset)+1; /* possible trailing '/'*/
+    if((trueprefix = (char*)malloc(truelen+1+1))==NULL) /* nul term */
+	{stat = NC_ENOMEM; goto done;}
+    /* Build the true prefix */
+    trueprefix[0] = '\0';
+    strlcat(trueprefix,zzmap->dataset,truelen+1);
+    strlcat(trueprefix,prefix0,truelen+1); /* recall prefix starts with '/' */
+    /* If the prefix did not end in '/', then add it */
+    if(prefixlen > 1 && prefix0[prefixlen-1] != '/')
+	strlcat(trueprefix,"/",truelen+1);
+    truelen = strlen(trueprefix);
+
+    /* Get number of entries */
+    num_entries = zip_get_num_entries(zzmap->archive, (zip_flags_t)0);
+#ifdef CACHESEARCH
+    if(num_entries > 0 && zzmap->searchcache == NULL) {
+        /* Release the current cache */
+        freesearchcache(zzmap->searchcache);
+        zzmap->searchcache = NULL;
+	/* Re-build the searchcache */
+        if((cache = calloc(sizeof(char*),num_entries+1))==NULL)
+	    {stat = NC_ENOMEM; goto done;}
+        for(i=0;i < num_entries; i++) {
+	    const char *name = NULL;
+	    /* get ith entry */
+	    name = zip_get_name(zzmap->archive, i, (zip_flags_t)0);
+	    /* Add to cache */
+	    if((cache[i] = strdup(name))==NULL)
+	        {stat = NC_ENOMEM; goto done;}
+	}
+	cache[num_entries] = NULL;
+	zzmap->searchcache = cache; cache = NULL;
+     }
+#endif
+#ifdef CACHESEARCH
+    if(zzmap->searchcache != NULL)
+#endif
+    {
+	const char *key = NULL;
+	size_t keylen = 0;
+
+	/* Walk cache looking for names with prefix */
+        for(i=0;i < num_entries; i++) {
+	    /* get ith entry */
+#ifdef CACHESEARCH
+	    key = zzmap->searchcache[i];
+#else
+	    key = zip_get_name(zzmap->archive, i, (zip_flags_t)0);
+#endif
+	    keylen = strlen(key);
+	    /* Does this name begin with trueprefix? */
+	    if(keylen > 0
+	       && (keylen <= truelen || strncmp(key,trueprefix,truelen) != 0))
+	        continue; /* no match */
+	    nclistpush(matches,nulldup(key));
+	}
+	/* Now remove later duplicates */
+	for(i=0;i<nclistlength(matches);i++) {
+	    int j;
+	    const char* is = nclistget(matches,i);
+	    for(j=nclistlength(matches)-1;j>i;j--) {
+	        char* js = nclistget(matches,j);
+	        if(strcmp(js,is)==0) {
+		    /* reclaim the duplicate */
+		    nclistremove(matches,j);
+		    nullfree(js);
+		}
+	    }	    
+	}
+    }
+
+    /* Remove prefix from all entries in matches */
+    if((stat = nczm_removeprefix(trueprefix,nclistlength(matches),(char**)nclistcontents(matches)))) goto done;
+
+    /* Lexical sort the results */
+    NCZ_sortstringlist(nclistcontents(matches),nclistlength(matches));
+
+done:
     if(cache != NULL) freesearchcache(cache);
     nullfree(trueprefix);
     return ZUNTRACEX(stat,"|matches|=%d",(int)nclistlength(matches));
@@ -747,7 +862,8 @@ static NCZMAP_API zapi = {
     ziplen,
     zipread,
     zipwrite,
-    zipsearch,
+    ziplist,
+    ziplistall
 };
 
 static int

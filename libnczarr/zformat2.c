@@ -27,7 +27,7 @@ static int ZF2_codec2hdf(const NC_FILE_INFO_T* file, const NC_VAR_INFO_T* var, c
 static int write_grp(NC_FILE_INFO_T* file, NCZ_FILE_INFO_T* zfile, NCZMAP* map, NC_GRP_INFO_T* grp);
 static int write_var_meta(NC_FILE_INFO_T* file, NCZ_FILE_INFO_T* zfile, NCZMAP* map, NC_VAR_INFO_T* var);
 static int write_var(NC_FILE_INFO_T* file, NCZ_FILE_INFO_T* zfile, NCZMAP* map, NC_VAR_INFO_T* var);
-static int write_atts(NC_FILE_INFO_T* file, NCZ_FILE_INFO_T* zfile, NCZMAP* map, NC_OBJ* container, NCindex* attlist);
+static int build_atts(NC_FILE_INFO_T* file, NCZ_FILE_INFO_T* zfile, NCZMAP* map, NC_OBJ* container, NCindex* attlist, NCjson**, NCjson**);
 
 static int read_superblock(NC_FILE_INFO_T* file, int* nczarrvp);
 static int read_grp(NC_FILE_INFO_T* file, NC_GRP_INFO_T* grp);
@@ -142,6 +142,8 @@ write_grp(NC_FILE_INFO_T* file, NCZ_FILE_INFO_T* zfile, NCZMAP* map, NC_GRP_INFO
     NCjson* jsubgrps = NULL;
     NCjson* jsuper = NULL;
     NCjson* jtmp = NULL;
+    NCjson* jatts = NULL;
+    NCjson* jtypes = NULL;
 
     ZTRACE(3,"file=%s grp=%s isclose=%d",file->controller->path,grp->hdr.name,isclose);
 
@@ -214,10 +216,14 @@ write_grp(NC_FILE_INFO_T* file, NCZ_FILE_INFO_T* zfile, NCZMAP* map, NC_GRP_INFO
 	goto done;
     nullfree(key); key = NULL;
 
-    /* Build the Z2ATTRS object */
+    /* Build and write the Z2ATTRS object */
     assert(grp->att);
-    if((stat = write_atts(file,zfile,map,(NC_OBJ*)grp, grp->att)))
-	goto done;
+    if((stat = build_atts(file,zfile,map,(NC_OBJ*)grp, grp->att,&jatts,&jtypes)))goto done;
+    /* write .zattrs path */
+    if((stat = nczm_concat(fullpath,Z2ATTRS,&key))) goto done;
+    /* Write to map */
+    if((stat=NCZ_uploadjson(map,key,jatts))) goto done;
+    nullfree(key); key = NULL;
 
     /* Now write all the variables */
     for(i=0; i<ncindexsize(grp->vars); i++) {
@@ -268,6 +274,8 @@ write_var_meta(NC_FILE_INFO_T* file, NCZ_FILE_INFO_T* zfile, NCZMAP* map, NC_VAR
     NCjson* jdimrefs = NULL;
     NCjson* jtmp = NULL;
     NCjson* jfill = NULL;
+    NCjson* jatts = NULL;
+    NCjson* jtypes = NULL;
     char* dtypename = NULL;
     int purezarr = 0;
     size64_t shape[NC_MAX_VAR_DIMS];
@@ -494,10 +502,14 @@ write_var_meta(NC_FILE_INFO_T* file, NCZ_FILE_INFO_T* zfile, NCZMAP* map, NC_VAR
 
     var->created = 1;
 
-    /* Build .zattrs object */
+    /* Build and write .zattrs object */
     assert(var->att);
-    if((stat = write_atts(file,zfile,map,(NC_OBJ*)var, var->att)))
-	goto done;
+    if((stat = build_atts(file,zfile,map,(NC_OBJ*)var, var->att,&jatts,&jtypes)))goto done;
+    /* write .zattrs path */
+    if((stat = nczm_concat(fullpath,Z2ATTRS,&key))) goto done;
+    /* Write to map */
+    if((stat=NCZ_uploadjson(map,key,jatts))) goto done;
+    nullfree(key); key = NULL;
 
 done:
     nclistfreeall(dimrefs);
@@ -553,7 +565,7 @@ done:
  * @author Dennis Heimbigner
  */
 static int
-write_atts(NC_FILE_INFO_T* file, NCZ_FILE_INFO_T* zfile, NCZMAP* map, NC_OBJ* container, NCindex* attlist)
+build_atts(NC_FILE_INFO_T* file, NCZ_FILE_INFO_T* zfile, NCZMAP* map, NC_OBJ* container, NCindex* attlist, NCjson** jattsp, NCjson** jtypesp)
 {
     int i,stat = NC_NOERR;
     NCjson* jatts = NULL;
@@ -571,23 +583,19 @@ write_atts(NC_FILE_INFO_T* file, NCZ_FILE_INFO_T* zfile, NCZMAP* map, NC_OBJ* co
     int purezarr = 0;
     int inrootgroup = 0;
     NC_VAR_INFO_T* var = NULL;
-    NC_GRP_INFO_T* grp = NULL;
     char* dtype = NULL;
     int endianness = (NC_isLittleEndian()?NC_ENDIAN_LITTLE:NC_ENDIAN_BIG);
 
     ZTRACE(3,"file=%s container=%s |attlist|=%u",file->controller->path,container->name,(unsigned)ncindexsize(attlist));
 
+    purezarr = (zfile->flags & FLAG_PUREZARR)?1:0;
+    if(zfile->flags & FLAG_XARRAYDIMS) isxarray = 1;
+
     if(container->sort == NCVAR) {
 	var = (NC_VAR_INFO_T*)container;
 	if(var->container && var->container->parent == NULL)
 	    inrootgroup = 1;
-    } else if(container->sort == NCGRP) {
-	grp = (NC_GRP_INFO_T*)container;
     }
-
-    purezarr = (zfile->flags & FLAG_PUREZARR)?1:0;
-
-    if(zfile->flags & FLAG_XARRAYDIMS) isxarray = 1;
 
     /* Create the attribute dictionary */
     NCJcheck(NCJnew(NCJ_DICT,&jatts));
@@ -601,6 +609,7 @@ write_atts(NC_FILE_INFO_T* file, NCZ_FILE_INFO_T* zfile, NCZMAP* map, NC_OBJ* co
 	for(i=0;i<ncindexsize(attlist);i++) {
 	    NC_ATT_INFO_T* a = (NC_ATT_INFO_T*)ncindexith(attlist,i);
 	    size_t typesize = 0;
+	    nc_type internaltype = a->nc_typeid;
 #if 0
 	    const NC_reservedatt* ra = NC_findreserved(a->hdr.name);
 	    /* If reserved and hidden, then ignore */
@@ -612,14 +621,20 @@ write_atts(NC_FILE_INFO_T* file, NCZ_FILE_INFO_T* zfile, NCZMAP* map, NC_OBJ* co
 		typesize = NCZ_get_maxstrlen(container);
 	    else
 		{if((stat = NC4_inq_atomic_type(a->nc_typeid,NULL,&typesize))) goto done;}
-	    /* Convert to storable json */
-	    if((stat = NCZ_stringconvert(a->nc_typeid,a->len,a->data,&jdata))) goto done;
+
+  	    /* Track complex json representation*/
+            if(internaltype == NC_CHAR && NCZ_iscomplexjsontext(a->len,(char*)a->data,&jdata)) {
+		internaltype = NC_JSON; /* hack to remember this case */
+		typesize = 0;
+	    } else {
+	        if((stat = NCZ_stringconvert(a->nc_typeid,a->len,a->data,&jdata))) goto done;
+	    }
 	    NCJinsert(jatts,a->hdr.name,jdata);
 	    jdata = NULL;
 
-	    /* Collect the corresponding dtype */
 	    if(!purezarr) {
-		if((stat = ncz2_nctype2dtype(a->nc_typeid,endianness,purezarr,typesize,&dtype))) goto done;
+	        /* Collect the corresponding dtype */
+		if((stat = ncz2_nctype2dtype(internaltype,endianness,purezarr,typesize,&dtype))) goto done;
 		NCJnewstring(NCJ_STRING,dtype,&jtype);
 		nullfree(dtype); dtype = NULL;
 		NCJinsert(jtypes,a->hdr.name,jtype); /* add {name: type} */
@@ -628,6 +643,7 @@ write_atts(NC_FILE_INFO_T* file, NCZ_FILE_INFO_T* zfile, NCZMAP* map, NC_OBJ* co
 	}
     }
 
+#if 0
     /* Construct container path */
     if(container->sort == NCGRP)
 	stat = NCZ_grpkey(grp,&fullpath);
@@ -635,7 +651,37 @@ write_atts(NC_FILE_INFO_T* file, NCZ_FILE_INFO_T* zfile, NCZMAP* map, NC_OBJ* co
 	stat = NCZ_varkey(var,&fullpath);
     if(stat)
 	goto done;
+#endif
 
+    /* Add Quantize Attribute */
+    if(container->sort == NCVAR && var && var->quantize_mode > 0) {
+        char mode[64];
+        const char* qattname = NULL;
+        snprintf(mode,sizeof(mode),"%d",var->nsd);
+        NCJcheck(NCJnewstring(NCJ_INT,mode,&jint));
+        /* Insert the quantize attribute */
+        switch (var->quantize_mode) {
+        case NC_QUANTIZE_BITGROOM:
+            qattname = NC_QUANTIZE_BITGROOM_ATT_NAME;
+            break;
+        case NC_QUANTIZE_GRANULARBR:
+            qattname = NC_QUANTIZE_GRANULARBR_ATT_NAME;
+            break;
+        case NC_QUANTIZE_BITROUND:
+            qattname = NC_QUANTIZE_BITROUND_ATT_NAME;
+            break;
+        default: {stat = NC_ENCZARR; goto done;}
+        }
+        if(!purezarr) {
+            NCJcheck(NCJnewstring(NCJ_STRING,"<u4",&jtype));
+            NCJcheck(NCJinsert(jtypes,qattname,jtype));
+            jtype = NULL;
+	    }
+        NCJcheck(NCJinsert(jatts,qattname,jint));
+        jint = NULL;
+    }
+
+    /* Insert option XARRAY attribute */
     if(container->sort == NCVAR) {
 	if(inrootgroup && isxarray) {
 	    int dimsinroot = 1;
@@ -670,38 +716,11 @@ write_atts(NC_FILE_INFO_T* file, NCZ_FILE_INFO_T* zfile, NCZMAP* map, NC_OBJ* co
                 jdimrefs = NULL;
                 /* And a fake type */
                 if(!purezarr) {
-                    NCJcheck(NCJnewstring(NCJ_STRING,">S1",&jtype));
+                    NCJcheck(NCJnewstring(NCJ_STRING,"|J0",&jtype));
                     NCJcheck(NCJinsert(jtypes,NC_XARRAY_DIMS,jtype)); /* add {name: type} */
                     jtype = NULL;
                 }
             }
-        }
-        /* Add Quantize Attribute */
-        if(container->sort == NCVAR && var && var->quantize_mode > 0) {
-            char mode[64];
-            const char* qattname = NULL;
-            snprintf(mode,sizeof(mode),"%d",var->nsd);
-            NCJcheck(NCJnewstring(NCJ_INT,mode,&jint));
-            /* Insert the quantize attribute */
-            switch (var->quantize_mode) {
-            case NC_QUANTIZE_BITGROOM:
-                qattname = NC_QUANTIZE_BITGROOM_ATT_NAME;
-                break;
-            case NC_QUANTIZE_GRANULARBR:
-                qattname = NC_QUANTIZE_GRANULARBR_ATT_NAME;
-                break;
-            case NC_QUANTIZE_BITROUND:
-                qattname = NC_QUANTIZE_BITROUND_ATT_NAME;
-                break;
-            default: {stat = NC_ENCZARR; goto done;}
-            }
-	    if(!purezarr) {
-                NCJcheck(NCJnewstring(NCJ_STRING,"<u4",&jtype));
-                NCJcheck(NCJinsert(jtypes,qattname,jtype));
-                jtype = NULL;
-	    }
-            NCJcheck(NCJinsert(jatts,qattname,jint));
-            jint = NULL;
         }
     }
     if(NCJdictlength(jatts) > 0) {
@@ -720,13 +739,10 @@ write_atts(NC_FILE_INFO_T* file, NCZ_FILE_INFO_T* zfile, NCZMAP* map, NC_OBJ* co
                 NCJcheck(NCJinsert(jatts,NCZ_V2_ATTR,jdict));
             jdict = NULL;
  	}
-        /* write .zattrs path */
-        if((stat = nczm_concat(fullpath,Z2ATTRS,&key))) goto done;
-        /* Write to map */
-        if((stat=NCZ_uploadjson(map,key,jatts))) goto done;
-        nullfree(key); key = NULL;
     }
 
+    if(jattsp) {*jattsp = jatts; jatts = NULL;}
+    if(jtypesp) {*jtypesp = jtypes; jtypes = NULL;}
 done:
     nullfree(fullpath);
     nullfree(key);
@@ -875,7 +891,7 @@ ZF2_readattrs(NC_FILE_INFO_T* file, NC_OBJ* container, const NCjson* jatts, stru
                 ainfo[i].nctype = atypes[i];
                 jvalues = NCJdictvalue(jattrs,i);
 		assert(ainfo[i].values == NULL);
-                if((stat= NCJclone(jvalues,&ainfo[i].values))) goto done;
+                if((stat= NCJclone(jvalues,(NCjson**)&ainfo[i].values))) goto done;
             }
         }
     }
@@ -1419,6 +1435,7 @@ read_vars(NC_FILE_INFO_T* file, NC_GRP_INFO_T* grp, NClist* varnames)
         const char* varname = (const char*)nclistget(varnames,i);
         if((stat = read_var1(file,grp,varname))) goto done;
     }
+
 done:
     return ZUNTRACE(THROW(stat));
 }
@@ -1623,7 +1640,7 @@ NCZ_searchvars(NCZ_FILE_INFO_T* zfile, NC_GRP_INFO_T* grp, NClist* varnames)
     /* Compute the key for the grp */
     if((stat = NCZ_grpkey(grp,&grpkey))) goto done;
     /* Get the map and search group */
-    if((stat = nczmap_search(zfile->map,grpkey,matches))) goto done;
+    if((stat = nczmap_list(zfile->map,grpkey,matches))) goto done;
     for(i=0;i<nclistlength(matches);i++) {
         const char* name = nclistget(matches,i);
         if(name[0] == NCZM_DOT) continue; /* zarr/nczarr specific */
@@ -1657,7 +1674,7 @@ NCZ_searchsubgrps(NCZ_FILE_INFO_T* zfile, NC_GRP_INFO_T* grp, NClist* subgrpname
     /* Compute the key for the grp */
     if((stat = NCZ_grpkey(grp,&grpkey))) goto done;
     /* Get the map and search group */
-    if((stat = nczmap_search(zfile->map,grpkey,matches))) goto done;
+    if((stat = nczmap_list(zfile->map,grpkey,matches))) goto done;
     for(i=0;i<nclistlength(matches);i++) {
         const char* name = nclistget(matches,i);
         if(name[0] == NCZM_DOT) continue; /* zarr/nczarr specific */

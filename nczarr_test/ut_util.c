@@ -514,3 +514,59 @@ fillcommon(struct Common* common, Vardef* var)
         memcpy(common->memshape,common->dimlens,sizeof(size64_t)*common->rank); /* fake it */
     }
 }
+
+#if 0
+static int
+searchR(NCZMAP* map, int depth, const char* prefix0, NClist* objects)
+{
+    int i,stat = NC_NOERR;
+    NClist* matches = nclistnew();
+    char prefix[4096]; /* only ok because we know testdata */
+    size_t prefixlen;
+    
+    nclistpush(objects,strdup(prefix0));
+
+    prefix[0] = '\0';
+    strlcat(prefix,prefix0,sizeof(prefix));
+    prefixlen = strlen(prefix);
+
+    /* get next level object keys **below** the prefix: should have form: <name> */
+    switch (stat = nczmap_search(map, prefix, matches)) {
+    case NC_NOERR: break;
+    case NC_ENOTFOUND: stat = NC_NOERR; break;/* prefix is not a dir */
+    default: goto done;
+    }
+    reportx(PASS,prefix,"search",map);
+
+    /* recurse */
+    for(i=0;i<nclistlength(matches);i++) {
+	const char* key = nclistget(matches,i);
+	/* ensure trailing '/' */
+        if(prefix[prefixlen-1] != '/')
+	    strlcat(prefix,"/",sizeof(prefix));
+	strlcat(prefix,key,sizeof(prefix));
+        if((stat = searchR(map,depth+1,prefix,objects))) goto done;
+	/* restore prefix */
+	prefix[prefixlen] = '\0';
+	if(stat != NC_NOERR)
+	    goto done;
+    }
+done:
+    nclistfreeall(matches);
+    return THROW(stat);
+}
+#endif /*0*/
+
+int
+ut_search(NCZMAP* map, const char* prefix, NClist* objects)
+{
+    int stat = NC_NOERR;
+
+    if((stat = nczmap_listall(map,prefix,objects))) goto done;
+
+    /* Sort */
+    ut_sortlist(objects);
+
+done:
+    return THROW(stat);
+}

@@ -917,7 +917,7 @@ NCZ_get_att(int ncid, int varid, const char *name, void *value,
     NC_GRP_INFO_T *grp;
     NC_VAR_INFO_T *var = NULL;
     char norm_name[NC_MAX_NAME + 1];
-    int retval;
+    int retval = NC_NOERR;
 
     LOG((2, "%s: ncid 0x%x varid %d", __func__, ncid, varid));
 
@@ -935,8 +935,15 @@ NCZ_get_att(int ncid, int varid, const char *name, void *value,
                                        value);
     }
 
-    return nc4_get_att_ptrs(h5, grp, var, norm_name, NULL, memtype,
+    /* See if the attribute exists */
+    retval = nc4_get_att_ptrs(h5, grp, var, norm_name, NULL, memtype,
                             NULL, NULL, value);
+
+    /* If asking for _FillValue and it does not exist, build it */
+    if(retval == NC_ENOTATT && varid != NC_GLOBAL && strcmp(norm_name,"_FillValue")==0) {
+	retval = ncz_create_fillvalue(var);
+    }
+    return THROW(retval);
 }
 
 #if 0
@@ -979,6 +986,28 @@ done:
 }
 #endif
 
+/* Test if fillvalue is default */
+int
+isdfaltfillvalue(nc_type nctype, void* fillval)
+{
+    switch (nctype) {
+    case NC_BYTE: if(NC_FILL_BYTE == *((signed char*)fillval)) return 1; break;
+    case NC_CHAR: if(NC_FILL_CHAR == *((char*)fillval)) return 1; break;
+    case NC_SHORT: if(NC_FILL_SHORT == *((short*)fillval)) return 1; break;
+    case NC_INT: if(NC_FILL_INT == *((int*)fillval)) return 1; break;
+    case NC_FLOAT: if(NC_FILL_FLOAT == *((float*)fillval)) return 1; break;
+    case NC_DOUBLE: if(NC_FILL_DOUBLE == *((double*)fillval)) return 1; break;
+    case NC_UBYTE: if(NC_FILL_UBYTE == *((unsigned char*)fillval)) return 1; break;
+    case NC_USHORT: if(NC_FILL_USHORT == *((unsigned short*)fillval)) return 1; break;
+    case NC_UINT: if(NC_FILL_UINT == *((unsigned int*)fillval)) return 1; break;
+    case NC_INT64: if(NC_FILL_INT64 == *((long long int*)fillval)) return 1; break;
+    case NC_UINT64: if(NC_FILL_UINT64 == *((unsigned long long int*)fillval)) return 1; break;
+    case NC_STRING: if(strcmp(NC_FILL_STRING,*((char**)fillval))) return 1; break;
+    default: break;
+    }
+    return 0;
+}
+
 /* If we do not have a _FillValue, then go ahead and create it */
 int
 ncz_create_fillvalue(NC_VAR_INFO_T* var)
@@ -991,7 +1020,7 @@ ncz_create_fillvalue(NC_VAR_INFO_T* var)
     if(!var->atts_read) goto done; /* above my pay grade */
 
     /* Is FillValue warranted? */
-    if(!var->no_fill && var->fill_value != NULL) {
+    if(!var->no_fill && var->fill_value != NULL && !isdfaltfillvalue(var->type_info->hdr.id,var->fill_value)) {
         /* Make sure _FillValue does not exist */
 	for(i=0;i<ncindexsize(var->att);i++) {
 	    fv = (NC_ATT_INFO_T*)ncindexith(var->att,i);

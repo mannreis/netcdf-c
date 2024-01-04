@@ -13,8 +13,6 @@ typedef int (*NCZWALKFCN)(NCZMAP*,const char*,const char*,void*);
 /**************************************************/
 /*Forward*/
 
-static int nczmap_walkR(NCZMAP* map, NCbytes* prefix, NCZWALKFCN, void* param);
-
 /**************************************************/
 
 NCZM_FEATURES
@@ -183,10 +181,21 @@ nczmap_write(NCZMAP* map, const char* key, size64_t count, const void* content)
 }
 
 int
-nczmap_search(NCZMAP* map, const char* prefix, NClist* matches)
+nczmap_list(NCZMAP* map, const char* prefix, NClist* matches)
 {
     int stat = NC_NOERR;
-    if((stat = map->api->search(map, prefix, matches)) == NC_NOERR) {
+    if((stat = map->api->list(map, prefix, matches)) == NC_NOERR) {
+        if((stat = NCZ_sortstringlist(nclistcontents(matches),nclistlength(matches)))) goto done; /* sort the list */
+    }
+done:
+    return stat;
+}
+
+int
+nczmap_listall(NCZMAP* map, const char* prefix, NClist* matches)
+{
+    int stat = NC_NOERR;
+    if((stat = map->api->listall(map, prefix, matches)) == NC_NOERR) {
         if((stat = NCZ_sortstringlist(nclistcontents(matches),nclistlength(matches)))) goto done; /* sort the list */
     }
 done:
@@ -338,7 +347,7 @@ done:
 int
 nczm_clear(NCZMAP* map)
 {
-    if(map) 
+    if(map)
 	nullfree(map->url);
     return NC_NOERR;
 }
@@ -500,28 +509,26 @@ done:
     return THROW(stat);    
 }
 
-static int
-nczm_compare(const void* arg1, const void* arg2)
-{
-    char* n1 = *((char**)arg1);
-    char* n2 = *((char**)arg2);
-    return strcmp(n1,n2);
-}
 
-/* sort a list of strings */
-void
-nczm_sortlist(NClist* l)
+/* Remove a given prefix from the front of each given key */
+int
+nczm_removeprefix(const char* prefix, size_t nkeys, char** keys)
 {
-    if(l == NULL || nclistlength(l) == 0) return;
-    nczm_sortenvv(nclistlength(l),(char**)nclistcontents(l));
-}
+    int stat = NC_NOERR;
+    size_t i,prefixlen;
 
-/* quick sort a list of strings */
-void
-nczm_sortenvv(int n, char** envv)
-{
-    if(n <= 1) return;
-    qsort(envv, n, sizeof(char*), nczm_compare);
+    if(nkeys == 0 || keys == NULL) return stat;
+    prefixlen = strlen(prefix);
+    for(i=0;i<nkeys;i++) {
+	if(strncmp(keys[i],prefix,prefixlen)==0) {
+	    char* newkey = strdup(keys[i]+prefixlen);
+	    if(newkey == NULL) return NC_ENOMEM;
+	    nullfree(keys[i]);
+	    keys[i] = newkey;
+	    newkey = NULL;
+	}
+    }
+    return stat;
 }
 
 void
@@ -571,6 +578,7 @@ If the function returns an error, then the walk terminates and returns the error
 @return NC_NOERR if the operation succeeded
 @return NC_EXXX if the operation failed for one of several possible reasons
 */
+#if 0
 int
 nczmap_walk(NCZMAP* map, const char* prefix, NCZWALKFCN fcn, void* param)
 {
@@ -593,7 +601,7 @@ nczmap_walkR(NCZMAP* map, NCbytes* prefix, NCZWALKFCN fcn, void* param)
     size_t prefixlen = ncbyteslength(prefix);
 
     /* get list of next level segments (partial keys) */
-    if((stat=nczmap_search(map,ncbytescontents(prefix),nextlevel))) goto done;
+    if((stat=nczmap_list(map,ncbytescontents(prefix),nextlevel))) goto done;
     if(nclistlength(nextlevel) == 0) goto done; /* max depth reached */
 
     /* Apply fcn to all paths at nextlevel */
@@ -622,3 +630,37 @@ done:
     nclistfreeall(nextlevel);
     return THROW(stat);
 }
+#else /*0*/
+int
+nczmap_walk(NCZMAP* map, const char* prefix, NCZWALKFCN fcn, void* param)
+{
+    int stat = NC_NOERR;
+    NCbytes* path = ncbytesnew();
+    NClist* subtree = nclistnew();
+    size_t i;
+
+    assert(prefix != NULL && strlen(prefix) > 0);
+    if(prefix[0] != '/') ncbytescat(path,"/");
+    ncbytescat(path,prefix);
+
+    /* get list of all keys below the prefix */
+    if((stat=nczmap_listall(map,ncbytescontents(path),subtree))) goto done;
+    if(nclistlength(subtree) == 0) goto done; /* empty subtree */
+    
+    /* Apply fcn to all paths in subtree */
+    for(i=0;i<nclistlength(subtree);i++) {
+        const char* key = nclistget(subtree,i);
+	if(key == NULL) continue;
+	/* invoke function */
+	stat = fcn(map,ncbytescontents(path),key,param);
+	if(stat != NC_NOERR) goto done;
+    }
+
+done:
+    ncbytesfree(path);
+    nclistfreeall(subtree);
+    return THROW(stat);
+}
+
+
+#endif /*0*/
