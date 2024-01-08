@@ -484,6 +484,8 @@ extern const char* nc4_atomic_name[NUM_ATOMIC_TYPES];
 
 /* Binary searcher for reserved attributes */
 extern const NC_reservedatt* NC_findreserved(const char* name);
+/* reserved attribute initializer */
+extern void NC_initialize_reserved(void);
 
 /* Global State Management */
 extern NCglobalstate* NC_getglobalstate(void);
@@ -501,9 +503,15 @@ extern void NC_freeglobalstate(void);
 #define NC_ATT_NC3_STRICT_NAME "_nc3_strict"
 #define NC_XARRAY_DIMS "_ARRAY_DIMENSIONS"
 #define NC_ATT_CODECS "_Codecs"
-#define NC_NCZARR_ATTR "_nczarr_attr"
-#define NC_NCZARR_ATTR_UC "_NCZARR_ATTR"
 #define NC_NCZARR_MAXSTRLEN_ATTR "_nczarr_maxstrlen"
 #define NC_NCZARR_DEFAULT_MAXSTRLEN_ATTR "_nczarr_default_maxstrlen"
+
+/* Must match values in libnczarr/zinternal.h */
+#define NC_NCZARR_SUPERBLOCK "_nczarr_superblock"
+#define NC_NCZARR_GROUP "_nczarr_group"
+#define NC_NCZARR_ARRAY "_nczarr_array"
+#define NC_NCZARR_ATTR "_nczarr_attrs"
+#define NC_NCZARR_ATTR_UC "_NCZARR_ATTRS" /* deprecated */
+
 
 #endif /* _NC4INTERNAL_ */

@@ -34,7 +34,7 @@ static int NCZ_json_convention_read(const NCjson* json, NCjson** jtextp);
 int
 ncz_getattlist(NC_GRP_INFO_T *grp, int varid, NC_VAR_INFO_T **varp, NCindex **attlist)
 {
-    int retval;
+    int retval = NC_NOERR;
     NC_FILE_INFO_T* file = grp->nc4_info;
     NCZ_FILE_INFO_T* zinfo = file->format_file_info;
 
@@ -43,10 +43,7 @@ ncz_getattlist(NC_GRP_INFO_T *grp, int varid, NC_VAR_INFO_T **varp, NCindex **at
     if (varid == NC_GLOBAL)
     {
         /* Do we need to read the atts? */
-        if (!grp->atts_read)
-            if ((retval = NCZ_read_attrs(file, (NC_OBJ*)grp, NULL)))
-                return retval;
-
+        if (!grp->atts_read) {retval = NC_EINTERNAL; goto done;}
         if (varp)
             *varp = NULL;
         *attlist = grp->att;
@@ -60,15 +57,13 @@ ncz_getattlist(NC_GRP_INFO_T *grp, int varid, NC_VAR_INFO_T **varp, NCindex **at
         assert(var->hdr.id == varid);
 
         /* Do we need to read the atts? */
-        if (!var->atts_read)
-            if ((retval = NCZ_read_attrs(file, (NC_OBJ*)var, NULL)))
-                return retval;
-
+        if (!var->atts_read) {retval = NC_EINTERNAL; goto done;}
         if (varp)
             *varp = var;
         *attlist = var->att;
     }
-    return NC_NOERR;
+done:
+    return retval;
 }
 
 /**
@@ -1089,10 +1084,11 @@ and then create them in the appropriate container.
 @param file
 @param container Group or Variable.
 @param jatts the Attributes in json format or NULL if needs retrieval.
+@param jatypes the Attributes types 
 */
 
 int
-NCZ_read_attrs(NC_FILE_INFO_T* file, NC_OBJ* container, const NCjson* jatts)
+NCZ_read_attrs(NC_FILE_INFO_T* file, NC_OBJ* container, const NCjson* jatts, const NCjson* jatypes)
 {
     int stat = NC_NOERR;
     size_t alen = 0;
@@ -1126,7 +1122,7 @@ NCZ_read_attrs(NC_FILE_INFO_T* file, NC_OBJ* container, const NCjson* jatts)
     }
 
     /* Read the attribute info */
-    if((stat=NCZF_readattrs(file,container,jatts,&ainfo))) goto done;
+    if((stat=NCZF_readattrs(file,container,jatts,jatypes,&ainfo))) goto done;
 
     if(ainfo != NULL) {
         /* Create the attributes (watching out for special attributes) */

@@ -67,6 +67,8 @@ NC4_initialize(void)
             nc_set_log_level((int)level);
     }
 #endif
+    NC_initialize_reserved();
+
     return ret;
 }
 

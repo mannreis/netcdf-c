@@ -1541,7 +1541,7 @@ NCZ_put_vars(int ncid, int varid, const size_t *startp, const size_t *countp,
 #endif
     size64_t fdims[NC_MAX_VAR_DIMS];
     size64_t start[NC_MAX_VAR_DIMS], count[NC_MAX_VAR_DIMS];
-    size64_t stride[NC_MAX_VAR_DIMS], ones[NC_MAX_VAR_DIMS];
+    size64_t stride[NC_MAX_VAR_DIMS];
     int retval, range_error = 0, i, d2;
     void *bufr = NULL;
     int bufrd = 0; /* 1 => we allocated bufr */
@@ -1586,7 +1586,6 @@ NCZ_put_vars(int ncid, int varid, const size_t *startp, const size_t *countp,
 	start[0] = 0;
 	count[0] = 1;
 	stride[0] = 1;
-	ones[0] = 1;
     } else {
         for (i = 0; i < var->ndims; i++)
         {
@@ -1598,7 +1597,6 @@ NCZ_put_vars(int ncid, int varid, const size_t *startp, const size_t *countp,
 	    start[i] = startp[i];
 	    count[i] = countp ? countp[i] : fdims[i];
 	    stride[i] = stridep ? stridep[i] : 1;
-	    ones[i] = 1;
 
   	    /* Check to see if any counts are zero. */
 	    if (!count[i])
@@ -1848,7 +1846,6 @@ NCZ_get_vars(int ncid, int varid, const size_t *startp, const size_t *countp,
     size64_t fdims[NC_MAX_VAR_DIMS]; /* size of the dimensions */
     size64_t start[NC_MAX_VAR_DIMS];
     size64_t stride[NC_MAX_VAR_DIMS];
-    size64_t ones[NC_MAX_VAR_DIMS];
     int no_read = 0, provide_fill = 0;
     int fill_value_size[NC_MAX_VAR_DIMS];
     int retval, range_error = 0, i, d2;
@@ -1881,7 +1878,6 @@ NCZ_get_vars(int ncid, int varid, const size_t *startp, const size_t *countp,
 	start[0] = 0;
 	count[0] = 1;
 	stride[0] = 1;
-	ones[0] = 1;
     } else {
         for (i = 0; i < var->ndims; i++)
         {
@@ -1892,7 +1888,6 @@ NCZ_get_vars(int ncid, int varid, const size_t *startp, const size_t *countp,
 	    count[i] = countp[i];
 	    stride[i] = stridep ? stridep[i] : 1;
 
-	    ones[i] = 1;
 	    /* if any of the count values are zero don't actually read. */
 	    if (count[i] == 0)
 	        no_read++;

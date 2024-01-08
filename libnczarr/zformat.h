@@ -33,7 +33,7 @@ typedef struct NCZ_Formatter {
     int (*close)     (NC_FILE_INFO_T* file);
     int (*readmeta)  (NC_FILE_INFO_T* file);
     int (*writemeta) (NC_FILE_INFO_T* file);
-    int (*readattrs) (NC_FILE_INFO_T* file, NC_OBJ* container, const NCjson* jatts, struct NCZ_AttrInfo**);
+    int (*readattrs) (NC_FILE_INFO_T* file, NC_OBJ* container, const NCjson* jatts, const NCjson* jtypes, struct NCZ_AttrInfo**);
     int (*buildchunkkey)(size_t rank, const size64_t* chunkindices, char dimsep, char** keyp);
     int (*codec2hdf) (const NC_FILE_INFO_T* file, const NC_VAR_INFO_T* var, const NCjson* jfilter, NCZ_Filter* filter, struct NCZ_Plugin* plugin);
     int (*hdf2codec) (const NC_FILE_INFO_T* file, const NC_VAR_INFO_T* var, NCZ_Filter* filter);
@@ -55,7 +55,7 @@ extern int NCZF_readmeta(NC_FILE_INFO_T* file);
 extern int NCZF_writemeta(NC_FILE_INFO_T* file);
 extern int NCZF_close(NC_FILE_INFO_T* file);
     
-extern int NCZF_readattrs(NC_FILE_INFO_T* file, NC_OBJ* container, const NCjson* jatts, struct NCZ_AttrInfo**);
+extern int NCZF_readattrs(NC_FILE_INFO_T* file, NC_OBJ* container, const NCjson* jatts, const NCjson* jtypes, struct NCZ_AttrInfo**);
 
 extern int NCZF_codec2hdf(const NC_FILE_INFO_T* file, const NC_VAR_INFO_T* var, const NCjson* jfilter, NCZ_Filter* filter, struct NCZ_Plugin* plugin);
 extern int NCZF_hdf2codec(const NC_FILE_INFO_T* file, const NC_VAR_INFO_T* var, NCZ_Filter* filter);

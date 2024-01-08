@@ -36,8 +36,8 @@
 */
 
 /** @internal List of reserved attributes.
-    WARNING: This list must be in (strcmp) sorted order for binary search. */
-static const NC_reservedatt NC_reserved[] = {
+    WARNING: This list will be sorted in (strcmp) sorted order for binary search. */
+static NC_reservedatt NC_reserved[] = {
     {NC_ATT_CLASS, READONLYFLAG|HIDDENATTRFLAG},			/*CLASS*/
     {NC_ATT_DIMENSION_LIST, READONLYFLAG|HIDDENATTRFLAG},		/*DIMENSION_LIST*/
     {NC_ATT_NAME, READONLYFLAG|HIDDENATTRFLAG},				/*NAME*/
@@ -47,17 +47,23 @@ static const NC_reservedatt NC_reserved[] = {
     {NC_ATT_FORMAT, READONLYFLAG},					/*_Format*/
     {ISNETCDF4ATT, READONLYFLAG|NAMEONLYFLAG},				/*_IsNetcdf4*/
     {NCPROPS,READONLYFLAG|NAMEONLYFLAG|HIDDENATTRFLAG},			/*_NCProperties*/
-    {NC_NCZARR_ATTR_UC, READONLYFLAG|HIDDENATTRFLAG},			/*_NCZARR_ATTR */
     {NC_ATT_COORDINATES, READONLYFLAG|HIDDENATTRFLAG},			/*_Netcdf4Coordinates*/
     {NC_ATT_DIMID_NAME, READONLYFLAG|HIDDENATTRFLAG},			/*_Netcdf4Dimid*/
     {SUPERBLOCKATT, READONLYFLAG|NAMEONLYFLAG},				/*_SuperblockVersion*/
     {NC_ATT_NC3_STRICT_NAME, READONLYFLAG},				/*_nc3_strict*/
     {NC_ATT_NC3_STRICT_NAME, READONLYFLAG},				/*_nc3_strict*/
+    {NC_NCZARR_SUPERBLOCK, READONLYFLAG|HIDDENATTRFLAG},		/*_nczarr_superblock */
+    {NC_NCZARR_GROUP, READONLYFLAG|HIDDENATTRFLAG},			/*_nczarr_group */
+    {NC_NCZARR_ARRAY, READONLYFLAG|HIDDENATTRFLAG},			/*_nczarr_array */
     {NC_NCZARR_ATTR, READONLYFLAG|HIDDENATTRFLAG},			/*_nczarr_attr */
+    {NC_NCZARR_ATTR_UC, READONLYFLAG|HIDDENATTRFLAG},			/*_NCZARR_ATTR */
 };
-#define NRESERVED (sizeof(NC_reserved) / sizeof(NC_reservedatt))  /*|NC_reservedatt|*/
+#define NRESERVED (sizeof(NC_reserved) / sizeof(NC_reservedatt))  /*|NC_reserved|*/
 
+/*Forward */
 static int NC4_move_in_NCList(NC* nc, int new_id);
+static int bincmp(const void* arg1, const void* arg2);
+static int sortcmp(const void* arg1, const void* arg2);
 
 #if NC_HAS_LOGGING
 /* This is the severity level of messages which will be logged. Use
@@ -796,7 +802,7 @@ nc4_var_set_ndims(NC_VAR_INFO_T *var, int ndims)
 
         /* Initialize dimids to illegal values (-1). See the comment
            in nc4_rec_match_dimscales(). */
-      memset(var->dimids, -1, (size_t)ndims * sizeof(int));
+        memset(var->dimids, -1, (size_t)ndims * sizeof(int));
     }
 
     return NC_NOERR;
@@ -2026,6 +2032,7 @@ NC4_show_metadata(int ncid)
 const NC_reservedatt*
 NC_findreserved(const char* name)
 {
+#if 0
     int n = NRESERVED;
     int L = 0;
     int R = (n - 1);
@@ -2042,6 +2049,32 @@ NC_findreserved(const char* name)
             R = (m - 1);
     }
     return NULL;
+#else
+    return (const NC_reservedatt*)bsearch(name,NC_reserved,NRESERVED,sizeof(NC_reservedatt),bincmp);
+#endif
+}
+
+void
+NC_initialize_reserved(void)
+{
+    /* Guarantee the reserved attribute list is sorted */
+    qsort((void*)NC_reserved,NRESERVED,sizeof(NC_reservedatt),sortcmp);
+}       
+
+static int
+sortcmp(const void* arg1, const void* arg2)
+{
+    NC_reservedatt* r1 = (NC_reservedatt*)arg1;
+    NC_reservedatt* r2 = (NC_reservedatt*)arg2;
+    return strcmp(r1->name,r2->name);
+}
+
+static int
+bincmp(const void* arg1, const void* arg2)
+{
+    const char* name = (const char*)arg1;
+    NC_reservedatt* ra = (NC_reservedatt*)arg2;
+    return strcmp(name,ra->name);
 }
 
 static int

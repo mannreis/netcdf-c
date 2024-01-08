@@ -99,7 +99,7 @@ done:
 }
 #endif
 
-/* Warning: not free returned zcvt.strv; it may point into a string in jsrc */
+/* Warning: do not free returned zcvt.strv; it may point into a string in jsrc */
 int
 NCZ_json2cvt(const NCjson* jsrc, struct ZCVT* zcvt, nc_type* typeidp)
 {

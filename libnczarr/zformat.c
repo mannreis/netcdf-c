@@ -100,14 +100,14 @@ NCZF_close(NC_FILE_INFO_T* file)
 }
 
 int
-NCZF_readattrs(NC_FILE_INFO_T* file, NC_OBJ* container, const NCjson* jatts, struct NCZ_AttrInfo** attrp)
+NCZF_readattrs(NC_FILE_INFO_T* file, NC_OBJ* container, const NCjson* jatts, const NCjson* jtypes, struct NCZ_AttrInfo** attrp)
 {
     int stat = NC_NOERR;
     NCZ_FILE_INFO_T* zfile = NULL;
 
     zfile = (NCZ_FILE_INFO_T*)file->format_file_info;
     assert(zfile != NULL);
-    stat = zfile->dispatcher->readattrs(file,container,jatts,attrp);
+    stat = zfile->dispatcher->readattrs(file,container,jatts,jtypes,attrp);
     return THROW(stat);
 }
 

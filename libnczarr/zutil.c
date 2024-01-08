@@ -132,19 +132,19 @@ static const struct ZTYPESV3 {
 } znamesv3[N_NCZARR_TYPES] = {
 /* nc_type       Pure Zarr   typelen    NCZarr */
 /*NC_NAT*/      {NULL,          0,      NULL},
-/*NC_BYTE*/     {"int8",        0,      NULL},
-/*NC_CHAR*/     {"uint8",       0,      "char"},
-/*NC_SHORT*/    {"int16",       0,      NULL},
-/*NC_INT*/      {"int32",       0,      NULL},
-/*NC_FLOAT*/    {"float32",     0,      NULL},
-/*NC_DOUBLE*/   {"float64",     0,      NULL},
-/*NC_UBYTE*/    {"uint8",       0,      NULL},
-/*NC_USHORT*/   {"uint16",      0,      NULL},
-/*NC_UINT*/     {"uint32",      0,      NULL},
-/*NC_INT64*/    {"int64",       0,      NULL},
-/*NC_UINT64*/   {"uint64",      0,      NULL},
+/*NC_BYTE*/     {"int8",        1,      NULL},
+/*NC_CHAR*/     {"uint8",       1,      "char"},
+/*NC_SHORT*/    {"int16",       2,      NULL},
+/*NC_INT*/      {"int32",       4,      NULL},
+/*NC_FLOAT*/    {"float32",     4,      NULL},
+/*NC_DOUBLE*/   {"float64",     8,      NULL},
+/*NC_UBYTE*/    {"uint8",       1,      NULL},
+/*NC_USHORT*/   {"uint16",      2,      NULL},
+/*NC_UINT*/     {"uint32",      4,      NULL},
+/*NC_INT64*/    {"int64",       8,      NULL},
+/*NC_UINT64*/   {"uint64",      8,      NULL},
 /*NC_STRING*/   {"r%u",         0,      "string"},
-/*NC_JSON*/     {"uint8",       0,      "json"} /* NCZarr internal type */
+/*NC_JSON*/     {"uint8",       1,      "json"} /* NCZarr internal type */
 };
 
 /* map nc_type -> NCJ_SORT */
@@ -1344,7 +1344,16 @@ done:
     return THROW(stat);
 }
 
-/* Find an object matching the given name and of given sort */
+/* Find an object matching the given name and of given sort.
+@param parent start search here
+@param fqn path to the object
+@param sort of desired object
+@param objectp return pointer to matching object, or if not found,
+               then to the group where it should have been found.
+@return NC_NOERR
+@return NC_ENOOBJECT if object not found (=> objectp contains where it should be)
+@return NC_EXXX
+*/
 int
 NCZ_locateFQN(NC_GRP_INFO_T* parent, const char* fqn, NC_SORT sort, NC_OBJ** objectp)
 {
@@ -1384,7 +1393,7 @@ NCZ_locateFQN(NC_GRP_INFO_T* parent, const char* fqn, NC_SORT sort, NC_OBJ** obj
         if(object != NULL && (sort == NCNAT || sort == NCATT)) break; /* not this */
 	object = NULL; /* not found */
     } while(0);
-    if(object == NULL) {ret = NC_ENOOBJECT; goto done;}
+    if(object == NULL) {object = (NC_OBJ*)grp; ret = NC_ENOOBJECT;}
     if(objectp) *objectp = object;
 done:
     nclistfreeall(segments);

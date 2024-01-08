@@ -67,9 +67,6 @@
 #define Z3GROUP "zarr.json"
 #define Z3ARRAY "zarr.json"
 
-/* Pure Zarr pseudo names */
-#define ZDIMANON "_zdim"
-
 /* Bytes codec name */
 #define ZBYTES3 "bytes"
 
@@ -97,32 +94,49 @@ Inserted into any .zattrs ? or should it go into the container?
 /* V3 Reserved Attributes */
 /*
 Inserted into group zarr.json:
+Inserted into root group zarr.json as an extra attribute.
 _nczarr_superblock: {
-    version: 3.0.0,    
-    format: 3,
-    groups: { // Group+array skeleton
-	"/":        {arrays: [{name: <name>},...], subgroups: [{name: <name>},...]},
-	<groupFQN>: {arrays: [{name: <name>},...], subgroups: [{name: <name>},...]},
-	...
-	<groupFQN>: {arrays: [{name: <name>},...], subgroups: [{name: <name>},...]},
+    "version": 3.0.0,    
+    "format": 3,
+    "groups": { // Group+array skeleton
+    "/": { // the topmost dictionary node represents the root group
+           "arrays": [<name>,...],
+           subgroups: {
+               "<grp1>": {"arrays": [...],
+                           subgroups: {
+                               "<grp1.1>":{"arrays": [...], subgroups: {...}},
+                               ...
+                               "<grp1.n>": {"arrays": [...], subgroups: {...}}
+                           },
+                         },
+               ...
+               "<grpn>": {"arrays": [...],
+                           subgroups: {
+                               "<grpn.1>":{"arrays": [...], subgroups: {...}},
+                               ...
+                               "<grpn.m>": {"arrays": [...], subgroups: {...}}
+                           },
+                         },
+           }
+        }
     }
 }
 
 Optionally Inserted into any group zarr.json as an extra attribute.
-"_nczarr_attrs": [{\"name\": \"attr1\", \"configuration\": {\"type\": \"<i4\"}}, ...]
+"_nczarr_attrs": {\"attribute_types\": [{\"name\": \"attr1\", \"configuration\": {\"type\": \"<dtype>\"}}, ...]}
 
-Inserted into any group zarr.json as an attribute:
+Optionally inserted into any group zarr.json as an attribute:
 "_nczarr_group": "{
 \"dimensions\": [{name: <dimname>, size: <integer>, unlimited: 1|0},...],
 }"
 
-Inserted into any array zarr.json as an attribute:
+Optionally Inserted into any array zarr.json as an attribute:
 "_nczarr_array": "{
 \"dimensions_references\": [\"/g1/g2/d1\", \"/d2\",...],
-\"type_alias\": "<string indicating special type aliasing>"
+\"type_alias\": "<string indicating special type aliasing>" // optional
 }"
 
-The "netcdf-type key is used to signal ambiguous dtypes.
+The "type-alias key is used to signal ambiguous dtypes.
 Specifically, there are three current cases:
 | dtype | type_alias |
 | ----- | ---------- |
@@ -131,19 +145,20 @@ Specifically, there are three current cases:
 | uint8 | json       |
 
 Optionally Inserted into any array zarr.json as an extra attribute.
-"_nczarr_attrs": [{\"name\": \"attr1\", \"configuration\": {\"type\": \"<i4\"}}, ...]
-}
+"_nczarr_attrs": {\"attribute_types\": [{\"name\": \"attr1\", \"configuration\": {\"type\": \"<dtype>\"}}, ...]}
 */
 
 #define NCZ_V2_SUPERBLOCK "_nczarr_superblock"
+/* Must match values in include/nc4internal.h */
 #define NCZ_V2_GROUP   "_nczarr_group"
 #define NCZ_V2_ARRAY   "_nczarr_array"
-#define NCZ_V2_ATTR    NC_NCZARR_ATTR
+#define NCZ_V2_ATTR    "_nczarr_attrs"
 
 #define NCZ_V3_SUPERBLOCK "_nczarr_superblock"
-#define NCZ_V3_GROUP  NCZ_V2_GROUP
-#define NCZ_V3_ARRAY  NCZ_V2_ARRAY
-#define NCZ_V3_ATTR   NCZ_V2_ATTR
+/* Must match values in include/nc4internal.h */
+#define NCZ_V3_GROUP   "_nczarr_group"
+#define NCZ_V3_ARRAY   "_nczarr_array"
+#define NCZ_V3_ATTR    "_nczarr_attrs"
 
 #define NCZARRCONTROL "nczarr"
 #define PUREZARRCONTROL "zarr"
@@ -212,7 +227,7 @@ typedef struct NCZ_FILE_INFO {
 #		define FLAG_LOGGING     4
 #		define FLAG_XARRAYDIMS  8
     NCZM_IMPL mapimpl;
-    const NCjson* jsuper; /* _nczarr_superblock; Only used by NCZarr 3.0.0 and later; do not reclaim */
+    NCjson* jsuper; /* _nczarr_superblock; Only used by NCZarr 3.0.0 and later; reclaim */
     struct NCZ_Formatter* dispatcher;
 } NCZ_FILE_INFO_T;
 
@@ -334,7 +349,7 @@ int ncz_create_fillvalue(NC_VAR_INFO_T* var);
 int ncz_makeattr(NC_OBJ*, NCindex* attlist, const char* name, nc_type typid, size_t len, void* values, NC_ATT_INFO_T**);
 int NCZ_computeattrinfo(const char* name, nc_type atype, nc_type typehint, int purezarr, const NCjson* values, nc_type* typeidp, size_t* typelenp, size_t* lenp, void** datap);
 int NCZ_computeattrdata(nc_type typehint, nc_type* typeidp, const NCjson* values, size_t* typelenp, size_t* countp, void** datap);
-int NCZ_read_attrs(NC_FILE_INFO_T* file, NC_OBJ* container, const NCjson* jatts);
+int NCZ_read_attrs(NC_FILE_INFO_T* file, NC_OBJ* container, const NCjson* jatts, const NCjson* jatypes);
 int NCZ_attr_convert(const NCjson* src, nc_type typeid, size_t typelen, int* countp, NCbytes* dst);
 
 /* zvar.c */

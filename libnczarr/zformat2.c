@@ -17,7 +17,7 @@ static int ZF2_open(NC_FILE_INFO_T* file, NCURI* uri, NCZMAP* map);
 static int ZF2_close(NC_FILE_INFO_T* file);
 static int ZF2_writemeta(NC_FILE_INFO_T* file);
 static int ZF2_readmeta(NC_FILE_INFO_T* file);
-static int ZF2_readattrs(NC_FILE_INFO_T* file, NC_OBJ* container, const NCjson* jatts, struct NCZ_AttrInfo** ainfop);
+static int ZF2_readattrs(NC_FILE_INFO_T* file, NC_OBJ* container, const NCjson* jatts, const NCjson* jatypes, struct NCZ_AttrInfo** ainfop);
 static int ZF2_buildchunkkey(size_t rank, const size64_t* chunkindices, char dimsep, char** keyp);
 #ifdef ENABLE_NCZARR_FILTERS
 static int ZF2_hdf2codec(const NC_FILE_INFO_T* file, const NC_VAR_INFO_T* var, NCZ_Filter* filter);
@@ -817,7 +817,7 @@ done:
 @author Dennis Heimbigner
 */
 static int
-ZF2_readattrs(NC_FILE_INFO_T* file, NC_OBJ* container, const NCjson* jatts, struct NCZ_AttrInfo** ainfop)
+ZF2_readattrs(NC_FILE_INFO_T* file, NC_OBJ* container, const NCjson* jatts, const NCjson* jatypes, struct NCZ_AttrInfo** ainfop)
 {
     int stat = NC_NOERR;
     const char* fullpath = NULL;
@@ -833,6 +833,7 @@ ZF2_readattrs(NC_FILE_INFO_T* file, NC_OBJ* container, const NCjson* jatts, stru
     size_t i;
 
     assert(jatts == NULL);
+    NC_UNUSED(jatypes);
     
     ZTRACE(3,"map=%p container=%s nczarrv1=%d",map,container->name,nczarrv1);
 
@@ -1746,7 +1747,7 @@ NCZ_computedimrefs(NC_FILE_INFO_T* file, NCZ_FILE_INFO_T* zfile, NCZMAP* map, NC
         char zdimname[4096];
         if(zvar->xarray == NULL) {
             assert(nclistlength(dimnames) == 0);
-            if((stat = NCZ_read_attrs(file,(NC_OBJ*)var,NULL))) goto done;
+            if((stat = NCZ_read_attrs(file,(NC_OBJ*)var,NULL,NULL))) goto done;
         }
         if(zvar->xarray != NULL) {
             /* convert xarray to the dimnames */
@@ -1764,7 +1765,7 @@ NCZ_computedimrefs(NC_FILE_INFO_T* file, NCZ_FILE_INFO_T* zfile, NCZMAP* map, NC
         for(i=0;i<ndims;i++) {
             /* Compute the set of absolute paths to dimrefs */
             char zdimname[4096];
-            snprintf(zdimname,sizeof(zdimname),"/%s_%llu",ZDIMANON,shapes[i]);
+            snprintf(zdimname,sizeof(zdimname),"/%s_%llu",NCDIMANON,shapes[i]);
             nclistpush(dimnames,strdup(zdimname));
         }
     }
