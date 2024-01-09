@@ -21,6 +21,7 @@
 
 /* Opaque */
 struct NCZ_Plugin;
+struct NCZ_Outline;
 
 /* This is the dispatch table, with a pointer to each netCDF
  * function. */
@@ -76,6 +77,9 @@ extern const NCZ_Formatter* NCZ_formatter3; /* NCZarr V3 dispatch table => Zarr 
 /* Use inference to get map and the formatter */
 extern int NCZ_get_map(NC_FILE_INFO_T* file, NCURI* url, int mode, size64_t constraints, void* params, NCZMAP** mapp);
 extern int NCZ_get_formatter(NC_FILE_INFO_T* file, const NCZ_Formatter** formatterp);
+
+/* Misc */
+extern void NCZ_freeoutline(struct NCZ_Outline*);
 
 #if defined(__cplusplus)
 }

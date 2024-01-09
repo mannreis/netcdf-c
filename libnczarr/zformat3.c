@@ -10,11 +10,33 @@
 #endif
 
 /**************************************************/
+
+#define Z3VIRTUAL Z3OBJECT##".virtual" 
+
+/**************************************************/
+
+/* Track the file outline */
+typedef struct NCZ_Outline {
+    char* name;
+    int isarray;
+    int isrealgroup; /* group has zarr.json    */
+    NClist* arrays;    /* NClist<char*>  */
+    NClist* subgroups; /* NClist<NCZ_Outline*> */
+} NCZ_Outline;
+
+static NCZ_Outline* newoutline(const char* name);
+static int buildoutline(NClist* paths, NCZ_Outline**);
+static int buildoutlineR(NCZ_Outline* parent, NClist* allpaths, NClist* segments, size_t pos);
+static void dumpoutlineR(const NCZ_Outline* ol, NCbytes* buf, int depth);
+static void olindent(NCbytes* buf, int depth);
+static void convertoutlinearrays(NCZ_Outline* parent);
+
+/**************************************************/
 /* Big endian Bytes filter */
 static const char* NCZ_Bytes_Big_Text = "{\"name\": \"bytes\", \"configuration\": {\"endian\": \"big\"}}";
 NCjson* NCZ_Bytes_Big_Json = NULL;
 
-/* Little endian Bytes filter */
+p/* Little endian Bytes filter */
 static const char* NCZ_Bytes_Little_Text = "{\"name\": \"bytes\", \"configuration\": {\"endian\": \"little\"}}";
 NCjson* NCZ_Bytes_Little_Json = NULL;
 
@@ -39,7 +61,6 @@ static int write_var(NC_FILE_INFO_T* file, NCZ_FILE_INFO_T* zfile, NCZMAP* map, 
 
 static int build_atts(NC_FILE_INFO_T* file, NCZ_FILE_INFO_T* zfile, NC_OBJ* container, NCindex* attlist, NCjson** jattsp, NCjson** jnczattsp);
 static int build_superblock(NC_FILE_INFO_T* file, NCjson** jsuperp);
-static int build_group_skeleton(NC_FILE_INFO_T* file, NC_GRP_INFO_T* grp, NCjson** grpp);
 
 static int read_grp(NC_FILE_INFO_T* file, NC_GRP_INFO_T* grp);
 static int read_vars(NC_FILE_INFO_T* file, NC_GRP_INFO_T* grp, NClist* varnames);
@@ -59,7 +80,7 @@ static int subobjects(NCZ_FILE_INFO_T* zfile, NC_GRP_INFO_T* grp, NClist* varnam
 static NCjson* build_attr_type_dict(const char* aname, const char* dtype);
 static NCjson* build_named_config(const char* name, int pairs, ...);
 static void infersubgroups(const char* grpkey, NClist* paths, NClist* subgrps);
-static int findgroupskeleton(NCZ_FILE_INFO_T* zfile, NC_GRP_INFO_T* grp, const NCjson* rootskeleton, const NCjson** skeletonp);
+static int findgroupoutline(NCZ_FILE_INFO_T* zfile, NC_GRP_INFO_T* grp, const NCZ_Outline* rootoutline, const NCZ_Outline** outlinep);
 static int convertdimnames2fqns(NC_FILE_INFO_T* file, NC_GRP_INFO_T* grp, NClist* dimnames, NClist* dimfqns);
 
 /**************************************************/
@@ -724,32 +745,8 @@ done:
 }
 
 /**
-The super block contains a JSON tree representing part of the
-so-called combined metadata information.
-It contains the group names, the dimension objects,
-and the array names.
-Eventually,if the Zarr V3 spec defines the combined metadata,
-then that will be used instead of this information.
-
-The general form is described in zinternal.h.
-where the topmost dictionary node represents the root group:
-_nczarr_superblock: {
-    version: 3.0.0,    
-    format: 3,
-    root: {
-	dimensions: {name: <dimname>, size: <integer>, unlimited: 1|0},
-	arrays: [{name: <name>},...],
-	children: [
-		{name: <name>,
-		dimensions: {name: <dimname>, size: <integer>, unlimited: 1|0},
-		arrays: [{name: <name>},...],
-		children: [{name: <name>, subgrps: [...]},{name: <name>, subgrps: [...]},...]
-		},
-		...
-	],
-    }
-}
-
+The super block is a placeholder in case
+combined metadata information if implemented in V3
 */
 
 static int
@@ -772,17 +769,8 @@ build_superblock(NC_FILE_INFO_T* file, NCjson** jsuperp)
     NCJcheck(NCJinsertstring(jsuper,"version",version));
     NCJcheck(NCJinsertint(jsuper,"format",zfile->zarr.nczarr_format));
 
-    /* Capture and insert the var+subgroup skeleton */
-    if((stat = build_group_skeleton(file,file->root_grp,&jgroup))) goto done;
-    NCJcheck(NCJinsert(jgroups, "/", jgroup));
-    jgroup = NULL;
-    
-    /* Complete superblock */
-    NCJcheck(NCJinsert(jsuper, "groups", jgroups));
-    jgroups = NULL;
-
     if(jsuperp) {*jsuperp = jsuper; jsuper = NULL;}
-done:
+
     NCJreclaim(jgroup);
     NCJreclaim(jgroups);
     NCJreclaim(jsuper);
@@ -790,7 +778,7 @@ done:
 }
 
 static int
-build_group_skeleton(NC_FILE_INFO_T* file, NC_GRP_INFO_T* grp, NCjson** jgrpp)
+build_group_outline(NC_FILE_INFO_T* file, NC_GRP_INFO_T* grp, NCjson** jgrpp)
 {
     int stat = NC_NOERR;
     NCjson* jgrp = NULL;
@@ -846,6 +834,8 @@ ZF3_readmeta(NC_FILE_INFO_T* file)
     NC_GRP_INFO_T* root = NULL;
     NCZ_GRP_INFO_T* zroot = NULL;
     NCjson* jrootgrp = NULL;
+    NClist* paths = NULL;
+    char* rootkey = NULL;
 
     ZTRACE(3,"file=%s",file->controller->path);
     
@@ -865,11 +855,22 @@ ZF3_readmeta(NC_FILE_INFO_T* file)
     default: goto done;
     }
 
+    /* Build the outline for the file */
+    {
+	paths = nclistnew();
+        /* Compute the key for the root grp */
+        if((stat = NCZ_grpkey(root,&rootkey))) goto done;
+        if((stat = nczmap_listall(zfile->map,rootkey,paths))) goto done;
+        if((stat = buildoutline(paths,&zfile->outline))) goto done;
+    }
+    
     /* Now load the groups contents starting with root */
     if((stat = read_grp(file,file->root_grp)))
 	goto done;
 
 done:
+    nullfree(rootkey);
+    nclistfreeall(paths);
     return ZUNTRACE(THROW(stat));
 }
 
@@ -1004,7 +1005,6 @@ verify_superblock(NC_FILE_INFO_T* file, const NCjson* jsuper)
     int stat = NC_NOERR;
     NCZ_FILE_INFO_T* zfile = (NCZ_FILE_INFO_T*)file->format_file_info;
     const NCjson* jvalue = NULL;
-    const NCjson* jgroups = NULL;
 
     NCJcheck(NCJdictget(jsuper,"version",&jvalue));
     if(jvalue != NULL) {
@@ -1016,10 +1016,7 @@ verify_superblock(NC_FILE_INFO_T* file, const NCjson* jsuper)
 	sscanf(NCJstring(jvalue),"%d",&zfile->zarr.zarr_format);
 	assert(zfile->zarr.zarr_format == ZARRFORMAT3);
     }
-    NCJcheck(NCJdictget(jsuper,"groups",&jgroups));
-    if(jgroups == NULL) {stat = NC_ENCZARR; goto done;}
 
-done:
     return THROW(stat);
 }
 
@@ -1057,8 +1054,10 @@ read_grp(NC_FILE_INFO_T* file, NC_GRP_INFO_T* grp)
 	goto done;
 
     /* Download the grp meta-data; might not exist for virtual groups */
+
     /* build Z3GROUP path */
     if((stat = nczm_concat(fullpath,Z3GROUP,&key))) goto done;
+
     /* Read */
     stat=NCZ_downloadjson(map,key,&jgroup);
     nullfree(key); key = NULL;
@@ -1077,7 +1076,6 @@ read_grp(NC_FILE_INFO_T* file, NC_GRP_INFO_T* grp)
 		if(!purezarr && jsuper == NULL) {stat = NC_ENCZARR; goto done;}
 		if(jsuper != NULL) {
 	            if((stat = verify_superblock(file,jsuper))) goto done;
-	            NCJcheck(NCJclone(jsuper,&zfile->jsuper)); /* save */
 		}
 	    }
 	    /* Get _nczarr_group */
@@ -1781,7 +1779,7 @@ NCZ_collect_grps(NC_FILE_INFO_T* file, NC_GRP_INFO_T* grp, NCjson** jsubgrpsp)
     for(i=0; i<ncindexsize(grp->children); i++) {
 	NC_GRP_INFO_T* g = (NC_GRP_INFO_T*)ncindexith(grp->children,i);
 	/* Recurse to build the subgroup dict for g*/
-	if((stat = build_group_skeleton(file,g,&jsubgrp))) goto done;
+	if((stat = build_group_outline(file,g,&jsubgrp))) goto done;
 	NCJcheck(NCJinsert(jsubgrps,g->hdr.name,jsubgrp));
 	jsubgrp = NULL;
     }
@@ -1856,37 +1854,24 @@ static int
 subobjects(NCZ_FILE_INFO_T* zfile, NC_GRP_INFO_T* grp, NClist* varnames, NClist* grpnames)
 {
     int i, stat = NC_NOERR;
-    const NCjson* jsuper = NULL;
-    const NCjson* jsuperroot = NULL;
-    const NCjson* jskeleton = NULL;
-    const NCjson* jarrays = NULL;
-    const NCjson* jsubgrps = NULL;
+    const NCZ_Outline* rootoutline = NULL;
+    const NCZ_Outline* outline = NULL;
 
-    jsuper = zfile->jsuper;
-    if(jsuper == NULL) {stat = NC_ENCZARR; goto done;}
-    if(jsuper == NULL || NCJsort(jsuper)!= NCJ_DICT) {stat = NC_ENCZARR; goto done;}
+    rootoutline = zfile->outline;;
+    if(outline == NULL) {stat = NC_ENCZARR; goto done;}
+
+    /* Get the group's corresponding outline */
+    if((stat = findgroupoutline(zfile,grp,rootoutline,&outline))) goto done;
+    if(outline == NULL) {stat = NC_ENCZARR; goto done;}
     
-    NCJcheck(NCJdictget(jsuper,"groups",&jsuperroot));
-    if(jsuperroot == NULL || NCJsort(jsuperroot)!= NCJ_DICT) {stat = NC_ENCZARR; goto done;}
-
-    /* Get the group's corresponding skeleton */
-    if((stat = findgroupskeleton(zfile,grp,jsuperroot,&jskeleton))) goto done;
-    if(jskeleton == NULL || NCJsort(jskeleton) != NCJ_DICT) {stat = NC_ENCZARR; goto done;}
-    
-    /* Get the subarrays and subgroups */
-    NCJcheck(NCJdictget(jskeleton,"arrays",&jarrays));
-    NCJcheck(NCJdictget(jskeleton,"children",&jsubgrps));
-
-    for(i=0;i<NCJarraylength(jarrays);i++) {
-	const NCjson* jarray = NCJith(jarrays,i);
-	assert(NCJisatomic(jarray));
-	nclistpush(varnames,strdup(NCJstring(jarray)));
+    for(i=0;i<nclistlength(outline->arrays);i++) {
+	const char* varname = nclistget(outline->arrays,i);
+	nclistpush(varnames,strdup(varname));
     }
 
-    for(i=0;i<NCJdictlength(jsubgrps);i++) {
-	const NCjson* jgname = NCJdictkey(jsubgrps,i);
-	assert(NCJisatomic(jgname));
-	nclistpush(grpnames,strdup(NCJstring(jgname)));
+    for(i=0;i<nclistlength(outline->subgroups);i++) {
+	const NCZ_Outline* goutline = nclistget(outline->subgroups,i);
+	nclistpush(grpnames,strdup(goutline->name));
     }
 
 done:
@@ -2042,39 +2027,43 @@ infersubgroups(const char* grpkey, NClist* paths, NClist* subgrps)
 }
 
 /**
-Given the group skeleton from the superblock,
-locate the subskeleton matching a given group.
+Given the root group outline,
+locate the outline matching a given group.
 @param zfile
-@param grp whose skeleton we want to find
-@param rootsubgrps the superblock "groups" value
-@param skeletonp return matching (sub)skeleton
+@param grp whose outline we want to find
+@param rootoutline the root outline
+@param outlinep return matching (sub)outline
 @return NC_NOERR|NC_EXXX
 */
 static int
-findgroupskeleton(NCZ_FILE_INFO_T* zfile, NC_GRP_INFO_T* grp, const NCjson* rootjgroup, const NCjson** skeletonp)
+findgroupoutline(NCZ_FILE_INFO_T* zfile, NC_GRP_INFO_T* grp, const NCZ_Outline* rootoutline,  const NCZ_Outline** outlinep)
 {
     int stat = NC_NOERR;
-    const NCjson* jsubgrps = NULL;
-    const NCjson* jsubskel = NULL;
     NClist* fqn = NULL;
     NC_GRP_INFO_T* g = NULL;
-    size_t i;
+    size_t i,j;
+    const NClist* subgrps = NULL;
+    const NCZ_Outline* subgrp = NULL;
 
     /* get the sequence of parents of grp, including grp */
     fqn = nclistnew();    
     for(g=grp;g != NULL;g=g->parent)
         nclistinsert(fqn,0,g);
     assert(((NC_GRP_INFO_T*)nclistget(fqn,0))->parent == NULL);
-    /* Walk the skeleton */
-    jsubgrps = rootjgroup;
+    /* Walk the outline */
+    subgrps = rootoutline->subgroups;
     for(i=0;i<nclistlength(fqn);i++) {
         g = (NC_GRP_INFO_T*)nclistget(fqn,i);
-	NCJcheck(NCJdictget(jsubgrps,g->hdr.name,&jsubskel));
-	if(jsubskel == NULL) {stat = NC_ENCZARR; goto done;}
-	NCJcheck(NCJdictget(jsubskel,"children",&jsubgrps));
-	if(jsubgrps == NULL) {stat = NC_ENCZARR; goto done;}
+	for(j=0;j<nclistlength(subgrps);j++) {
+	    subgrp = (const NCZ_Outline*)nclistget(subgrps,j);
+	    if(strcmp(g->hdr.name,subgrp->name)==0) break;
+	    subgrp = NULL;
+	}
+	if(subgrp == NULL) {stat = NC_ENCZARR; goto done;}
+	subgrps = subgrp->subgroups;
+	if(subgrps == NULL) {stat = NC_ENCZARR; goto done;}
     }
-    if(skeletonp) {*skeletonp = jsubskel; jsubskel = NULL;}
+    if(outlinep) *outlinep = subgrp;
 
 done:
     return stat;
@@ -2397,6 +2386,7 @@ done:
     return THROW(stat);
 }
 #endif /*ENABLE_NCZARR_FILTERS*/
+
 /**************************************************/
 /* Utilities */
 
@@ -2433,6 +2423,242 @@ build_named_config(const char* name, int pairs, ...)
     NCJinsert(jdict,"configuration",jcfg);
     va_end(ap);
     return jdict;
+}
+
+/**************************************************/
+/* Outline Management */
+
+static NCZ_Outline*
+newoutline(const char* name)
+{
+    NCZ_Outline* ol = (NCZ_Outline*)calloc(1,sizeof(NCZ_Outline));
+    if(ol != NULL) {
+	ol->name = strdup(name);
+	ol->isarray = 0;
+	ol->isrealgroup = 0;
+	ol->arrays = NULL;
+	ol->subgroups = nclistnew();
+    }
+    return ol;
+}
+
+void
+NCZ_freeoutline(NCZ_Outline* ol)
+{
+    size_t i;
+    if(ol != NULL) {
+	if(ol->name) free(ol->name);
+	nclistfreeall(ol->arrays);
+	for(i=0;i<nclistlength(ol->subgroups);i++) {
+	    NCZ_Outline* o = (NCZ_Outline*)nclistget(ol->subgroups,i);
+	    NCZ_freeoutline(o);
+	}
+	nclistfree(ol->subgroups);
+	free(ol);
+    }
+}
+
+void
+NCZ_dumpoutline(const NCZ_Outline* ol)
+{
+    NCbytes* buf = ncbytesnew();
+    dumpoutlineR(ol,buf,0);
+    fprintf(stderr,"%s\n",ncbytescontents(buf));
+    ncbytesfree(buf);
+}
+
+static void
+dumpoutlineR(const NCZ_Outline* ol, NCbytes* buf, int depth)
+{
+    int i;
+    olindent(buf,depth);
+    if(ol == NULL) {ncbytescat(buf,"<null>"); goto done;}
+    ncbytescat(buf,ol->name);
+    if(ol->isarray) {ncbytescat(buf,"{}"); goto done;}
+    if(!ol->isrealgroup) {ncbytescat(buf,"*");}
+    ncbytescat(buf,"{");
+    ncbytescat(buf,"arrays=");
+    ncbytescat(buf,"[");
+    for(i=0;i<nclistlength(ol->arrays);i++) {
+	if(i>0) ncbytescat(buf,",");
+	ncbytescat(buf,(const char*)nclistget(ol->arrays,i));
+    }
+    ncbytescat(buf,"]");
+    if(nclistlength(ol->subgroups) > 0) {
+        olindent(buf,depth);
+        ncbytescat(buf,"subgroups=");
+        ncbytescat(buf,"[");
+        for(i=0;i<nclistlength(ol->subgroups);i++) {
+	    const NCZ_Outline* grp = (NCZ_Outline*)nclistget(ol->subgroups,i);
+            dumpoutlineR(grp,buf,depth+1);
+	}
+        ncbytescat(buf,"]");
+        olindent(buf,depth);
+    }
+    ncbytescat(buf,"}\n");
+done:
+    fprintf(stderr,"\n");
+}
+
+static void
+olindent(NCbytes* buf, int depth)
+{
+    int i;
+    ncbytescat(buf,"\n");
+    for(i=0;i<depth*2;i++) ncbytescat(buf," ");
+}
+
+
+#if 0
+static int
+nsegcmp(const void* a1, const void* a2)
+{
+    int cmp;
+    const char* s1 = *((const char**)a1);
+    const char* s2 = *((const char**)a2);
+    NClist* segments1 = nclistnew();
+    NClist* segments2 = nclistnew();    
+
+    (void)ncz_splitkey(s1,segments1);
+    (void)ncz_splitkey(s2,segments2);
+    if(nclistlength(segments1) < nclistlength(segments1)) {cmp = -1;}
+    else if(nclistlength(segments1) > nclistlength(segments1)) {cmp = 1;} 
+    else {cmp = 0;} /* (nclistlength(segments1) == nclistlength(segments1) */
+
+    nclistfreeall(segments1);
+    nclistfreeall(segments2);
+    return cmp;
+}
+#endif
+
+/**
+Construct the outline from the set of defined objects in the file.
+@param paths set of paths for defined objects
+@param outlinep return root group outline
+@return NC_NOERR|NC_EXXX
+*/
+static int
+buildoutline(NClist* paths, NCZ_Outline** outlinep)
+{
+    int stat = NC_NOERR;
+    NCZ_Outline* root = NULL;
+    size_t i,j,k,npaths;
+    NClist* segments = NULL;
+    NCbytes* key = ncbytesnew();
+
+    npaths = nclistlength(paths);
+    if(npaths == 0) goto done;
+
+    /* create the outline root */
+    root = newoutline("/");
+
+    /* Create fake paths for virtual groups */
+    for(i=0;i<npaths;i++) {
+	size_t segcount;
+        const char* path = nclistget(paths,i);
+	/* convert to a list of segments */
+	segments = nclistnew();
+        if((stat=ncz_splitkey(path,segments))) goto done;
+	/* look at each group prefix of path */
+	segcount = nclistlength(segments);
+	for(j=0;j<segcount-1;j++) { /* -1 to avoid trailing e.g. zarr.json */
+	    const char* seg = (const char*)nclistget(segments,j);
+	    ncbytescat(key,"/");
+    	    ncbytescat(key,seg);
+       	    ncbytescat(key,Z3OBJECT);
+	    /* See if this key is already in the set of paths */
+	    if(!nclistmatch(paths,ncbytescontents(key),0)) {
+		/* Not found, so create a virtual path */
+		/* mark the Z3OBJECT as virtual */
+		ncbytescat(key,".virtual");
+		nclistpush(paths,ncbytesextract(key))
+	    }
+	}
+	ncbytesclear(key);
+	nclistfreeall(segments); segments = NULL;
+    }
+
+    /* re-sort */
+    NCZ_sortstringlist((char**)nclistcontents(paths),nclistlength(paths));
+
+    /* create the outline node for each path as if they were all groups */
+    for(i=0;i<npaths;i++) {
+        const char* path = nclistget(paths,i);
+        buildpath1(root,path)
+    }
+    /* Convert array objects */
+    convertoutlinearrays(root);
+
+    if(outlinep) {*outlinep = root; root = NULL;}
+done:
+    ncbytesfree(key);
+    nclistfreeall(segments);
+    NCZ_freeoutline(root);
+    return THROW(stat);
+}
+
+/* Recursive helper */
+static int
+buildpath1(NCZ_Outline* root, const char* path)
+{
+    int stat = NC_NOERR;
+    NCZ_Outline* grp = NULL;
+    const char* grpseg;
+    size_t i,j,nsegs;
+    NClist* segments = NULL;
+
+    segments = nclistnew();
+    if((stat=ncz_splitkey(path,segments))) goto done;
+    nsegs = nclistlength(segments);
+
+    /* Look at the segment list to determine what we have */
+    if(memcmp(zarrjson,"c.",2)==0 || memcmp(zarrjson,"c/",2)==0) goto done; /*ignore these because there will be matching array*/
+    if(strcmp(nclistget(segments,nsegs-1),Z3OBJECT) != 0
+       && strcmp(nclistget(segments,nsegs-1),Z3VIRTUAL) != 0) {stat = NC_EINVAL; goto done;}
+
+    /* walk down from the root to locate the parent to this path */
+    for(grp=root,i=0;i<nsegs-1;i++) {
+	for(j=0;j<nclistlength(grp->subgroups);j++) {
+???	    NCZ_Outline* sub = (NCZ_Outline*)nclistget(grp->subgroups)
+	
+    }   
+
+    /* find/create corresponding outline and recurse*/
+    pos = -1;
+    for(j=0;j<nclistlength(parent->subgroups);j++) {
+	grp = nclistget(parent->subgroups,j);
+	if(strcmp(grp->name,grpseg)==0) {pos = (int)j; break;}
+	grp = NULL;
+    }
+    if(grp == NULL) {/* create missing outline group */
+	grp = newoutline(grpseg);
+	nclistpush(parent->subgroups,grp);
+    }
+    /* recurse */
+    buildforpathR(grp,segments,j);
+
+    nclistfreeall(segments); segments = NULL;
+    return stat;
+}
+
+static void
+convertoutlinearrays(NCZ_Outline* parent)
+{
+    size_t i;
+    /* Walk backward since we may modify parent->subgrps */
+    for(i=nclistlength(parent->subgroups)-1;i>=0;i--) {
+	NCZ_Outline* child = nclistget(parent->subgroups,i);
+	if(nclistlength(child->subgroups)==0) {
+	    assert(child->arrays == NULL);
+	    child->isarray = 1;
+	    nclistfree(child->subgroups);
+	    child->subgroups = NULL;
+	    if(parent->arrays == NULL) parent->arrays = nclistnew();
+	    nclistpush(parent->arrays,strdup(child->name));
+	    nclistremove(parent->subgroups,i);
+	    free(child);
+	}
+    }
 }
 
 /**************************************************/

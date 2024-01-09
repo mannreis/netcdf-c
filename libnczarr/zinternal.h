@@ -64,8 +64,9 @@
 
 /* V3 Reserved Objects */
 #define Z3METAROOT "/zarr.json"
-#define Z3GROUP "zarr.json"
-#define Z3ARRAY "zarr.json"
+#define Z3OBJECT "zarr.json"
+#define Z3GROUP Z3OBJECT
+#define Z3ARRAY Z3OBJECT
 
 /* Bytes codec name */
 #define ZBYTES3 "bytes"
@@ -93,33 +94,10 @@ Inserted into any .zattrs ? or should it go into the container?
 
 /* V3 Reserved Attributes */
 /*
-Inserted into group zarr.json:
 Inserted into root group zarr.json as an extra attribute.
 _nczarr_superblock: {
     "version": 3.0.0,    
     "format": 3,
-    "groups": { // Group+array skeleton
-    "/": { // the topmost dictionary node represents the root group
-           "arrays": [<name>,...],
-           subgroups: {
-               "<grp1>": {"arrays": [...],
-                           subgroups: {
-                               "<grp1.1>":{"arrays": [...], subgroups: {...}},
-                               ...
-                               "<grp1.n>": {"arrays": [...], subgroups: {...}}
-                           },
-                         },
-               ...
-               "<grpn>": {"arrays": [...],
-                           subgroups: {
-                               "<grpn.1>":{"arrays": [...], subgroups: {...}},
-                               ...
-                               "<grpn.m>": {"arrays": [...], subgroups: {...}}
-                           },
-                         },
-           }
-        }
-    }
 }
 
 Optionally Inserted into any group zarr.json as an extra attribute.
@@ -199,6 +177,7 @@ struct NCZMAP;
 struct NCZChunkCache;
 struct NCZ_Formatter;
 struct NCproplist;
+struct Outline;
 
 /**************************************************/
 /* Define annotation data for NCZ objects */
@@ -227,8 +206,8 @@ typedef struct NCZ_FILE_INFO {
 #		define FLAG_LOGGING     4
 #		define FLAG_XARRAYDIMS  8
     NCZM_IMPL mapimpl;
-    NCjson* jsuper; /* _nczarr_superblock; Only used by NCZarr 3.0.0 and later; reclaim */
     struct NCZ_Formatter* dispatcher;
+    struct NCZ_Outline* outline; /* record the tree of groups and arrays in the file; V3 reading only */
 } NCZ_FILE_INFO_T;
 
 /* This is a struct to handle the dim metadata. */
