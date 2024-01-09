@@ -1828,6 +1828,7 @@ done:
     NCJreclaim(json);
     return stat;
 }
+
 static int
 subobjects(NCZ_FILE_INFO_T* zfile, NC_GRP_INFO_T* grp, NClist* varnames, NClist* grpnames)
 {
