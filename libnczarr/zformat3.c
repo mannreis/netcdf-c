@@ -11,12 +11,14 @@
 
 /**************************************************/
 
+static void freeDimInfoList(NCZ_DimInfo**, size_t ndims);
+
 /**************************************************/
 /* Big endian Bytes filter */
 static const char* NCZ_Bytes_Big_Text = "{\"name\": \"bytes\", \"configuration\": {\"endian\": \"big\"}}";
 NCjson* NCZ_Bytes_Big_Json = NULL;
 
-p/* Little endian Bytes filter */
+/* Little endian Bytes filter */
 static const char* NCZ_Bytes_Little_Text = "{\"name\": \"bytes\", \"configuration\": {\"endian\": \"little\"}}";
 NCjson* NCZ_Bytes_Little_Json = NULL;
 
@@ -56,7 +58,7 @@ static int NCZ_decodesizet64vec(const NCjson* jshape, size64_t* shapes);
 static int NCZ_decodesizetvec(const NCjson* jshape, size_t* shapes);
 static int NCZ_computedimrefs(NC_FILE_INFO_T*, NC_GRP_INFO_T*, NC_VAR_INFO_T*, const NClist*, const NClist*, const size64_t*);
 static int subobjects_pure(NCZ_FILE_INFO_T* zfile, NC_GRP_INFO_T* grp, NClist* varnames, NClist* grpnames);
-static int subobjects(NCZ_FILE_INFO_T* zfile, NC_GRP_INFO_T* grp, NClist* varnames, NClist* grpnames);
+static int subobjects(NCZ_FILE_INFO_T* zfile, NC_GRP_INFO_T* grp, const NCjson* jnczgrp, NClist* varnames, NClist* grpnames);
 static NCjson* build_attr_type_dict(const char* aname, const char* dtype);
 static NCjson* build_named_config(const char* name, int pairs, ...);
 static void infersubgroups(const char* grpkey, NClist* paths, NClist* subgrps);
@@ -152,7 +154,9 @@ write_grp(NC_FILE_INFO_T* file, NC_GRP_INFO_T* grp)
     NCjson* jdims = NULL;     /* group dimensions */
     NCjson* jtype = NULL;
     NCjson* jtmp = NULL;
-  
+    NCjson* jnczgrp = NULL;
+    NCjson* jarrays = NULL;
+    NCjson* jsubgrps = NULL;
 
     ZTRACE(3,"file=%s grp=%s isclose=%d",file->controller->path,grp->hdr.name,isclose);
 
@@ -161,7 +165,11 @@ write_grp(NC_FILE_INFO_T* file, NC_GRP_INFO_T* grp)
 
     /* Do we need zarr.json for this group? */
     if(purezarr && ncindexsize(grp->att) > 0) needzarrjson = 1;
-    else if(!purezarr && (rootgrp || ncindexsize(grp->dim) > 0 || ncindexsize(grp->att) > 0)) needzarrjson = 1;
+    else if(!purezarr && rootgrp) needzarrjson = 1;
+    else if(ncindexsize(grp->att) > 0) needzarrjson = 1;
+    else if(!purezarr && ncindexsize(grp->vars) > 0) needzarrjson = 1;
+    else if(!purezarr && ncindexsize(grp->children) > 0) needzarrjson = 1;
+    else needzarrjson = 0;
 
     if(needzarrjson) {
         /* Construct grp key */
@@ -187,9 +195,20 @@ write_grp(NC_FILE_INFO_T* file, NC_GRP_INFO_T* grp)
 	}
 
 	/* Add optional special attribute: _nczarr_group */
-	if(!purezarr && ncindexsize(grp->dim) > 0) {
+	if(!purezarr) {
+	    NCJcheck(NCJnew(NCJ_DICT,&jnczgrp));
 	    /* Collect the dimensions in this group */
 	    if((stat = NCZ_collect_dims(file, grp, &jdims))) goto done;
+	    NCJinsert(jnczgrp,"dimensions",jdims);
+	    jdims = NULL;
+	    /* Collect the arrays in this group */
+	    if((stat = NCZ_collect_arrays(file, grp, &jarrays))) goto done;
+	    NCJinsert(jnczgrp,"arrays",jarrays);
+	    jarrays = NULL;
+	    /* Collect the subgrps in this group */
+	    if((stat = NCZ_collect_grps(file, grp, &jsubgrps))) goto done;
+	    NCJinsert(jnczgrp,"subgroups",jsubgrps);
+	    jsubgrps = NULL;
 	    /* build corresponding type */
 	    jtype = build_attr_type_dict(NCZ_V3_GROUP,"json");
 	    if(jtypes == NULL) NCJcheck(NCJnew(NCJ_ARRAY,&jtypes));
@@ -252,6 +271,7 @@ write_grp(NC_FILE_INFO_T* file, NC_GRP_INFO_T* grp)
 done:
     nullfree(key);
     nullfree(fullpath);
+#if 0
     NCJreclaim(jsuper);
     NCJreclaim(jatts);
     NCJreclaim(jtypes);
@@ -259,6 +279,10 @@ done:
     NCJreclaim(jtype);
     NCJreclaim(jtmp);
     NCJreclaim(jzarrjson);
+    NCJreclaim(jnczgrp);
+    NCJreclaim(jarrays);
+    NCJreclaim(jsubgrps);
+#endif
     return ZUNTRACE(THROW(stat));
 }
 
@@ -755,40 +779,6 @@ build_superblock(NC_FILE_INFO_T* file, NCjson** jsuperp)
     return THROW(stat);
 }
 
-static int
-build_group_outline(NC_FILE_INFO_T* file, NC_GRP_INFO_T* grp, NCjson** jgrpp)
-{
-    int stat = NC_NOERR;
-    NCjson* jgrp = NULL;
-    NCjson* jsubgrps = NULL;
-    NCjson* jarrays = NULL;
-
-    /* Collect the arrays in this group */
-    if((stat = NCZ_collect_arrays(file, grp, &jarrays))) goto done;
-
-    /* Collect the subgroups in this group (recursively) */
-    if((stat = NCZ_collect_grps(file, grp, &jsubgrps))) goto done;
-
-    /* Fill in the grp dict */
-    NCJcheck(NCJnew(NCJ_DICT,&jgrp));
-#if 0
-    NCJcheck(NCJinsert(jgrp,"dimensions",jdims));
-    jdims = NULL;
-#endif
-    NCJcheck(NCJinsert(jgrp,"arrays",jarrays));
-    jarrays = NULL;
-    NCJcheck(NCJinsert(jgrp,"children",jsubgrps));
-    jsubgrps = NULL;
-
-    if(jgrpp) {*jgrpp = jgrp; jgrp = NULL;}
-
-done:
-    NCJreclaim(jgrp);
-    NCJreclaim(jsubgrps);
-    NCJreclaim(jarrays);
-//    NCJreclaim(jdims);
-    return THROW(stat);
-}
 
 /**************************************************/
 /* Map->Internal */
@@ -833,15 +823,6 @@ ZF3_readmeta(NC_FILE_INFO_T* file)
     default: goto done;
     }
 
-    /* Build the outline for the file */
-    {
-	paths = nclistnew();
-        /* Compute the key for the root grp */
-        if((stat = NCZ_grpkey(root,&rootkey))) goto done;
-        if((stat = nczmap_listall(zfile->map,rootkey,paths))) goto done;
-        if((stat = buildoutline(paths,&zfile->outline))) goto done;
-    }
-    
     /* Now load the groups contents starting with root */
     if((stat = read_grp(file,file->root_grp)))
 	goto done;
@@ -1022,6 +1003,7 @@ read_grp(NC_FILE_INFO_T* file, NC_GRP_INFO_T* grp)
     const NCjson* jatts = NULL;
     const NCjson* jtypes = NULL;
     const NCjson* jtmp = NULL;
+    const NCjson* jnczgrp = NULL;
 
     ZTRACE(3,"file=%s grp=%s",file->controller->path,grp->hdr.name);
     
@@ -1045,7 +1027,6 @@ read_grp(NC_FILE_INFO_T* file, NC_GRP_INFO_T* grp)
         /* process attributes TODO: fix when/if we do lazy attribute read */
         NCJcheck(NCJdictget(jgroup,"attributes",&jatts));
 	if(!purezarr && jatts != NULL) {
-    	    const NCjson* jnczgrp = NULL;
             const NCjson* jdims = NULL;
 	    if(grp->parent == NULL) {/* root group */
 	        const NCjson* jsuper = NULL;
@@ -1078,7 +1059,7 @@ read_grp(NC_FILE_INFO_T* file, NC_GRP_INFO_T* grp)
     if(purezarr)
 	{if((stat = subobjects_pure(zfile,grp,subvars,subgrps))) goto done;}
     else
-	{if((stat = subobjects(zfile,grp,subvars,subgrps))) goto done;}
+	{if((stat = subobjects(zfile,grp,jnczgrp,subvars,subgrps))) goto done;}
 
     /* Define vars */
     if((stat = read_vars(file,grp,subvars))) goto done;
@@ -1672,14 +1653,8 @@ NCZ_collect_dims(NC_FILE_INFO_T* file, NC_GRP_INFO_T* parent, NCjson** jdimsp)
 	jdim = NULL;
     }
 
-    /* Dict'ize array of dims */
-    NCJcheck(NCJnew(NCJ_DICT,&jdimdict));
-    NCJinsert(jdimdict,"dimensions",jdims);
-    jdims = NULL;
+    if(jdimsp) {*jdimsp = jdims; jdims = NULL;}
 
-    if(jdimsp) {*jdimsp = jdimdict; jdimdict = NULL;}
-
-    NCJreclaim(jdimdict);
     NCJreclaim(jdims);
     NCJreclaim(jdim);
     NCJreclaim(jdimsize);
@@ -1744,29 +1719,27 @@ NCZ_collect_grps(NC_FILE_INFO_T* file, NC_GRP_INFO_T* grp, NCjson** jsubgrpsp)
 {
     int i, stat=NC_NOERR;
     NCjson* jsubgrps = NULL;
-    NCjson* jsubgrp = NULL;
-    NCjson* jgrpname = NULL;
+    NCjson* jsubgrpname = NULL;
 
-    ZTRACE(3,"file=%s grp=%s",file->controller->path,grp->hdr.name);
+    ZTRACE(3,"file=%s parent=%s",file->controller->path,parent->hdr.name);
 
-    NCJcheck(NCJnew(NCJ_DICT,&jsubgrps));
+    NCJcheck(NCJnew(NCJ_ARRAY,&jsubgrps));
 
-    /* For each subgroup, build the subgroup metadata and insert into
-       the json for the group here. This is recursive.
-    */
-    for(i=0; i<ncindexsize(grp->children); i++) {
-	NC_GRP_INFO_T* g = (NC_GRP_INFO_T*)ncindexith(grp->children,i);
-	/* Recurse to build the subgroup dict for g*/
-	if((stat = build_group_outline(file,g,&jsubgrp))) goto done;
-	NCJcheck(NCJinsert(jsubgrps,g->hdr.name,jsubgrp));
-	jsubgrp = NULL;
+    for(i=0; i<ncindexsize(parent->children); i++) {
+	NC_GRP_INFO_T* grp = (NC_GRP_INFO_T*)ncindexith(parent->children,i);
+	jsubgrpname = NULL;
+	
+	/* jsonize subgrp name */
+	NCJcheck(NCJnewstring(NCJ_STRING,grp->hdr.name,&jsubgrpname));
+
+	/* Add the subgrp name*/
+	NCJcheck(NCJappend(jsubgrps,jsubgrpname));
+	jsubgrpname = NULL;
     }
-
     if(jsubgrpsp) {*jsubgrpsp = jsubgrps; jsubgrps = NULL;}
-done:
-    NCJreclaim(jsubgrp);
+
     NCJreclaim(jsubgrps);
-    NCJreclaim(jgrpname);
+    NCJreclaim(jsubgrpname);
     return ZUNTRACE(THROW(stat));
 }
 
@@ -1829,28 +1802,47 @@ done:
     return stat;
 }
 
+/**
+Extract the child vars, groups, and dimensions for this group.
+@param zfile
+@param parent group
+@param jnczgrp JSON for _nczarr_group attribute 
+@param varnames list of names of variables in this group
+@param grpnames list of names of subgroups in this group
+@param dims list of NCZ_DimInfo representing the dimensions to be defined in this group.
+@return NC_NOERR|NC_EXXX
+*/
 static int
-subobjects(NCZ_FILE_INFO_T* zfile, NC_GRP_INFO_T* grp, NClist* varnames, NClist* grpnames)
+subobjects(NCZ_FILE_INFO_T* zfile, NC_GRP_INFO_T* parent, const NCjson* jnczgrp, NClist* varnames, NClist* grpnames)
 {
     int i, stat = NC_NOERR;
-    const NCZ_Outline* rootoutline = NULL;
-    const NCZ_Outline* outline = NULL;
-
-    rootoutline = zfile->outline;;
-    if(outline == NULL) {stat = NC_ENCZARR; goto done;}
-
-    /* Get the group's corresponding outline */
-    if((stat = findgroupoutline(zfile,grp,rootoutline,&outline))) goto done;
-    if(outline == NULL) {stat = NC_ENCZARR; goto done;}
+    NCjson* jsubgrps = NULL;
+    NCjson* jarrays = NULL;
+    NCjson* jdims = NULL;
     
-    for(i=0;i<nclistlength(outline->arrays);i++) {
-	const char* varname = nclistget(outline->arrays,i);
-	nclistpush(varnames,strdup(varname));
+    NCJcheck(NCJdictget(jnczgrp,"arrays",&jarrays));
+    NCJcheck(NCJdictget(jnczgrp,"subgroups",&jsubgrps));
+    NCJcheck(NCJdictget(jnczgrp,"dimensions",&jdims));
+
+    for(i=0;i<NCJarraylength(jarrays);i++) {
+	const NCjson* jname = NCJith(jarrays,i);
+	nclistpush(varnames,strdup(NCJstrings(jname)));
     }
 
-    for(i=0;i<nclistlength(outline->subgroups);i++) {
-	const NCZ_Outline* goutline = nclistget(outline->subgroups,i);
-	nclistpush(grpnames,strdup(goutline->name));
+    for(i=0;i<NCJarraylength(jsubgrps);i++) {
+	const NCjson* jname = NCJith(jsubgrps,i);
+	nclistpush(grpnames,strdup(NCJstrings(jname)));
+    }
+
+    for(i=0;i<NCJarraylength(jdims);i++) {
+	const NCjson* jdim = NULL;
+	const NCjson* jname = NULL;
+	const NCjson* jsize = NULL;
+	const NCjson* junlim = NULL;
+
+	jdim = NCJith(jdims,i);
+	NCJcheck(NCJdictget(jdim,"name",&jname))'
+	nclistpush(grpnames,strdup(NCJstrings(jname)));
     }
 
 done:
@@ -2298,48 +2290,84 @@ done:
 
 /**
 Given a group path, collect the immediate
-descendant information, namely:
-- zarr.json for the group
-- arrays in this group
+descendant information.
+The procedure is as follows:
+1. Let X be the set of names and objects just below the parent grp kkey.
+2. assert zarr.json is in X representing the parent grp.
+3. For each name N in X see if N/zarr.json exists.
+   If so, then read zarr.json and see if it is a group vs array zarr.json
+4. For all M in X s.t. M/zarr.json does not exist, assume M is a virtual group.
+
 @param
 @return
 */
 static int
-get
+getnextlevel(NCZ_FILE_INFO_T* zfile, NC_GRP_INFO_T* parent, NClist* varnames, NClist* subgrpnames)
 {
-    int stat = NC_NOERR;
-    NCjson* jgrp = NULL;
-    NCjson* jsubgrps = NULL;
-    NCjson* jarrays = NULL;
+    int i,stat = NC_NOERR;
+    char* grpkey = NULL;
+    char* subkey = NULL;
+    char* zobject = NULL;
+    NClist* matches = nclistnew();
+    int haszarrjson = 0;
+    void* content = NULL;
+    NCjson* jzarrjson = NULL;
 
-    /* Collect the arrays in this group */
-    if((stat = NCZ_collect_arrays(file, grp, &jarrays))) goto done;
-
-    /* Collect the subgroups in this group (recursively) */
-    if((stat = NCZ_collect_grps(file, grp, &jsubgrps))) goto done;
-
-    /* Fill in the grp dict */
-    NCJcheck(NCJnew(NCJ_DICT,&jgrp));
-#if 0
-    NCJcheck(NCJinsert(jgrp,"dimensions",jdims));
-    jdims = NULL;
-#endif
-    NCJcheck(NCJinsert(jgrp,"arrays",jarrays));
-    jarrays = NULL;
-    NCJcheck(NCJinsert(jgrp,"children",jsubgrps));
-    jsubgrps = NULL;
-
-    if(jgrpp) {*jgrpp = jgrp; jgrp = NULL;}
+    /* Compute the key for the grp */
+    if((stat = NCZ_grpkey(grp,&grpkey))) goto done;
+    /* Get the map and search group for nextlevel of objects */
+    if((stat = nczmap_list(zfile->map,grpkey,matches))) goto done;
+    for(i=0;i<nclistlength(matches);i++) {
+	size64_t zjlen;
+        const char* name = nclistget(matches,i);
+	const NCjson* jnodetype;
+	if(strcmp(name,Z3OBJECT)==0) {haszarrjson = 1; continue;}
+        /* See if name/zarr.json exists */
+        if((stat = nczm_concat(grpkey,name,&subkey))) goto done;
+        if((stat = nczm_concat(subkey,Z3OBJECT,&zobject))) goto done;
+        switch(stat = nczmap_len(zfile->map,zobject,zjlen)) {
+	case NC_NOERR: break;
+	case NC_ENOOBJECT: nclistpush(subgrpnames,name); continue; /* assume a virtual group */
+	default: goto done;
+	}
+	if((content = malloc(zjlen))==NULL) {stat = NC_ENOMEM; goto done;}
+        if((stat = nczmap_read(zfile->map,zobject,0,zjlen,content))) goto done; /* read the zarr.json */
+	/* parse it */
+	NCJcheck(NCJparsen((size_t)zlen,(char*)content,0,&jzarrjson));
+	if(jzarrjson == NULL) {stat = NC_ENOTZARR; goto done;}
+	/* See what the node_type says */
+	NCJcheck(NCJdictget(jzarrjson,"node_type",&jnodetype));
+	if(strcmp("array",NCJstring(jnodetype))==0)
+	    nclistpush(varnames,strdup(subkey));
+	else if(strcmp("group",NCJstring(jnodetype))==0)
+	    nclistpush(subgrpnames,strdup(subkey));
+	else
+	    {stat = NC_ENOTZARR; goto done;}
+    }
 
 done:
-    NCJreclaim(jgrp);
-    NCJreclaim(jsubgrps);
-    NCJreclaim(jarrays);
-//    NCJreclaim(jdims);
-    return THROW(stat);
+    nullfree(content);
+    nullfree(grpkey);
+    nullfree(subkey);
+    nullfree(zobject);
+    nclistfreeall(matches);
+    nullfree(content);
+    NCJreclaim(jzarrjson);
+    return stat;
 }
 
-
+static void
+freeDimInfoList(NCZ_DimInfo** diminfo, size_t ndims)
+{
+    size_t i;
+    if(diminfo == NULL) return;
+    for(i=0;i<ndims;i++) {
+	NC_DimInfo* di = diminfo[i];
+	nullfree(di->path);
+	nullfree(di);
+    }
+    nullfree(diminfo);
+}
 
 /**************************************************/
 /* Utilities */

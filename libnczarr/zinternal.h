@@ -106,6 +106,8 @@ Optionally Inserted into any group zarr.json as an extra attribute.
 Optionally inserted into any group zarr.json as an attribute:
 "_nczarr_group": "{
 \"dimensions\": [{name: <dimname>, size: <integer>, unlimited: 1|0},...],
+\"arrays\": ["<name>",...],
+\"subgroups\": ["<name>",...]
 }"
 
 Optionally Inserted into any array zarr.json as an attribute:
@@ -258,11 +260,11 @@ typedef struct NCZ_TYPE_INFO {
 } NCZ_TYPE_INFO_T;
 
 /* Parsed dimension info */
-struct NCZ_DimInfo {
+typedef struct NCZ_DimInfo {
     char* path;
     size64_t dimlen;
     int unlimited;
-};
+} NCZ_DimInfo;
 
 /* Parsed Attribute info */
 struct NCZ_AttrInfo {
