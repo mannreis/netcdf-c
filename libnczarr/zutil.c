@@ -1434,6 +1434,7 @@ splitfqn(const char* fqn0, NClist* segments)
     for(i=0;i<count;i++){
 	char* descaped = NCZ_deescape(p);
 	nclistpush(segments,descaped);
+	p += (strlen(p)+1);
     }
     nullfree(fqn);
     return stat;

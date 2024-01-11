@@ -11,8 +11,6 @@
 
 /**************************************************/
 
-static void freeDimInfoList(NCZ_DimInfo**, size_t ndims);
-
 /**************************************************/
 /* Big endian Bytes filter */
 static const char* NCZ_Bytes_Big_Text = "{\"name\": \"bytes\", \"configuration\": {\"endian\": \"big\"}}";
@@ -58,10 +56,11 @@ static int NCZ_decodesizet64vec(const NCjson* jshape, size64_t* shapes);
 static int NCZ_decodesizetvec(const NCjson* jshape, size_t* shapes);
 static int NCZ_computedimrefs(NC_FILE_INFO_T*, NC_GRP_INFO_T*, NC_VAR_INFO_T*, const NClist*, const NClist*, const size64_t*);
 static int subobjects_pure(NCZ_FILE_INFO_T* zfile, NC_GRP_INFO_T* grp, NClist* varnames, NClist* grpnames);
-static int subobjects(NCZ_FILE_INFO_T* zfile, NC_GRP_INFO_T* grp, const NCjson* jnczgrp, NClist* varnames, NClist* grpnames);
+static int subobjects(NCZ_FILE_INFO_T* zfile, NC_GRP_INFO_T* parent, const NCjson* jnczgrp, NClist* varnames, NClist* grpnames);
 static NCjson* build_attr_type_dict(const char* aname, const char* dtype);
 static NCjson* build_named_config(const char* name, int pairs, ...);
-static void infersubgroups(const char* grpkey, NClist* paths, NClist* subgrps);
+static int convertdimnames2fqns(NC_FILE_INFO_T* file, NC_GRP_INFO_T* grp, NClist* dimnames, NClist* dimfqns);
+static int getnextlevel(NCZ_FILE_INFO_T* zfile, NC_GRP_INFO_T* parent, NClist* varnames, NClist* subgrpnames);
 
 /**************************************************/
 
@@ -216,8 +215,8 @@ write_grp(NC_FILE_INFO_T* file, NC_GRP_INFO_T* grp)
 	    jtype = NULL;
 	    /* Insert _nczarr_group into "attributes" */
 	    if(jatts == NULL) NCJcheck(NCJnew(NCJ_DICT,&jatts));
-	    NCJcheck(NCJinsert(jatts,NCZ_V3_GROUP,jdims));
-	    jdims = NULL;
+	    NCJcheck(NCJinsert(jatts,NCZ_V3_GROUP,jnczgrp));
+	    jnczgrp = NULL;
 	}
 
 	/* Add optional special attribute: _nczarr_superblock */
@@ -1595,7 +1594,6 @@ static int
 NCZ_collect_dims(NC_FILE_INFO_T* file, NC_GRP_INFO_T* parent, NCjson** jdimsp)
 {
     int i, stat=NC_NOERR;
-    NCjson* jdimdict = NULL;
     NCjson* jdims = NULL;
     NCjson* jdim = NULL;
     NCjson* jdimname = NULL;
@@ -1708,14 +1706,14 @@ NCZ_collect_arrays(NC_FILE_INFO_T* file, NC_GRP_INFO_T* parent, NCjson** jarrays
  * @internal JSONize subgrps in a group
  *
  * @param  file pointer to file struct
- * @param  grp the group to jsonize
+ * @param  parent the group to jsonize
  * @param  jgrpp return the array of jsonized grps
  * @return ::NC_NOERR No error.
  *
  * @author Dennis Heimbigner
  */
 static int
-NCZ_collect_grps(NC_FILE_INFO_T* file, NC_GRP_INFO_T* grp, NCjson** jsubgrpsp)
+NCZ_collect_grps(NC_FILE_INFO_T* file, NC_GRP_INFO_T* parent, NCjson** jsubgrpsp)
 {
     int i, stat=NC_NOERR;
     NCjson* jsubgrps = NULL;
@@ -1746,59 +1744,16 @@ NCZ_collect_grps(NC_FILE_INFO_T* file, NC_GRP_INFO_T* grp, NCjson** jsubgrpsp)
 static int
 subobjects_pure(NCZ_FILE_INFO_T* zfile, NC_GRP_INFO_T* grp, NClist* varnames, NClist* grpnames)
 {
-    int i,stat = NC_NOERR;
+    int stat = NC_NOERR;
     char* grpkey = NULL;
-    char* objkey = NULL;
-    char* zjkey = NULL;
-    char* content = NULL;
-    NClist* matches = nclistnew();
-    NClist* nextlevel = nclistnew();
-    NCjson* json = NULL;
-    const NCjson* jnodetype = NULL; /* do not reclaim */
 
     /* Compute the key for the grp */
     if((stat = NCZ_grpkey(grp,&grpkey))) goto done;
     /* Get the map and search group */
-    if((stat = nczmap_listall(zfile->map,grpkey,matches))) goto done;
-    /* infer groups that do not have an explicit zarr.json */
-    infersubgroups(grpkey,matches,nextlevel);
-
-    for(i=0;i<nclistlength(nextlevel);i++) {
-	size64_t size;
-	const char* name = nclistget(nextlevel,i);
-	nullfree(content); content = NULL;
-	NCJreclaim(json); json = NULL;
-	if(strcmp(name,Z3GROUP)==0) continue; /* only want next level */
-	/* See if name/zarr.json exists */
-	nullfree(objkey); objkey = NULL;
-	nullfree(zjkey);  zjkey = NULL;
-	if((stat = nczm_concat(grpkey,name,&objkey))) goto done;
-	if((stat = nczm_concat(objkey,Z3ARRAY,&zjkey))) goto done;
-	if((stat = nczmap_len(zfile->map,zjkey,&size)) == NC_NOERR) {
-	    /* Read contents of the zarr.json (with room for trailing nul)*/
-	    if((content = (char*)malloc(size))==NULL) {stat = NC_ENOMEM; goto done;}
-	    if((stat = nczmap_read(zfile->map,zjkey,0,size,content))) goto done;
-	    /* Parse */
-	    if((NCJparsen(size,content,0,&json))) {stat = NC_ENOTZARR; goto done;}
-	    if(NCJsort(json) != NCJ_DICT) {stat = NC_ENOTZARR; goto done;}
-	    if((NCJdictget(json,"node_type",&jnodetype))) {stat = NC_ENOTZARR; goto done;}
-	    if(strcasecmp("group",NCJstring(jnodetype))==0)
-		nclistpush(grpnames,strdup(name));
-	    else if(strcasecmp("array",NCJstring(jnodetype))==0)
-		nclistpush(varnames,strdup(name));
-	    /* else ignore */
-	}
-	stat = NC_NOERR;
-    }
+    if((stat = getnextlevel(zfile,grp,varnames,grpnames))) goto done;
 
 done:
-    nullfree(objkey);
     nullfree(grpkey);
-    nullfree(zjkey);
-    nullfree(content);
-    nclistfreeall(matches);
-    nclistfreeall(nextlevel);
-    NCJreclaim(json);
     return stat;
 }
 
@@ -1816,36 +1771,22 @@ static int
 subobjects(NCZ_FILE_INFO_T* zfile, NC_GRP_INFO_T* parent, const NCjson* jnczgrp, NClist* varnames, NClist* grpnames)
 {
     int i, stat = NC_NOERR;
-    NCjson* jsubgrps = NULL;
-    NCjson* jarrays = NULL;
-    NCjson* jdims = NULL;
+    const NCjson* jsubgrps = NULL;
+    const NCjson* jarrays = NULL;
     
     NCJcheck(NCJdictget(jnczgrp,"arrays",&jarrays));
     NCJcheck(NCJdictget(jnczgrp,"subgroups",&jsubgrps));
-    NCJcheck(NCJdictget(jnczgrp,"dimensions",&jdims));
 
     for(i=0;i<NCJarraylength(jarrays);i++) {
 	const NCjson* jname = NCJith(jarrays,i);
-	nclistpush(varnames,strdup(NCJstrings(jname)));
+	nclistpush(varnames,strdup(NCJstring(jname)));
     }
 
     for(i=0;i<NCJarraylength(jsubgrps);i++) {
 	const NCjson* jname = NCJith(jsubgrps,i);
-	nclistpush(grpnames,strdup(NCJstrings(jname)));
+	nclistpush(grpnames,strdup(NCJstring(jname)));
     }
 
-    for(i=0;i<NCJarraylength(jdims);i++) {
-	const NCjson* jdim = NULL;
-	const NCjson* jname = NULL;
-	const NCjson* jsize = NULL;
-	const NCjson* junlim = NULL;
-
-	jdim = NCJith(jdims,i);
-	NCJcheck(NCJdictget(jdim,"name",&jname))'
-	nclistpush(grpnames,strdup(NCJstrings(jname)));
-    }
-
-done:
     return stat;
 }
 
@@ -1955,6 +1896,7 @@ done:
 }
 #endif
 
+#if 0
 /**
 We need to infer the existence of sub-groups of a parent group that do not have a zarr.json object.
 Basically assumes that any path that has some longer path is itself a group.
@@ -1996,7 +1938,37 @@ infersubgroups(const char* grpkey, NClist* paths, NClist* subgrps)
 	if(dup) {free(q);} else {nclistpush(subgrps,q); q = NULL;}
    }
 }
+#endif /*0*/
 
+/* Convert simple dimension name to an FQN by assuming that
+   the name is relative to grp
+   */
+static int
+convertdimnames2fqns(NC_FILE_INFO_T* file, NC_GRP_INFO_T* grp, NClist* dimnames, NClist* dimfqns)
+{
+    int stat = NC_NOERR;
+    size_t i, fqnlen;
+    NCbytes* fqn = ncbytesnew();
+
+    /* Get the FQN of grp */
+    if((stat = NCZ_makeFQN(grp,(NC_OBJ*)grp,fqn))) goto done;
+    fqnlen = ncbyteslength(fqn);
+
+    for(i=0;i<nclistlength(dimnames);i++) {
+	const char* dimname = nclistget(dimnames,i);
+        if(dimname[0] != '/') {
+            /* Compute the fqn of the dim */
+	    ncbytessetlength(fqn,fqnlen);
+	    ncbytescat(fqn,"/");
+	    ncbytescat(fqn,dimname);
+	    dimname = (const char*)ncbytescontents(fqn);
+	}
+	nclistpush(dimfqns,dimname);
+    }
+done:
+    ncbytesfree(fqn);
+    return THROW(stat);
+}
 
 /**
 Given a set of dim refs as fqns, set the corresponding dimids for the variable.
@@ -2309,23 +2281,22 @@ getnextlevel(NCZ_FILE_INFO_T* zfile, NC_GRP_INFO_T* parent, NClist* varnames, NC
     char* subkey = NULL;
     char* zobject = NULL;
     NClist* matches = nclistnew();
-    int haszarrjson = 0;
     void* content = NULL;
     NCjson* jzarrjson = NULL;
 
     /* Compute the key for the grp */
-    if((stat = NCZ_grpkey(grp,&grpkey))) goto done;
+    if((stat = NCZ_grpkey(parent,&grpkey))) goto done;
     /* Get the map and search group for nextlevel of objects */
     if((stat = nczmap_list(zfile->map,grpkey,matches))) goto done;
     for(i=0;i<nclistlength(matches);i++) {
 	size64_t zjlen;
         const char* name = nclistget(matches,i);
 	const NCjson* jnodetype;
-	if(strcmp(name,Z3OBJECT)==0) {haszarrjson = 1; continue;}
+	if(strcmp(name,Z3OBJECT)==0) {continue;}
         /* See if name/zarr.json exists */
         if((stat = nczm_concat(grpkey,name,&subkey))) goto done;
         if((stat = nczm_concat(subkey,Z3OBJECT,&zobject))) goto done;
-        switch(stat = nczmap_len(zfile->map,zobject,zjlen)) {
+        switch(stat = nczmap_len(zfile->map,zobject,&zjlen)) {
 	case NC_NOERR: break;
 	case NC_ENOOBJECT: nclistpush(subgrpnames,name); continue; /* assume a virtual group */
 	default: goto done;
@@ -2333,7 +2304,7 @@ getnextlevel(NCZ_FILE_INFO_T* zfile, NC_GRP_INFO_T* parent, NClist* varnames, NC
 	if((content = malloc(zjlen))==NULL) {stat = NC_ENOMEM; goto done;}
         if((stat = nczmap_read(zfile->map,zobject,0,zjlen,content))) goto done; /* read the zarr.json */
 	/* parse it */
-	NCJcheck(NCJparsen((size_t)zlen,(char*)content,0,&jzarrjson));
+	NCJcheck(NCJparsen((size_t)zjlen,(char*)content,0,&jzarrjson));
 	if(jzarrjson == NULL) {stat = NC_ENOTZARR; goto done;}
 	/* See what the node_type says */
 	NCJcheck(NCJdictget(jzarrjson,"node_type",&jnodetype));
@@ -2356,18 +2327,19 @@ done:
     return stat;
 }
 
+#if 0
 static void
-freeDimInfoList(NCZ_DimInfo** diminfo, size_t ndims)
+clearDimInfoList(NCZ_DimInfo** diminfo, size_t ndims)
 {
     size_t i;
     if(diminfo == NULL) return;
     for(i=0;i<ndims;i++) {
-	NC_DimInfo* di = diminfo[i];
+	NCZ_DimInfo* di = diminfo[i];
 	nullfree(di->path);
 	nullfree(di);
     }
-    nullfree(diminfo);
 }
+#endif
 
 /**************************************************/
 /* Utilities */

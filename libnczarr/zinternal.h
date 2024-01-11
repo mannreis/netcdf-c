@@ -179,7 +179,6 @@ struct NCZMAP;
 struct NCZChunkCache;
 struct NCZ_Formatter;
 struct NCproplist;
-struct Outline;
 
 /**************************************************/
 /* Define annotation data for NCZ objects */
@@ -209,7 +208,6 @@ typedef struct NCZ_FILE_INFO {
 #		define FLAG_XARRAYDIMS  8
     NCZM_IMPL mapimpl;
     struct NCZ_Formatter* dispatcher;
-    struct NCZ_Outline* outline; /* record the tree of groups and arrays in the file; V3 reading only */
 } NCZ_FILE_INFO_T;
 
 /* This is a struct to handle the dim metadata. */
