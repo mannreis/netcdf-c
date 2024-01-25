@@ -266,11 +266,10 @@ typedef struct NCZ_DimInfo {
 
 /* Parsed Attribute info */
 struct NCZ_AttrInfo {
-    const char* name;
+    char* name;
     nc_type nctype;
-    const NCjson* values;
+    NCjson* values;
 };
-
 
 #if 0
 /* Define the contents of the .nczcontent object */

@@ -101,6 +101,7 @@ static int s3objectsinfo(NClist* contents, NClist* keys, NClist* lens);
 static int s3commonprefixes(NClist* list, NClist* keys);
 static int mergekeysets(NClist*,NClist*,NClist*);
 static int rawtokeys(s3r_buf_t* response, NClist* keys, NClist* lengths, struct LISTOBJECTSV2** listv2p);
+static int httptonc(long httpcode);
 
 static int queryadd(NClist* query, const char* key, const char* value);
 static int queryend(NClist* query, char** querystring);
@@ -182,6 +183,7 @@ NC_s3sdkbucketexists(void* s3client0, const char* bucket, int* existsp, char** e
 
     if((stat = makes3fullpath(s3client->rooturl,bucket,NULL,NULL,url))) goto done;
     if((stat = NCH5_s3comms_s3r_head(s3client->h5s3client, ncbytescontents(url), NULL, NULL, &httpcode, NULL))) goto done;
+    stat = httptonc(httpcode);
 
     if(existsp) {*existsp = (stat == 0 && httpcode == 200);}
 done:
@@ -224,7 +226,7 @@ NC_s3sdkbucketdelete(void* s3client0, NCS3INFO* info, char** errmsgp)
 
 /*
 @return NC_NOERR if key points to a content-bearing object.
-@return NC_EEMPTY if object at key has no content.
+@return NC_ENOOBJECT if object at key does not exist
 @return NC_EXXX return true error
 */
 EXTERNL int
@@ -234,11 +236,13 @@ NC_s3sdkinfo(void* s3client0, const char* bucket, const char* pathkey, size64_t*
     NCS3CLIENT* s3client = (NCS3CLIENT*)s3client0;
     NCbytes* url = ncbytesnew();
     long long len = -1;
+    long httpcode = 0;
 
     NCTRACE(11,"bucket=%s pathkey=%s",bucket,pathkey);
 
     if((stat = makes3fullpath(s3client->rooturl,bucket,pathkey,NULL,url))) goto done;
-    if((stat = NCH5_s3comms_s3r_getsize(s3client->h5s3client, ncbytescontents(url), &len))) goto done;
+    if((stat = NCH5_s3comms_s3r_getsize(s3client->h5s3client, ncbytescontents(url), &len, &httpcode))) goto done;
+    stat = httptonc(httpcode);
 
     if(lenp) {*lenp = len;}
 
@@ -258,6 +262,7 @@ NC_s3sdkread(void* s3client0, const char* bucket, const char* pathkey, size64_t 
     NCS3CLIENT* s3client = (NCS3CLIENT*)s3client0;
     NCbytes* url = ncbytesnew();
     struct s3r_buf_t data = {0,NULL};
+    long httpcode = 0;
 
     NCTRACE(11,"bucket=%s pathkey=%s start=%llu count=%llu content=%p",bucket,pathkey,start,count,content);
 
@@ -266,8 +271,8 @@ NC_s3sdkread(void* s3client0, const char* bucket, const char* pathkey, size64_t 
     /* Read the data */
     data.count = count;
     data.content = content;
-    if((stat = NCH5_s3comms_s3r_read(s3client->h5s3client,ncbytescontents(url),(size_t)start,(size_t)count,&data))) goto done;
-    
+    if((stat = NCH5_s3comms_s3r_read(s3client->h5s3client,ncbytescontents(url),(size_t)start,(size_t)count,&data,&httpcode))) goto done;
+    stat = httptonc(httpcode);    
 done:
     ncbytesfree(url);
     return NCUNTRACE(stat);
@@ -284,6 +289,7 @@ NC_s3sdkwriteobject(void* s3client0, const char* bucket, const char* pathkey,  s
     NCS3CLIENT* s3client = (NCS3CLIENT*)s3client0;
     NCbytes* url = ncbytesnew();
     s3r_buf_t data;
+    long httpcode = 0;
 
     NCTRACE(11,"bucket=%s pathkey=%s count=%llu content=%p",bucket,pathkey,count,content);
 
@@ -292,7 +298,8 @@ NC_s3sdkwriteobject(void* s3client0, const char* bucket, const char* pathkey,  s
     /* Write the data */
     data.count = count;
     data.content = (void*)content;
-    if((stat = NCH5_s3comms_s3r_write(s3client->h5s3client,ncbytescontents(url),&data))) goto done;
+    if((stat = NCH5_s3comms_s3r_write(s3client->h5s3client,ncbytescontents(url),&data,&httpcode))) goto done;
+    stat = httptonc(httpcode);
     
 done:
     ncbytesfree(url);
@@ -361,6 +368,7 @@ getkeys(void* s3client0, const char* bucket, const char* prefixkey0, const char*
     int istruncated = 0;
     char* continuetoken = NULL;
     s3r_buf_t response = {0,NULL};
+    long httpcode = 0;
 
     NCTRACE(11,"bucket=%s prefixkey0=%s",bucket,prefixkey0);
     
@@ -391,7 +399,8 @@ getkeys(void* s3client0, const char* bucket, const char* prefixkey0, const char*
         ncbytescat(listurl,"?");
         ncbytescat(listurl,querystring);
 
-        if((stat = NCH5_s3comms_s3r_getkeys(s3client->h5s3client, ncbytescontents(listurl), &response))) goto done;
+        if((stat = NCH5_s3comms_s3r_getkeys(s3client->h5s3client, ncbytescontents(listurl), &response, &httpcode))) goto done;
+	if((stat = httptonc(httpcode))) goto done;
         if((stat = rawtokeys(&response,allkeys,NULL,&listv2))) goto done;
 	istruncated = (strcasecmp(listv2->istruncated,"true")==0?1:0);
 	nullfree(continuetoken);
@@ -450,9 +459,10 @@ NC_s3sdkdeletekey(void* s3client0, const char* bucket, const char* pathkey, char
 
     if((stat = makes3fullpath(s3client->rooturl,bucket,pathkey,NULL,url))) goto done;
 
-    switch(stat = NCH5_s3comms_s3r_deletekey(s3client->h5s3client, ncbytescontents(url), &httpcode)) {
+    if((stat = NCH5_s3comms_s3r_deletekey(s3client->h5s3client, ncbytescontents(url), &httpcode))) goto done;
+    switch(stat = httptonc(httpcode)) {
     case NC_NOERR: break;
-    case NC_EEMPTY: stat = NC_NOERR; break; /* don't care */
+    case NC_ENOOBJECT: break; /* does not exist */
     default: goto done;
     }
 
@@ -1054,3 +1064,33 @@ done:
     return NCTHROW(stat);
 }
 
+static int
+httptonc(long httpcode)
+{
+    int stat = NC_NOERR;
+    if(httpcode == 0)
+        stat = NC_NOERR;
+    else if(httpcode <= 99)
+        stat = NC_EINTERNAL; /* should never happen */
+    else if(httpcode <= 199)
+        stat = NC_NOERR; /* I guess */
+    else if(httpcode <= 299) {
+        switch (httpcode) {
+	case 200: stat = NC_NOERR; break;
+	case 204: stat = NC_ENOOBJECT; break;
+        default: stat = NC_NOERR; break;
+        }
+    } else if(httpcode <= 399)
+        stat = NC_NOERR; /* ? */
+    else if(httpcode <= 499) {
+        switch (httpcode) {
+        case 400: stat = NC_EINVAL; break;
+        case 401: case 402: case 403:
+            stat = NC_EAUTH; break;
+        case 404: stat = NC_ENOOBJECT; break;
+        default: stat = NC_EINVAL; break;
+        }
+    } else
+        stat = NC_ES3;
+    return stat;
+}

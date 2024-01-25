@@ -156,7 +156,6 @@ simpledelete(void)
         report(XFAIL,"open",map);
 	stat = NC_NOERR;
 	break;
-    case NC_EEMPTY:
     default: abort();
     }     
 

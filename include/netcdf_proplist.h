@@ -351,12 +351,12 @@ done:
  * @param key for which to search
  * @param valuep returned value
  * @param sizep returned size
- * @return NC_NOERR if key found, NC_EMPTY if key not found; NC_EXXX otherwise
+ * @return NC_NOERR if key found, NC_ENOOBJECT if key not found; NC_EXXX otherwise
  */
 OPTSTATIC int
 ncplistget(const NCproplist* plist, const char* key, uintptr_t* valuep, uintptr_t* sizep)
 {
-    int stat = NC_EEMPTY; /* assume not found til proven otherwise */
+    int stat = NC_ENOOBJECT; /* assume not found til proven otherwise */
     size_t i;
     NCProperty* props;
     uintptr_t value = 0;

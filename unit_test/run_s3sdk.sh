@@ -54,6 +54,10 @@ echo -e "\to Checking delete command for ${URL}/test_s3sdk.txt"
 ${CMD} ${execdir}/test_s3sdk -u "${URL}" -k "${S3ISOPATH}/test_s3sdk.txt" delete
 echo "Status: $?"
 
+echo -e "\to Checking delete command for non-existent ${URL}/test_s3sdk_x.txt"
+${CMD} ${execdir}/test_s3sdk -u "${URL}" -k "${S3ISOPATH}/test_s3sdk_x.txt" delete
+echo "Status: $?"
+
 if test "x$FEATURE_LARGE_TESTS" = xyes ; then
     echo -e "\to Checking longlist command for ${URL}"
     ${CMD} ${execdir}/test_s3sdk -u "${URL}" -k "${S3ISOPATH}"                longlist
@@ -62,7 +66,6 @@ fi
 
 echo -e "Finished"
 
-exit
 if test "x$GITHUB_ACTIONS" = xtrue; then
 # Cleanup on exit
 test_cleanup

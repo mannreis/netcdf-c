@@ -105,14 +105,14 @@ NCZ_misc_codec_to_hdf5(const NCproplist* env, const char* codec_json, int* idp, 
     NCjson* jcodec = NULL;
     const NCjson* jparams = NULL;
     const NCjson* jtmp = NULL;
-    size_t i,nparams = 0;
+    size_t i,npairs,dictpairs;
     unsigned* params = NULL;
-    int isv2 = 0;
+    int isv3 = 0;
     uintptr_t zarrformat = 0;
 
     ncplistget(env,"zarrformat",&zarrformat,NULL);
 
-    if(zarrformat == 2) isv2 = 1;
+    if(zarrformat == 3) isv3 = 1;
 
     /* parse the JSON */
     if(NCJparse(codec_json,0,&jcodec))
@@ -135,25 +135,29 @@ NCZ_misc_codec_to_hdf5(const NCproplist* env, const char* codec_json, int* idp, 
         jparams = jcodec;
     }
 
-    /* The codec will have (2*14 + 1) + 1 = 29 dict entries + id if v2*/
-    nparams = (2*14 + 1) + isv2;
-    if(NCJarraylength(jparams) != nparams) {
-        fprintf(stderr,"Incorrect no. of codec parameters: need=29 sent=%ld\n",(unsigned long)(nparams-isv2));
+    /* The codec will have:
+        v2: (14 + 1) == 14 dict entries + id
+        v3: (14) == 14 dict entries in configuration
+    */
+    /* verify the dict size */
+    if(isv3) dictpairs = (14); else dictpairs = (14+1);
+    if(NCJdictlength(jparams) != dictpairs) {
+	fprintf(stderr,"(1) Incorrect no. of codec parameters: need=%d sent=%d\n",(int)dictpairs,NCJdictlength(jparams));
+	fprintf(stderr,"jparams=%s\n",NCJtotext(jparams,0));
         stat = NC_EINVAL;
 	goto done;
     }
-    /* Actual # of parameters is 14 (ignoring the testcase number) */
-    nparams = 14;
-    if((params = (unsigned*)calloc(nparams,sizeof(unsigned)))== NULL) {stat = NC_ENOMEM; goto done;}
+    npairs = (14); /* ignore the test key. */
+    if((params = (unsigned*)calloc(npairs,sizeof(unsigned)))== NULL) {stat = NC_ENOMEM; goto done;}
 
-    for(i=0;i<nparams;i++) {
+    for(i=0;i<npairs;i++) {
 	struct NCJconst jc;
         if(NCJdictget(jparams,fields[i],&jtmp)) {stat = NC_EFILTER; goto done;}
 	if(NCJcvt(jtmp,NCJ_INT,&jc)) {stat = NC_EFILTER; goto done;}
 	if(jc.ival < 0 || jc.ival > NC_MAX_UINT) {stat = NC_EINVAL; goto done;}
 	params[i] = (unsigned)jc.ival;
     }
-    if(nparamsp) *nparamsp = nparams;
+    if(nparamsp) *nparamsp = npairs;
     if(paramsp) {*paramsp = params; params = NULL;}
     if(idp) *idp = H5Z_FILTER_TEST;
     
@@ -177,7 +181,7 @@ NCZ_misc_hdf5_to_codec(const NCproplist* env, int id, size_t nparams, const unsi
     if(nparams == 0 || params == NULL)
         {stat = NC_EINVAL; goto done;}
     if(nparams != 14) {
-	fprintf(stderr,"Incorrect no. of parameters: need=14 sent=%ld\n",(unsigned long)nparams);
+	fprintf(stderr,"(2) Incorrect no. of parameters: need=14 sent=%ld\n",(unsigned long)nparams);
 	stat = NC_EINVAL;
 	goto done;
     }

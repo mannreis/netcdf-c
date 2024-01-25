@@ -101,6 +101,7 @@ EXTERNL char* NCZ_backslashescape(const char* s);
 EXTERNL int NCZ_sortstringlist(void* vec, size_t count);
 EXTERNL int NCZ_sortpairlist(void* vec, size_t count);
 EXTERNL void NCZ_freeAttrInfoVec(struct NCZ_AttrInfo* ainfo);
+EXTERNL void NCZ_setatts_read(NC_OBJ* container);
 
 /* zwalk.c */
 EXTERNL int NCZ_read_chunk(int ncid, int varid, size64_t* zindices, void* chunkdata);

@@ -342,8 +342,8 @@ zfileexists(NCZMAP* map, const char* key)
     ZTRACE(5,"map=%s key=%s",zfmap->map.url,key);
     switch(stat=zflookupobj(zfmap,key,&fd)) {
     case NC_NOERR: break;
-    case NC_ENOOBJECT: stat = NC_EEMPTY;
-    case NC_EEMPTY: break;
+    case NC_ENOOBJECT: break;
+    case NC_EEMPTY: stat = NC_ENOOBJECT; break; /* key refers to a directory */
     default: break;
     }
     zfrelease(zfmap,&fd);    
@@ -365,8 +365,8 @@ zfilelen(NCZMAP* map, const char* key, size64_t* lenp)
         /* Get file size */
         if((stat=platformseek(&fd, SEEK_END, &len))) goto done;
 	break;
-    case NC_ENOOBJECT: stat = NC_EEMPTY;
-    case NC_EEMPTY: break;
+    case NC_ENOOBJECT: break;
+    case NC_EEMPTY: stat = NC_ENOOBJECT; break; /* key refers to a directory */
     default: break;
     }
     zfrelease(zfmap,&fd);
@@ -395,8 +395,8 @@ zfileread(NCZMAP* map, const char* key, size64_t start, size64_t count, void* co
         if((stat = platformseek(&fd, SEEK_SET, &start))) goto done;
         if((stat = platformread(&fd, count, content))) goto done;
 	break;
-    case NC_ENOOBJECT: stat = NC_EEMPTY;
-    case NC_EEMPTY: break;
+    case NC_ENOOBJECT: break;
+    case NC_EEMPTY: stat = NC_ENOOBJECT; break; /* key refers to a directory */
     default: break;
     }
     
@@ -467,7 +467,7 @@ zfileclose(NCZMAP* map, int delete)
 }
 
 /*
-Return a list of names immediately "below" a specified prefix key.
+Return a list of simple names immediately "below" a specified prefix key.
 In theory, the returned list should be sorted in lexical order,
 but it possible that it is not.
 The prefix key is not included. 
@@ -531,6 +531,8 @@ zfilelist(NCZMAP* map, const char* prefixkey, NClist* matches)
 #else
     while(nclistlength(nextlevel) > 0) {
 	char* segment = nclistremove(nextlevel,0);
+	/* remove any leading '/' */
+	if(segment[0] == '/') segment++;
 	nclistpush(matches,segment);
     }
 #endif
@@ -694,6 +696,9 @@ zfcreategroup(ZFMAP* zfmap, const char* key, int nskip)
     len = nclistlength(segments);
     len -= nskip; /* leave off last nskip segments */
     ncbytescat(path,zfmap->root); /* We need path to be absolute */
+    /* open and optionally create the root directory */	
+    if((stat = platformcreatedir(zfmap->map.mode,ncbytescontents(path)))) goto done;
+    /* Create subsidary groups (if any) */
     for(i=0;i<len;i++) {
 	const char* seg = nclistget(segments,i);
 	ncbytescat(path,"/");
@@ -891,6 +896,7 @@ platformcreatefile(mode_t mode, const char* canonpath, FD* fd)
 	stat = platformerr(errno);
         goto done; /* could not open */
     }
+
 done:
     errno = 0;
     return ZUNTRACEX(stat,"fd=%d",(fd?fd->fd:-1));

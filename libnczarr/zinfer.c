@@ -151,7 +151,7 @@ infer_open_format(NC_FILE_INFO_T* file, NCZ_FILE_INFO_T* zfile, NCZMAP* map, int
 	    else
 	        nczarrformat = NCZARRFORMAT2; 
 	    break;
-	case NC_EEMPTY: /* Does not exist */
+	case NC_ENOOBJECT: /* Does not exist */
 	    /* => zarr V2 and purezarr (=> nczarrformat == 0) */
 	    stat = NC_NOERR; /* reset */
 	    break;
@@ -172,7 +172,7 @@ infer_open_format(NC_FILE_INFO_T* file, NCZ_FILE_INFO_T* zfile, NCZMAP* map, int
 	    else
 	        nczarrformat = NCZARRFORMAT3;
 	    break;
-	case NC_EEMPTY: /* Does not exist */
+	case NC_ENOOBJECT: /* Does not exist */
 	    /* => zarr V3 and purezarr (=> nczarrformat == 0) */
 	    stat = NC_NOERR; /* reset */
 	    break;

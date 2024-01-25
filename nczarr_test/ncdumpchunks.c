@@ -420,7 +420,7 @@ dump(Format* format)
 	    for(r=0;r<format->rank;r++) zindices[r] = (size64_t)odom->index[r];
             switch (stat=NCZ_read_chunk(ncid, varid, zindices, chunkdata)) {
 	    case NC_NOERR: break;
-	    case NC_EEMPTY: holechunk = 1; break;
+	    case NC_ENOOBJECT: holechunk = 1; break;
 	    default: usage(stat);
 	    }
 	    break;

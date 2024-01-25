@@ -239,7 +239,7 @@ NCZ_transfer(struct Common* common, NCZSlice* slices)
 	    fprintf(stderr,"case: wholechunk: chunkindices: %s\n",nczprint_vector(common->rank,chunkindices));
 	/* Read the chunk; handles fixed vs char* strings*/
         switch ((stat = common->reader.read(common->reader.source, chunkindices, &chunkdata))) {
-        case NC_EEMPTY: /* cache created the chunk */
+        case NC_ENOOBJECT: /* not in cache => created the chunk */
 	    break;
         case NC_NOERR: break;
         default: goto done;
@@ -321,7 +321,7 @@ NCZ_transfer(struct Common* common, NCZSlice* slices)
         /* Read from cache */
         stat = common->reader.read(common->reader.source, chunkindices, &chunkdata);
 	switch (stat) {
-        case NC_EEMPTY: /* cache created the chunk */
+        case NC_ENOOBJECT: /* cache created the chunk */
 	    break;
         case NC_NOERR: break;
         default: goto done;
@@ -769,7 +769,7 @@ NCZ_transferscalar(struct Common* common)
     /* Read from single chunk from cache */
     chunkindices[0] = 0;
     switch ((stat = common->reader.read(common->reader.source, chunkindices, &chunkdata))) {
-    case NC_EEMPTY: /* cache created the chunk */
+    case NC_ENOOBJECT: /* cache created the chunk */
 	break;
     case NC_NOERR: break;
     default: goto done;

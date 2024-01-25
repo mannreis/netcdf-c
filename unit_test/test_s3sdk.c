@@ -353,9 +353,9 @@ testlistlong(void)
         printf("\tkey=%s: ",keys[i]);
         stat = NC_s3sdkdeletekey(s3client, s3info.bucket, keys[i], NULL);
         switch (stat) {
-        case NC_NOERR:  printf("deleted\n");        break;
-        case NC_EEMPTY: printf("does not exist\n"); break;
-        default:        printf("failed\n");         break;
+        case NC_NOERR:     printf("deleted\n");        break;
+        case NC_ENOOBJECT: printf("does not exist\n"); break;
+        default:           printf("failed\n");         break;
         }
         stat = NC_NOERR; /* reset */
     }    
@@ -414,21 +414,21 @@ testdeletekey(void)
     if((s3client = NC_s3sdkcreateclient(&s3info))==NULL) {CHECK(NC_ES3);}
     stat = NC_s3sdkdeletekey(s3client, s3info.bucket, dumpoptions.key, NULL);
 
-    printf("testdeletekey: url %s: ",newurl);
+    printf("testdeletekey: url %s%s: ",newurl,dumpoptions.key);
     switch (stat) {
-    case NC_NOERR:  printf("deleted\n");        break;
-    case NC_EEMPTY: printf("does not exist\n"); break;
-    default:        printf("failed\n");         break;
+    case NC_NOERR:     printf("deleted\n");        break;
+    case NC_ENOOBJECT: printf("does not exist\n"); break;
+    default:           printf("failed\n");         break;
     }
     stat = NC_NOERR; /* reset */
     
     /* Verify deleted and size */
     stat = NC_s3sdkinfo(s3client, s3info.bucket, dumpoptions.key, &size, NULL);
-    printf("testdeletekey.info: url %s: ",newurl);
+    printf("testdeletekey: url %s%s: ",newurl,dumpoptions.key);
     switch (stat) {
-    case NC_NOERR:  printf("not deleted; size=%d\n",(int)size); break;
-    case NC_EEMPTY: printf("deleted\n"); break;
-    default:        printf("failed\n"); goto done;
+    case NC_NOERR:     printf("not deleted; size=%d\n",(int)size); break;
+    case NC_ENOOBJECT: printf("deleted\n"); break;
+    default:           printf("failed\n"); goto done;
     }
     stat = NC_NOERR; /* reset */
 

@@ -289,6 +289,7 @@ NCZ_read_cache_chunk(NCZChunkCache* cache, const size64_t* indices, void** datap
         break;
     case NC_ENOOBJECT:
         entry = NULL; /* not found; */
+	stat = NC_NOERR;
 	break;
     default: goto done;
     }
@@ -318,7 +319,7 @@ fprintf(stderr,"|cache.read.lru|=%ld\n",nclistlength(cache->mru));
     entry = NULL;
     
 done:
-    if(created && stat == NC_NOERR)  stat = NC_EEMPTY; /* tell upper layers */
+    if(created && stat == NC_NOERR)  stat = NC_ENOOBJECT; /* tell upper layers */
     if(entry) free_cache_entry(cache,entry);
     return THROW(stat);
 }
@@ -654,7 +655,6 @@ put_chunk(NCZChunkCache* cache, NCZCacheEntry* entry)
     switch(stat) {
     case NC_NOERR:
 	break;
-    case NC_EEMPTY:
     default: goto done;
     }
 done:
@@ -705,8 +705,8 @@ get_chunk(NCZChunkCache* cache, NCZCacheEntry* entry)
     stat = nczmap_len(map,path,&size);
     nullfree(path); path = NULL;
     switch(stat) {
-    case NC_NOERR: entry->size = size; break;
-    case NC_EEMPTY: empty = 1; stat = NC_NOERR; break;
+    case NC_NOERR: entry->size = size; empty = (size == 0); break;
+    case NC_ENOOBJECT: empty = 1; stat = NC_NOERR; break; /* "create" the object */
     default: goto done;
     }
 
@@ -723,7 +723,7 @@ get_chunk(NCZChunkCache* cache, NCZCacheEntry* entry)
         nullfree(path); path = NULL;
         switch (stat) {
         case NC_NOERR: break;
-        case NC_EEMPTY: empty = 1; stat = NC_NOERR;break;
+        case NC_ENOOBJECT: empty = 1; stat = NC_NOERR;break;
 	default: goto done;
 	}
         entry->isfiltered = FILTERED(cache); /* Is the data being read filtered? */

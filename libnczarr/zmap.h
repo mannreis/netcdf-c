@@ -31,13 +31,18 @@ Thus one key is "contained" (possibly transitively)
 by another if one key is a prefix (in the string sense) of the other.
 So in this sense the key "/x/y/z" is contained by the key  "/x/y".
 
-In this model all keys "exist" but only some keys refer to
-objects containing content -- content bearing.
-An important restriction is placed on the structure of the tree.
-Namely, keys are only defined for content-bearing objects.
-Further, all the leaves of the tree are these content-bearing objects.
-This means that the key for one content-bearing object cannot
-be a prefix of any other key.
+In this model some keys refer to objects containing content -- content
+bearing.  All other keys are treated as non-existent.  An important
+restriction is placed on the structure of the tree.  Namely, keys are
+only defined for content-bearing objects.  Further, all the leaves of
+the tree are these content-bearing objects.  This means that the key
+for one content-bearing object cannot be a prefix of any other key.
+As a rule, an attempt to access a key that does not exist if flagged
+using the NC_ENOOBJECT error return. Internally, in some zmap implementations,
+NC_EEMPTY is used to signal that an attempt was made to access
+an object that technically exists, but should be treated as non-existent.
+The canonical case for this is in zmap_file.c, where directories
+technically exist, but are invisible outside the zmap API.
 
 There several other concepts of note.
 1. Dataset - a dataset is the complete tree contained by the key defining
@@ -146,17 +151,18 @@ always lead to something: a directory or a file.
 
 In any case, the zmap API returns three distinguished error code:
 1. NC_NOERR if a operation succeeded
-2. NC_EEMPTY is returned when accessing a key that has no content or does not exist.
+2. NC_EOBJECT is returned when accessing a key that that does not exist.
 
 This does not preclude other errors being returned such NC_EACCESS or NC_EPERM or NC_EINVAL
 if there are permission errors or illegal function arguments, for example.
 It also does not preclude the use of other error codes internal to the zmap
-implementation. So zmap_file, for example, uses NC_ENOTFOUND internally
+implementation. So zmap_file, for example, uses NC_ENOTFOUND or NC_EMPTY internally
 because it is possible to detect the existence of directories and files.
 This does not propagate to the API.
 
-Note that NC_EEMPTY is a new error code to signal to that the
-caller asked for non-content-bearing key.
+Note that NC_EEMPTY is a new error code to signal occurrence
+of objects like directories that are needed for the implemenation,
+but are not content-bearing.
 
 The current set of operations defined for zmaps are define with the
 generic nczm_xxx functions below.

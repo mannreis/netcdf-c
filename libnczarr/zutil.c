@@ -125,11 +125,12 @@ static const struct ZTYPESV2 {
 /*NC_JSON*/	{"|J0",0} /* NCZarr internal type */
 };
 
-static const struct ZTYPESV3 {
+/* Table for converting nc_type to dtype+alias */
+static const struct ZTNCYPE2DTYPEV3 {
     const char* zarr; /* Must be a legitimate Zarr V3 type */
     size_t typelen;
     const char* type_alias;
-} znamesv3[N_NCZARR_TYPES] = {
+} zv3nctype2dtype[N_NCZARR_TYPES] = {
 /* nc_type       Pure Zarr   typelen    NCZarr */
 /*NC_NAT*/      {NULL,          0,      NULL},
 /*NC_BYTE*/     {"int8",        1,      NULL},
@@ -145,6 +146,28 @@ static const struct ZTYPESV3 {
 /*NC_UINT64*/   {"uint64",      8,      NULL},
 /*NC_STRING*/   {"r%u",         0,      "string"},
 /*NC_JSON*/     {"uint8",       1,      "json"} /* NCZarr internal type */
+};
+
+/* Table for converting dtype to nc_type */
+static const struct ZDTYPE2NCTYPEV3 {
+    const char* dtype; /* Must be a legitimate Zarr V3 type */
+    size_t typelen;
+} zv3dtype2nctype[N_NCZARR_TYPES] = {
+/* nc_type       dtype   typelen  */
+/*NC_NAT*/      {NULL,          0},
+/*NC_BYTE*/     {"int8",        1},
+/*NC_CHAR*/     {"char ",       1},
+/*NC_SHORT*/    {"int16",       2},
+/*NC_INT*/      {"int32",       4},
+/*NC_FLOAT*/    {"float32",     4},
+/*NC_DOUBLE*/   {"float64",     8},
+/*NC_UBYTE*/    {"uint8",       1},
+/*NC_USHORT*/   {"uint16",      2},
+/*NC_UINT*/     {"uint32",      4},
+/*NC_INT64*/    {"int64",       8},
+/*NC_UINT64*/   {"uint64",      8},
+/*NC_STRING*/   {"string",      0},
+/*NC_JSON*/     {"json",        1}
 };
 
 /* map nc_type -> NCJ_SORT */
@@ -296,8 +319,12 @@ NCZ_downloadjson(NCZMAP* zmap, const char* key, NCjson** jsonp)
     char* content = NULL;
     NCjson* json = NULL;
 
-    if((stat = nczmap_len(zmap, key, &len)))
-	goto done;
+    switch (stat = nczmap_len(zmap, key, &len)) {
+    case NC_NOERR: break;
+    case NC_ENOOBJECT: /* fall thru */
+    default: goto done;
+    }
+
     if((content = malloc(len+1)) == NULL)
 	{stat = NC_ENOMEM; goto done;}
     if((stat = nczmap_read(zmap, key, 0, len, (void*)content)))
@@ -369,7 +396,7 @@ NCZ_createdict(NCZMAP* zmap, const char* key, NCjson** jsonp)
     /* See if it already exists */
     stat = NCZ_downloadjson(zmap,key,&json);
     if(stat != NC_NOERR) {
-	if(stat == NC_EEMPTY) {/* create it */
+	if(stat == NC_ENOOBJECT) {/* create it */
 	    if((stat = nczmap_def(zmap,key,NCZ_ISMETA)))
 		goto done;	    
         } else
@@ -404,7 +431,7 @@ NCZ_createarray(NCZMAP* zmap, const char* key, NCjson** jsonp)
 
     stat = NCZ_downloadjson(zmap,key,&json);
     if(stat != NC_NOERR) {
-	if(stat == NC_EEMPTY) {/* create it */
+	if(stat == NC_ENOOBJECT) {/* create it */
 	    if((stat = nczmap_def(zmap,key,NCZ_ISMETA)))
 		goto done;	    
 	    /* Create the initial array */
@@ -428,7 +455,7 @@ done:
 @param key - [in] key of the object
 @param jsonp - [out] return parsed json
 @return NC_NOERR
-@return NC_EEMPTY [object did not exist]
+@return NC_ENOOBJECT [object did not exist]
 @author Dennis Heimbigner
 */
 int
@@ -452,7 +479,7 @@ done:
 @param key - [in] key of the object
 @param jsonp - [out] return parsed json
 @return NC_NOERR
-@return NC_EEMPTY [object did not exist]
+@return NC_ENOOBJECT [object did not exist]
 @author Dennis Heimbigner
 */
 int
@@ -554,8 +581,11 @@ NCZ_subobjects(NCZMAP* map, const char* prefix, const char* tag, char dimsep, NC
 	ncbytescat(path,name);
 	ncbytescat(path,tag);
 	/* See if this object exists */
-        if((stat = nczmap_exists(map,ncbytescontents(path))) == NC_NOERR)
-	    nclistpush(objlist,name);
+        switch(stat = nczmap_exists(map,ncbytescontents(path))) {
+	case NC_NOERR: nclistpush(objlist,name); break;
+	case NC_ENOOBJECT: /*fall thru*/
+	default: goto done;
+	}
     }
 
 done:
@@ -565,7 +595,7 @@ done:
 }
 
 /**
-@internal Zarr V2: Given an nc_type+endianness+purezarr+MAXSTRLEN, produce the corresponding Zarr dtype string.
+@internal Zarr V2: Given an nc_type+endianness+purezarr+MAXSTRLEN, produce the corresponding Zarr type string.
 @param nctype     - [in] nc_type
 @param endianness - [in] endianness
 @param purezarr   - [in] 1=>pure zarr, 0 => nczarr
@@ -725,8 +755,8 @@ ncz3_nctype2dtype(nc_type nctype, int purezarr, int strlen, char** dnamep, const
     const char* tag = NULL;
 
     if(nctype <= NC_NAT || nctype > N_NCZARR_TYPES) return NC_EINVAL;
-    dtype = znamesv3[nctype].zarr;
-    tag = znamesv3[nctype].type_alias;
+    dtype = zv3nctype2dtype[nctype].zarr;
+    tag = zv3nctype2dtype[nctype].type_alias;
     snprintf(dname,sizeof(dname),dtype,strlen*8);
     if(dnamep) *dnamep = strdup(dname);
     if(tagp) *tagp = tag;
@@ -769,23 +799,24 @@ ncz3_dtype2nctype(const char* dtype , const char* dalias, nc_type* nctypep, size
 	} else if(strcmp(dalias,"json")==0) {
 	    nctype = NC_JSON;
 	    typelen = 0;
+	    /* short circuit handling of rn */
 	} else
-	    {dtype = dalias;}
+	    {dtype = dalias; dalias = NULL;}
+    }
+    /* Special case */
+    if(nctype == NC_NAT && (1 == sscanf(dtype,"r%zu",&typelen))) {
+	nctype = NC_STRING;
+   	if((typelen % 8) != 0) {stat = NC_ENCZARR; goto done;}
+	typelen = typelen / 8; /* convert bits to bytes */
     }
     if(nctype == NC_NAT) {
 	int i, match;
-	assert(dtype != NULL);
-	/* short circuit handling of rn */
-	if(1 == sscanf(dtype,"r%zu",&typelen)) {
-	    nctype = NC_STRING;
-   	    if((typelen % 8) != 0) {stat = NC_ENCZARR; goto done;}
-	    typelen = typelen / 8; /* convert bits to bytes */
-	    match = 1;
-	} else for(match=0,i=0;i<N_NCZARR_TYPES;i++) {
-	    if(znamesv3[i].zarr == NULL) continue;
-	    if(strcmp(znamesv3[i].zarr,dtype)==0) {
+	assert(dtype != NULL && dalias == NULL);
+	for(match=0,i=0;i<N_NCZARR_TYPES;i++) {
+	    if(zv3dtype2nctype[i].dtype == NULL) continue; /* NC_NAT only */
+	    if(strcmp(zv3dtype2nctype[i].dtype,dtype)==0) {
                 nctype = i;
-                typelen = znamesv3[i].typelen;
+                typelen = zv3dtype2nctype[i].typelen;
 		match = 1;
 		break;
 	    }
@@ -1382,15 +1413,15 @@ NCZ_locateFQN(NC_GRP_INFO_T* parent, const char* fqn, NC_SORT sort, NC_OBJ** obj
     do {
 	const char* segment = (const char*)nclistget(segments,count-1); /* last segment */
         object = ncindexlookup(grp->children,segment);
-        if(object != NULL && (sort == NCNAT || sort == NCGRP)) break; /* not this */
+        if(object != NULL && (sort == NCNAT || sort == NCGRP)) break; /* match */
         object = ncindexlookup(grp->dim,segment);
-        if(object != NULL && (sort == NCNAT || sort == NCDIM)) break; /* not this */
+        if(object != NULL && (sort == NCNAT || sort == NCDIM)) break; /* match */
         object = ncindexlookup(grp->vars,segment);
-        if(object != NULL && (sort == NCNAT || sort == NCVAR)) break; /* not this */
+        if(object != NULL && (sort == NCNAT || sort == NCVAR)) break; /* match */
 	object = ncindexlookup(grp->type,segment);
-        if(object != NULL && (sort == NCNAT || sort == NCTYP)) break; /* not this */
+        if(object != NULL && (sort == NCNAT || sort == NCTYP)) break; /* match */
 	object = ncindexlookup(grp->att,segment);
-        if(object != NULL && (sort == NCNAT || sort == NCATT)) break; /* not this */
+        if(object != NULL && (sort == NCNAT || sort == NCATT)) break; /* match */
 	object = NULL; /* not found */
     } while(0);
     if(object == NULL) {object = (NC_OBJ*)grp; ret = NC_ENOOBJECT;}
@@ -1455,7 +1486,6 @@ NCZ_backslashescape(const char* s)
         char c = *p;
         switch (c) {
 	case '\\':
-	case '/':
 	case '.':
 	case '@':
 	    *q++ = '\\'; *q++ = '\\';
@@ -1536,6 +1566,20 @@ NCZ_sortpairlist(void* vec, size_t count)
 void
 NCZ_freeAttrInfoVec(struct NCZ_AttrInfo* ainfo)
 {
+    struct NCZ_AttrInfo* ap;
     if(ainfo == NULL) return;
+    for(ap=ainfo;ap->name;ap++) {
+        nullfree(ap->name);
+        NCJreclaim(ap->values);
+    }
     free(ainfo);
+}
+
+void
+NCZ_setatts_read(NC_OBJ* container)
+{
+    if(container->sort == NCGRP)
+        ((NC_GRP_INFO_T*)container)->atts_read = 1;
+    else /* container->sort == NCVAR */
+        ((NC_VAR_INFO_T*)container)->atts_read = 1;
 }

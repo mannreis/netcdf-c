@@ -357,7 +357,7 @@ NC_s3sdkbucketdelete(void* s3client0, NCS3INFO* info, char** errmsgp)
 
 /*
 @return NC_NOERR if key points to a content-bearing object.
-@return NC_EEMPTY if object at key has no content.
+@return NC_ENOOBJECT if object at key has no content.
 @return NC_EXXX return true error
 */
 EXTERNL int
@@ -386,7 +386,7 @@ NC_s3sdkinfo(void* s3client0, const char* bucket, const char* pathkey, size64_t*
 	/* Distinquish not-found from other errors */
 	switch (head_outcome.GetError().GetErrorType()) {
 	case Aws::S3::S3Errors::RESOURCE_NOT_FOUND:
-            stat = NC_EEMPTY;
+            stat = NC_ENOOBJECT;
 	    break;
 	case Aws::S3::S3Errors::ACCESS_DENIED:
             stat = NC_EACCESS;
@@ -558,7 +558,7 @@ NC_s3sdkclose(void* s3client0, NCS3INFO* info, int deleteit, char** errmsgp)
         /* Delete the root key; ok it if does not exist */
         switch (stat = NC_s3sdkdeletekey(s3client0,info->bucket,info->rootkey,errmsgp)) {
         case NC_NOERR: break;
-        case NC_EEMPTY: case NC_ENOTFOUND: stat = NC_NOERR; break;
+        case NC_ENOOBJECT: case NC_ENOTFOUND: stat = NC_NOERR; break;
         default: break;
         }
     }

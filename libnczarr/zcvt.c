@@ -193,6 +193,11 @@ NCZ_convert1(const NCjson* jsrc, nc_type dsttype, NCbytes* buf)
 	    c = (signed char)zcvt.uint64v;
 	    ncbytesappend(buf,(char)c);
 	    break;
+	case NC_STRING:
+	    if(strlen(zcvt.strv) > 1) outofrange = 1;
+	    c = zcvt.strv[0];
+	    ncbytesappend(buf,(char)c);
+	    break;
 	default: abort();
 	}
 	} break;
@@ -210,6 +215,11 @@ NCZ_convert1(const NCjson* jsrc, nc_type dsttype, NCbytes* buf)
 	case NC_UINT64:
 	    if(zcvt.uint64v > NC_MAX_UBYTE) outofrange = 1;
 	    c = (unsigned char)zcvt.uint64v;
+	    ncbytesappend(buf,(char)c);
+	    break;
+	case NC_STRING:
+	    if(strlen(zcvt.strv) > 1) outofrange = 1;
+	    c = zcvt.strv[0];
 	    ncbytesappend(buf,(char)c);
 	    break;
 	default: abort();

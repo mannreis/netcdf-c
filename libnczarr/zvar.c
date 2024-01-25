@@ -387,7 +387,7 @@ NCZ_def_var(int ncid, const char *name, nc_type xtype, int ndims,
     /* Set these state flags for the var. */
     var->is_new_var = NC_TRUE;
     var->meta_read = NC_TRUE;
-    var->atts_read = NC_TRUE;
+    NCZ_setatts_read((NC_OBJ*)var);
 
 #ifdef ENABLE_NCZARR_FILTERS
     /* Set the filter list */
@@ -737,11 +737,13 @@ ncz_def_var_extra(int ncid, int varid, int *shuffle, int *unused1,
 	    goto done;
         /* Reclaim any existing fill_chunk */
         if((retval = NCZ_reclaim_fill_chunk(zvar->cache))) goto done;
+	var->fill_val_changed = 1;
     } else if (var->fill_value && no_fill && (*no_fill)) { /* Turning off fill value? */
         /* If there's a _FillValue attribute, delete it. */
         retval = NCZ_del_att(ncid, varid, _FillValue);
         if (retval && retval != NC_ENOTATT) return retval;
 	if((retval = NCZ_reclaim_fill_value(var))) return retval;
+	var->fill_val_changed = 1;
     }
 
     /* Is the user setting the endianness? */
@@ -2421,7 +2423,7 @@ NCZ_write_var_data(NC_FILE_INFO_T* file, NC_VAR_INFO_T* var)
 	    if((stat = NCZ_buildchunkpath(zvar->cache,indices,&key))) goto done;
 	    switch (stat = nczmap_exists(map,key)) {
 	    case NC_NOERR: goto next; /* already exists */
-	    case NC_EEMPTY: break; /* does not exist, create it with fill */
+	    case NC_ENOOBJECT: break; /* does not exist, create it with fill */
 	    default: goto done; /* some other error */
 	    }
             /* If we reach here, then chunk does not exist, create it with fill */

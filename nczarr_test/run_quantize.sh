@@ -19,8 +19,8 @@ testcase() {
   zext=$1
   fileargs tmp_quantize "mode=$zarr,$zext"
   case "$zext" in
-  file) template="file://${execdir}/%s.zarr#mode=zarr,$zext" ;;
-  zip)  template="file://${execdir}/%s.zip#mode=zarr,$zext" ;;
+  file) template="file://${ISOPATH}/%s.zarr#mode=zarr,$zext" ;;
+  zip)  template="file://${ISOPATH}/%s.zip#mode=zarr,$zext" ;;
   s3)  template="s3://${NCZARR_S3_TEST_BUCKET}/${S3TESTPATH}/%s.zarr#mode=zarr,$zext" ;;
   *) echo "unknown file type"; exit 1 ;;
   esac

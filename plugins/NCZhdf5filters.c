@@ -92,7 +92,7 @@ NCZ_raw_codec_to_hdf5(const NCproplist* env, const char* codec, int* idp, size_t
     struct NCJconst jc;
     uintptr_t zarrformat = 0;
     int hdf5id = 0;
-    size_t nparams = 0;
+    size_t nparams,npairs = 0;
     unsigned* params = NULL;
   
     if(nparamsp == NULL || paramsp == NULL)
@@ -126,8 +126,13 @@ NCZ_raw_codec_to_hdf5(const NCproplist* env, const char* codec, int* idp, size_t
     if(jc.ival < 0 || jc.ival > NC_MAX_UINT) {stat = NC_EINVAL; goto done;}
     nparams = (unsigned)jc.ival;
 
+    if(zarrformat == 3)
+       npairs = 1 + nparams;
+    else
+       npairs = 1 + 1 + nparams;
+
     /* Validate nparams */
-    if(NCJdictlength(jdict) != (nparams + 2)) {stat = NC_EFILTER; goto done;}
+    if(NCJdictlength(jdict) != npairs) {stat = NC_EFILTER; goto done;}
 
     if(nparams == 0) goto setvalues;
     
@@ -443,9 +448,9 @@ NCZ_deflate_hdf5_to_codec(const NCproplist* env, int id, size_t nparams, const u
 
     level = params[0];
     if(zarrformat == 3) {
-        snprintf(json,sizeof(json),"{\"name\": \"%s\", \"configuration\": {\"level\": \"%u\"}}",NCZ_zlib_codec.codecid,level);
+        snprintf(json,sizeof(json),"{\"name\": \"%s\", \"configuration\": {\"level\": %u}}",NCZ_zlib_codec.codecid,level);
     } else {
-        snprintf(json,sizeof(json),"{\"id\": \"%s\", \"level\": \"%u\"}",NCZ_zlib_codec.codecid,level);
+        snprintf(json,sizeof(json),"{\"id\": \"%s\", \"level\": %u}",NCZ_zlib_codec.codecid,level);
     }
 
     if(codecp) {

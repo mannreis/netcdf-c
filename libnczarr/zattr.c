@@ -43,7 +43,10 @@ ncz_getattlist(NC_GRP_INFO_T *grp, int varid, NC_VAR_INFO_T **varp, NCindex **at
     if (varid == NC_GLOBAL)
     {
         /* Do we need to read the atts? */
-        if (!grp->atts_read) {retval = NC_EINTERNAL; goto done;}
+        if (!grp->atts_read) {
+	    assert(zinfo->zarr.zarr_format == 2);
+	    if((retval=NCZ_read_attrs(file,(NC_OBJ*)grp,NULL,NULL))) goto done;
+	}
         if (varp)
             *varp = NULL;
         *attlist = grp->att;
@@ -57,7 +60,10 @@ ncz_getattlist(NC_GRP_INFO_T *grp, int varid, NC_VAR_INFO_T **varp, NCindex **at
         assert(var->hdr.id == varid);
 
         /* Do we need to read the atts? */
-        if (!var->atts_read) {retval = NC_EINTERNAL; goto done;}
+        if (!var->atts_read) {
+	    assert(zinfo->zarr.zarr_format == 2);
+	    if((retval=NCZ_read_attrs(file,(NC_OBJ*)var,NULL,NULL))) goto done;
+	}
         if (varp)
             *varp = var;
         *attlist = var->att;
@@ -1125,7 +1131,7 @@ NCZ_read_attrs(NC_FILE_INFO_T* file, NC_OBJ* container, const NCjson* jatts, con
     if((stat=NCZF_readattrs(file,container,jatts,jatypes,&ainfo))) goto done;
 
     if(ainfo != NULL) {
-        /* Create the attributes (watching out for special attributes) */
+	/* Create the attributes (watching out for special attributes) */
         for(alen=0,ap=ainfo;ap->name;ap++,alen++) {
             /* Iterate over the attributes to create the in-memory attributes */
             /* Watch for special cases: _FillValue and  _ARRAY_DIMENSIONS (xarray), etc. */
@@ -1139,7 +1145,7 @@ NCZ_read_attrs(NC_FILE_INFO_T* file, NC_OBJ* container, const NCjson* jatts, con
                 isdfaltmaxstrlen = 1;
             if(var != NULL && strcmp(ap->name,NC_NCZARR_MAXSTRLEN_ATTR)==0)
                 ismaxstrlen = 1;
-            /* Check for _nczarr_attr */
+            /* Check for _nczarr_attrs */
             if(strcmp(ap->name,NCZ_V2_ATTR)==0 || strcmp(ap->name,NCZ_V3_ATTR)==0) continue; /*ignore it*/
     
             /* See if this is reserved attribute */
@@ -1194,16 +1200,11 @@ NCZ_read_attrs(NC_FILE_INFO_T* file, NC_OBJ* container, const NCjson* jatts, con
         /* If we have not read a _FillValue, then go ahead and create it */
        if((stat = ncz_create_fillvalue((NC_VAR_INFO_T*)container))) goto done;
     }
-    /* Remember that we have read the atts for this var or group. */
-    if(container->sort == NCVAR)
-        ((NC_VAR_INFO_T*)container)->atts_read = 1;
-    else
-        ((NC_GRP_INFO_T*)container)->atts_read = 1;
-
+    NCZ_setatts_read(container); /* Remember that we have read the atts for this var or group. */
 done:
+    NCZ_freeAttrInfoVec(ainfo);
     if(data != NULL)
         stat = NC_reclaim_data(file->controller,att->nc_typeid,data,len);
-    NCZ_freeAttrInfoVec(ainfo);
     return ZUNTRACE(THROW(stat));
 }
 
@@ -1342,6 +1343,7 @@ NCZ_readattrs(NC_FILE_INFO_T* file, NC_OBJ* container, struct NCZ_AttrInfo** ain
 	    ap->nctype = atypes[i];
 	    /* clone and save the json value array */
 	    value = NCJdictvalue(jattrs,i);
+	    assert(ap->values == NULL);
 	    NCJclone(value,&ap->values);
 	}	
     }

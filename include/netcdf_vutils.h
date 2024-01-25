@@ -136,7 +136,7 @@ vsexpand(VString* vs)
 
   if(vs == NULL) return;
   assert(vs->nonextendible == 0);
-  newsz = (vs->alloc + VSTRALLOC); /* basically double allocated space */
+  newsz = (vs->alloc + VSTRALLOC); /* increase allocated space */
   if(vs->alloc >= newsz) return; /* space already allocated */
   newcontent=(char*)calloc(1,newsz+1);/* always room for nul term */
   assert(newcontent != NULL);
@@ -166,7 +166,7 @@ vsappendn(VString* vs, const char* elem, unsigned n)
   memcpy(&vs->content[vs->length],elem,n);
   vs->length += n;
   if(!vs->nonextendible)
-      vs->content[vs->length] = '\0';
+      vs->content[vs->length] = '\0'; /* guarantee nul term */
 }
 
 static void
@@ -196,7 +196,12 @@ static char*
 vsextract(VString* vs)
 {
     char* x = NULL;
-    if(vs == NULL || vs->content == NULL) return NULL;
+    if(vs == NULL) return NULL;
+    if(vs->content == NULL) {
+	/* guarantee content existence and nul terminated */
+	if((vs->content = calloc(1,sizeof(char)))==NULL) return NULL;
+	vs->length = 0;
+    }
     x = vs->content;
     vs->content = NULL;
     vs->length = 0;

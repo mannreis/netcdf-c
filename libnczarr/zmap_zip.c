@@ -334,8 +334,8 @@ zipexists(NCZMAP* map, const char* key)
     ZTRACE(6,"map=%s key=%s",map->url,key);
     switch(stat=zzlookupobj(zzmap,key,&zindex)) {
     case NC_NOERR: break;
-    case NC_ENOOBJECT: stat = NC_EEMPTY; break;
-    case NC_EEMPTY: break;
+    case NC_EEMPTY: stat = NC_ENOOBJECT; break;
+    case NC_ENOOBJECT: break;
     default: break;
     }
     return ZUNTRACE(stat);
@@ -355,8 +355,8 @@ ziplen(NCZMAP* map, const char* key, size64_t* lenp)
     case NC_NOERR:
 	if((stat = zzlen(zzmap,zindex,&len))) goto done;
         break;
-    case NC_ENOOBJECT: stat = NC_EEMPTY; len = 0; break;
-    case NC_EEMPTY: len = 0; break; /* |dir|==0 */
+    case NC_EEMPTY: stat = NC_ENOOBJECT; len = 0; break;
+    case NC_ENOOBJECT: len = 0; break; /* |dir|==0 */
     default: goto done;
     }
 
@@ -384,8 +384,8 @@ zipread(NCZMAP* map, const char* key, size64_t start, size64_t count, void* cont
 
     switch(stat = zzlookupobj(zzmap,key,&zindex)) {
     case NC_NOERR: break;
-    case NC_ENOOBJECT: stat = NC_EEMPTY; /* fall thru */
-    case NC_EEMPTY: /* its a dir; fall thru*/
+    case NC_EEMPTY: stat = NC_ENOOBJECT; /* fall thru */
+    case NC_ENOOBJECT: /* its a dir; fall thru*/
     default: goto done;
     }
     
@@ -451,8 +451,8 @@ zipwrite(NCZMAP* map, const char* key, size64_t count, const void* content)
         stat = NC_EOBJECT; //goto done; /* Zip files are write once */
 	zflags |= ZIP_FL_OVERWRITE;
 	break;
-    case NC_ENOOBJECT: stat = NC_NOERR; break;
     case NC_EEMPTY: /* its a dir; fall thru */
+    case NC_ENOOBJECT: stat = NC_NOERR; break;
     default: goto done;
     }
     

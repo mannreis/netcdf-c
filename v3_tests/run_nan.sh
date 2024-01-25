@@ -19,15 +19,9 @@ set -e
 
 # Location constants
 cdl="$srcdir/../ncdump/cdl"
+expected="$srcdir"
 
 # Functions
-
-# Remove fillvalue attribute since zarr generates it when hdf5 does not
-fvclean() {
-    cat $1 \
- 	| sed -e '/:_FillValue/d' \
-	| cat > $2
-}
 
 difftest() {
 echo ""; echo "*** Test zext=$zext"
@@ -43,7 +37,7 @@ for t in tst_nans ; do
    ${NCGEN} -4 -lb -o ${fileurl} ${cdl}/${ref}.cdl
    ${NCDUMP} ${headflag} ${specflag} -n ${ref} ${fileurl} > tmp_${t}.dmp
    # compare against expected
-   diff -b -w ${srcdir}/${ref}.dmp ./tmp_${t}.dmp
+   diff -b -w ${expected}/${ref}.dmp ./tmp_${t}.dmp
    echo "*** SUCCEED: ${t}"
 done
 }

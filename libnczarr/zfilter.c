@@ -1002,9 +1002,9 @@ getentries(const char* path, NClist* contents)
 	case ERROR_FILE_NOT_FOUND: /* No matching files */ /* fall thru */
 	    ret = NC_NOERR;
 	    goto done;
-	case ERROR_DIRECTORY: /* not a directory */
+	case ERROR_DIRECTORY: /* path is not a directory ; fall thru */
 	default:
-            ret = NC_EEMPTY;
+            ret = NC_EEMPTY; 
 	    goto done;
 	}
     }

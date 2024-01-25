@@ -349,7 +349,7 @@ objdump(void)
 	/* Now print info for this obj key */
 	switch (stat=nczmap_len(map,obj,&len)) {
 	    case NC_NOERR: break;
-	    case NC_EEMPTY: len = 0; stat = NC_NOERR; break;
+	    case NC_ENOOBJECT: len = 0; stat = NC_NOERR; break;
 	    case NC_EACCESS: /* fall thru */
 	    default: goto done;
 	}

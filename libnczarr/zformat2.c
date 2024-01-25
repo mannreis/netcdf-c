@@ -243,6 +243,7 @@ done:
     NCJreclaim(json);
     NCJreclaim(jgroup);
     NCJreclaim(jdims);
+    NCJreclaim(jatts);
     NCJreclaim(jvars);
     NCJreclaim(jsubgrps);
     nullfree(fullpath);
@@ -517,6 +518,7 @@ done:
     nullfree(key);
     nullfree(dtypename);
     nullfree(dimpath);
+    NCJreclaim(jatts);
     NCJreclaim(jvar);
     NCJreclaim(jncvar);
     NCJreclaim(jtmp);
@@ -792,7 +794,7 @@ ZF2_readmeta(NC_FILE_INFO_T* file)
     /* Ok, try to read superblock */
     switch(stat = read_superblock(file,&nczarr_format)) {
     case NC_NOERR: break;
-    case NC_EEMPTY:
+    case NC_ENOOBJECT:
         if(!purezarr) {stat = NC_ENOTZARR; goto done;}
         stat = NC_NOERR;
         break;
@@ -860,7 +862,7 @@ ZF2_readattrs(NC_FILE_INFO_T* file, NC_OBJ* container, const NCjson* jatts, cons
     /* Download the .zattrs object: may not exist */
     switch ((stat=NCZ_downloadjson(zfile->map,key,&jattrs))) {
     case NC_NOERR: break;
-    case NC_EEMPTY: stat = NC_NOERR; break; /* did not exist */
+    case NC_ENOOBJECT: stat = NC_NOERR; break; /* did not exist */
     default: goto done; /* failure */
     }
     nullfree(key); key = NULL;
@@ -894,9 +896,15 @@ ZF2_readattrs(NC_FILE_INFO_T* file, NC_OBJ* container, const NCjson* jatts, cons
 		assert(ainfo[i].values == NULL);
                 if((stat= NCJclone(jvalues,(NCjson**)&ainfo[i].values))) goto done;
             }
+	    /* Null terminate */
+	    memset(&ainfo[natts],0,sizeof(struct NCZ_AttrInfo));
         }
     }
+
     if(ainfop) {*ainfop = ainfo; ainfo = NULL;}
+
+    /* remember that we read the attributes */
+    NCZ_setatts_read(container);
 
 done:
     NCJreclaim(jattrs);
@@ -937,7 +945,7 @@ read_superblock(NC_FILE_INFO_T* file, int* nczarrvp)
 
     /* Get the Zarr root group */
     switch(stat = NCZ_downloadjson(zfile->map, Z2METAROOT, &jblock)) {
-    case NC_EEMPTY: /* not there */
+    case NC_ENOOBJECT: /* not there */
         nczarr_format = NCZARRFORMAT0; /* apparently pure zarr */
         zfile->flags |= FLAG_PUREZARR;
         stat = NC_NOERR; /* reset */
@@ -1064,11 +1072,9 @@ read_dims(NC_FILE_INFO_T* file, NC_GRP_INFO_T* grp, NClist* diminfo)
             sscanf(sisunlimited,"%lld",&isunlim); /* Get unlimited flag */
         else
             isunlim = 0;
-        if((stat = nc4_dim_list_add(grp, name, (size_t)len, -1, &dim)))
-            goto done;
+        if((stat = nc4_dim_list_add(grp, name, (size_t)len, -1, &dim))) goto done;
         dim->unlimited = (isunlim ? 1 : 0);
-        if((dim->format_dim_info = calloc(1,sizeof(NCZ_DIM_INFO_T))) == NULL)
-            {stat = NC_ENOMEM; goto done;}
+        if((dim->format_dim_info = calloc(1,sizeof(NCZ_DIM_INFO_T))) == NULL) {stat = NC_ENOMEM; goto done;}
         ((NCZ_DIM_INFO_T*)dim->format_dim_info)->common.file = file;
     }
 
@@ -1648,9 +1654,11 @@ NCZ_searchvars(NCZ_FILE_INFO_T* zfile, NC_GRP_INFO_T* grp, NClist* varnames)
         /* See if name/.zarray exists */
         if((stat = nczm_concat(grpkey,name,&varkey))) goto done;
         if((stat = nczm_concat(varkey,Z2ARRAY,&zarray))) goto done;
-        if((stat = nczmap_exists(zfile->map,zarray)) == NC_NOERR)
-            nclistpush(varnames,strdup(name));
-        stat = NC_NOERR;
+        switch(stat = nczmap_exists(zfile->map,zarray)) {
+	case NC_NOERR: nclistpush(varnames,strdup(name)); break;
+	case NC_ENOOBJECT: stat = NC_NOERR; break; /* ignore */
+	default: goto done;
+        }
         nullfree(varkey); varkey = NULL;
         nullfree(zarray); zarray = NULL;
     }
@@ -1682,9 +1690,11 @@ NCZ_searchsubgrps(NCZ_FILE_INFO_T* zfile, NC_GRP_INFO_T* grp, NClist* subgrpname
         /* See if name/.zgroup exists */
         if((stat = nczm_concat(grpkey,name,&subkey))) goto done;
         if((stat = nczm_concat(subkey,Z2GROUP,&zgroup))) goto done;
-        if((stat = nczmap_exists(zfile->map,zgroup)) == NC_NOERR)
-            nclistpush(subgrpnames,strdup(name));
-        stat = NC_NOERR;
+        switch(stat = nczmap_exists(zfile->map,zgroup)) {
+	case NC_NOERR: nclistpush(subgrpnames,strdup(name)); break;
+	case NC_ENOOBJECT: stat = NC_NOERR; break;
+	default: goto done;
+	}
         nullfree(subkey); subkey = NULL;
         nullfree(zgroup); zgroup = NULL;
     }
@@ -1896,12 +1906,10 @@ NCZ_createdim(NC_FILE_INFO_T* file, const char* name, size64_t dimlen, NC_DIM_IN
     int stat = NC_NOERR;
     NC_GRP_INFO_T* root = file->root_grp;
     NC_DIM_INFO_T* thed = NULL;
-    if((stat = nc4_dim_list_add(root, name, (size_t)dimlen, -1, &thed)))
-        goto done;
+    if((stat = nc4_dim_list_add(root, name, (size_t)dimlen, -1, &thed))) goto done;
     assert(thed != NULL);
     /* Create struct for NCZ-specific dim info. */
-    if (!(thed->format_dim_info = calloc(1, sizeof(NCZ_DIM_INFO_T))))
-        {stat = NC_ENOMEM; goto done;}
+    if ((thed->format_dim_info = calloc(1, sizeof(NCZ_DIM_INFO_T)))==NULL) {stat = NC_ENOMEM; goto done;}
     ((NCZ_DIM_INFO_T*)thed->format_dim_info)->common.file = file;
     *dimp = thed; thed = NULL;
 done:

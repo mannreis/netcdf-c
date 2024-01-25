@@ -154,7 +154,8 @@ zs3create(const char *path, int mode, size64_t flags, void* parameters, NCZMAP**
 	}
 	/* The root object may or may not already exist */
         switch (stat = NC_s3sdkinfo(z3map->s3client,z3map->s3.bucket,z3map->s3.rootkey,NULL,&z3map->errmsg)) {
-	case NC_EEMPTY: /* no such object */
+	case NC_EEMPTY: /* fall thru */
+	case NC_ENOOBJECT: /* no such object */
 	    stat = NC_NOERR;  /* which is what we want */
 	    errclear(z3map);
 	    break;
@@ -270,7 +271,7 @@ done:
 
 /*
 @return NC_NOERR if key points to a content-bearing object.
-@return NC_EEMPTY if object at key has no content.
+@return NC_ENOOBJECT if object at key does not exist
 @return NC_EXXX return true error
 */
 static int
@@ -284,7 +285,7 @@ zs3exists(NCZMAP* map, const char* key)
 
 /*
 @return NC_NOERR if key points to a content-bearing object.
-@return NC_EEMPTY if object at key has no content.
+@return NC_ENOOBJECT if object at key does not exist
 @return NC_EXXX return true error
 */
 static int
@@ -300,7 +301,8 @@ zs3len(NCZMAP* map, const char* key, size64_t* lenp)
 
     switch (stat = NC_s3sdkinfo(z3map->s3client,z3map->s3.bucket,truekey,lenp,&z3map->errmsg)) {
     case NC_NOERR: break;
-    case NC_EEMPTY:
+    case NC_EEMPTY: stat = NC_ENOOBJECT; /* fall thru */
+    case NC_ENOOBJECT:
 	if(lenp) *lenp = 0;
 	goto done;
     default:
@@ -314,7 +316,7 @@ done:
 
 /*
 @return NC_NOERR if object at key was read
-@return NC_EEMPTY if object at key has no content.
+@return NC_ENOOBJECT if object at key does not exist
 @return NC_EXXX return true error
 */
 static int
@@ -331,7 +333,8 @@ zs3read(NCZMAP* map, const char* key, size64_t start, size64_t count, void* cont
     
     switch (stat=NC_s3sdkinfo(z3map->s3client, z3map->s3.bucket, truekey, &size, &z3map->errmsg)) {
     case NC_NOERR: break;
-    case NC_EEMPTY: goto done;
+    case NC_EEMPTY: stat = NC_ENOOBJECT;
+    case NC_ENOOBJECT: goto done;
     default: goto done; 	
     }
     /* Sanity checks */
@@ -349,7 +352,7 @@ done:
 
 /*
 @return NC_NOERR if key content was written
-@return NC_EEMPTY if object at key has no content.
+@return NC_ENOOBJECT if object at key does not exist
 @return NC_EXXX return true error
 */
 static int
@@ -370,7 +373,7 @@ zs3write(NCZMAP* map, const char* key, size64_t count, const void* content)
     switch (stat=NC_s3sdkinfo(z3map->s3client, z3map->s3.bucket, truekey, &objsize, &z3map->errmsg)) {
     case NC_NOERR: /* Figure out the new size of the object */
         break;
-    case NC_EEMPTY:
+    case NC_EEMPTY: case NC_ENOOBJECT:
 	stat = NC_NOERR; /* reset */
         break;
     default: reporterr(z3map); goto done;
@@ -438,7 +441,7 @@ zs3list(NCZMAP* map, const char* prefix, NClist* matches)
     
     if((stat = maketruekey(z3map->s3.rootkey,prefix,&trueprefix))) goto done;
     
-    if(*trueprefix != '/') return NC_EINTERNAL;
+    if(trueprefix[0] != '/') return NC_EINTERNAL;
     if((stat = NC_s3sdklist(z3map->s3client,z3map->s3.bucket,trueprefix,&nkeys,&list,&z3map->errmsg)))
         goto done;
     if(nkeys > 0) {
@@ -454,6 +457,7 @@ zs3list(NCZMAP* map, const char* prefix, NClist* matches)
 		/* Also check for trailing '/' */
 		if(strcmp(p,"/")==0) continue;
 		if(nczm_segment1(p,&newkey)) goto done;
+assert(newkey[0] != '/');
 	        nclistpush(tmp,newkey); newkey = NULL;
 	    }
         }

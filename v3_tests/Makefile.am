@@ -4,8 +4,13 @@
 # Put together AM_CPPFLAGS and AM_LDFLAGS.
 include $(top_srcdir)/lib_flags.am
 
+BUILT_SOURCES =
+EXTRA_DIST =
+DISTCLEANFILES =
+TESTS =
+
 # Following files are V3 specific versions
-V3FILES = ${ALLV3BASELINE}
+V3FILES = ${ALLV3BASELINE} ${ALLV3SCRIPTS}
 
 include $(top_srcdir)/nczarr_test/Makefile.files
 include $(top_srcdir)/nczarr_test/Makefile.core
@@ -16,7 +21,7 @@ EXTRA_DIST += CMakeLists.txt ${V3FILES}
 
 FILES = ${ALLSRC} ${ALLSCRIPTS} ${ALLBASELINE} findplugin.sh
 
-DISTCLEANFILES = ${FILES} ${ALLBUILTSRC} ${ALLBUILTSCRIPTS}
+DISTCLEANFILES += ${FILES} ${ALLBUILTSRC} ${ALLBUILTSCRIPTS}
 
 BUILT_SOURCES += ${FILES}
 
