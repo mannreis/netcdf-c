@@ -8,14 +8,14 @@ BUILT_SOURCES =
 EXTRA_DIST =
 DISTCLEANFILES =
 TESTS =
+check_PROGRAMS =
 
 include $(top_srcdir)/nczarr_test/Makefile.files
 
 BUILT_SOURCES += ${ALLBUILTSCRIPTS}
 
-
 # V2 specific files
-EXTRA_DIST = CMakeLists.txt Makefile.core Makefile.files ${ALLV2BASELINE} ${ALLV2SCRIPTS}
+EXTRA_DIST += CMakeLists.txt Makefile.core Makefile.files ${ALLV2BASELINE} ${ALLV2SCRIPTS}
 
 include $(top_srcdir)/nczarr_test/Makefile.core
 

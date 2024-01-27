@@ -23,6 +23,13 @@ expected="$srcdir"
 
 # Functions
 
+# Remove fillvalue attribute since zarr generates it when hdf5 does not
+fvclean() {
+    cat $1 \
+ 	| sed -e '/:_FillValue/d' \
+	| cat > $2
+}
+
 difftest() {
 echo ""; echo "*** Test zext=$zext"
 for t in tst_nans ; do

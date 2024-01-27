@@ -8,6 +8,7 @@ BUILT_SOURCES =
 EXTRA_DIST =
 DISTCLEANFILES =
 TESTS =
+check_PROGRAMS =
 
 # Following files are V3 specific versions
 V3FILES = ${ALLV3BASELINE} ${ALLV3SCRIPTS}
@@ -26,7 +27,7 @@ DISTCLEANFILES += ${FILES} ${ALLBUILTSRC} ${ALLBUILTSCRIPTS}
 BUILT_SOURCES += ${FILES}
 
 ${FILES}:
-	for u in $@ ; do cp -f ${top_srcdir}/nczarr_test/$$u $(srcdir) ;  done
+	for u in $@ ; do cp -f ${top_srcdir}/nczarr_test/$$u $(top_srcdir)/v3_tests ;  done 
 
 # If valgrind is present, add valgrind targets.
 @VALGRIND_CHECK_RULES@

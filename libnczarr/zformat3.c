@@ -825,6 +825,7 @@ ZF3_readmeta(NC_FILE_INFO_T* file)
 	goto done;
 
 done:
+    NCJreclaim(jrootgrp);
     nullfree(rootkey);
     nclistfreeall(paths);
     return ZUNTRACE(THROW(stat));
@@ -865,8 +866,8 @@ ZF3_readattrs(NC_FILE_INFO_T* file, NC_OBJ* container, const NCjson* jatts, cons
 	jkey = NCJdictkey(jatts,i);
 	assert(jkey != NULL && NCJisatomic(jkey));
 	jvalue = NCJdictvalue(jatts,i);
-	ainfo[i].name = NCJstring(jkey);
-	ainfo[i].values = jvalue;
+	ainfo[i].name = strdup(NCJstring(jkey));
+	NCJcheck(NCJclone(jvalue,&ainfo[i].values));
 	ainfo[i].nctype = NC_NAT; /* not yet known */
     }
 
@@ -1056,7 +1057,7 @@ read_grp(NC_FILE_INFO_T* file, NC_GRP_INFO_T* grp)
     /* Pull out lists about groups and vars */
     if(purezarr)
 	{if((stat = subobjects_pure(zfile,grp,subvars,subgrps))) goto done;}
-    else
+    else if(jnczgrp != NULL)
 	{if((stat = subobjects(zfile,grp,jnczgrp,subvars,subgrps))) goto done;}
 
     /* Define vars */
@@ -1770,6 +1771,7 @@ subobjects(NCZ_FILE_INFO_T* zfile, NC_GRP_INFO_T* parent, const NCjson* jnczgrp,
     const NCjson* jsubgrps = NULL;
     const NCjson* jarrays = NULL;
     
+    assert(jnczgrp != NULL);
     NCJcheck(NCJdictget(jnczgrp,"arrays",&jarrays));
     NCJcheck(NCJdictget(jnczgrp,"subgroups",&jsubgrps));
 
@@ -2297,16 +2299,20 @@ getnextlevel(NCZ_FILE_INFO_T* zfile, NC_GRP_INFO_T* parent, NClist* varnames, NC
 	const NCjson* jnodetype;
 	if(strcmp(name,Z3OBJECT)==0) {continue;}
         /* See if name/zarr.json exists */
+        nullfree(subkey); subkey = NULL;
         if((stat = nczm_concat(grpkey,name,&subkey))) goto done;
+	nullfree(zobject); zobject = NULL;
         if((stat = nczm_concat(subkey,Z3OBJECT,&zobject))) goto done;
         switch(stat = nczmap_len(zfile->map,zobject,&zjlen)) {
 	case NC_NOERR: break;
 	case NC_ENOOBJECT: nclistpush(subgrpnames,name); continue; /* assume a virtual group */
 	default: goto done;
 	}
+	nullfree(content); content = NULL;
 	if((content = malloc(zjlen))==NULL) {stat = NC_ENOMEM; goto done;}
         if((stat = nczmap_read(zfile->map,zobject,0,zjlen,content))) goto done; /* read the zarr.json */
 	/* parse it */
+	NCJreclaim(jzarrjson); jzarrjson = NULL;
 	NCJcheck(NCJparsen((size_t)zjlen,(char*)content,0,&jzarrjson));
 	if(jzarrjson == NULL) {stat = NC_ENOTZARR; goto done;}
 	/* See what the node_type says */

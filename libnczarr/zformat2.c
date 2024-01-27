@@ -27,7 +27,7 @@ static int ZF2_codec2hdf(const NC_FILE_INFO_T* file, const NC_VAR_INFO_T* var, c
 static int write_grp(NC_FILE_INFO_T* file, NCZ_FILE_INFO_T* zfile, NCZMAP* map, NC_GRP_INFO_T* grp);
 static int write_var_meta(NC_FILE_INFO_T* file, NCZ_FILE_INFO_T* zfile, NCZMAP* map, NC_VAR_INFO_T* var);
 static int write_var(NC_FILE_INFO_T* file, NCZ_FILE_INFO_T* zfile, NCZMAP* map, NC_VAR_INFO_T* var);
-static int build_atts(NC_FILE_INFO_T* file, NCZ_FILE_INFO_T* zfile, NCZMAP* map, NC_OBJ* container, NCindex* attlist, NCjson**, NCjson**);
+static int build_atts(NC_FILE_INFO_T* file, NCZ_FILE_INFO_T* zfile, NCZMAP* map, NC_OBJ* container, NCindex* attlist, NCjson**);
 
 static int read_superblock(NC_FILE_INFO_T* file, int* nczarrvp);
 static int read_grp(NC_FILE_INFO_T* file, NC_GRP_INFO_T* grp);
@@ -143,7 +143,6 @@ write_grp(NC_FILE_INFO_T* file, NCZ_FILE_INFO_T* zfile, NCZMAP* map, NC_GRP_INFO
     NCjson* jsuper = NULL;
     NCjson* jtmp = NULL;
     NCjson* jatts = NULL;
-    NCjson* jtypes = NULL;
 
     ZTRACE(3,"file=%s grp=%s isclose=%d",file->controller->path,grp->hdr.name,isclose);
 
@@ -218,7 +217,7 @@ write_grp(NC_FILE_INFO_T* file, NCZ_FILE_INFO_T* zfile, NCZMAP* map, NC_GRP_INFO
 
     /* Build and write the Z2ATTRS object */
     assert(grp->att);
-    if((stat = build_atts(file,zfile,map,(NC_OBJ*)grp, grp->att,&jatts,&jtypes)))goto done;
+    if((stat = build_atts(file,zfile,map,(NC_OBJ*)grp, grp->att,&jatts)))goto done;
     /* write .zattrs path */
     if((stat = nczm_concat(fullpath,Z2ATTRS,&key))) goto done;
     /* Write to map */
@@ -276,7 +275,6 @@ write_var_meta(NC_FILE_INFO_T* file, NCZ_FILE_INFO_T* zfile, NCZMAP* map, NC_VAR
     NCjson* jtmp = NULL;
     NCjson* jfill = NULL;
     NCjson* jatts = NULL;
-    NCjson* jtypes = NULL;
     char* dtypename = NULL;
     int purezarr = 0;
     size64_t shape[NC_MAX_VAR_DIMS];
@@ -505,7 +503,7 @@ write_var_meta(NC_FILE_INFO_T* file, NCZ_FILE_INFO_T* zfile, NCZMAP* map, NC_VAR
 
     /* Build and write .zattrs object */
     assert(var->att);
-    if((stat = build_atts(file,zfile,map,(NC_OBJ*)var, var->att,&jatts,&jtypes)))goto done;
+    if((stat = build_atts(file,zfile,map,(NC_OBJ*)var, var->att,&jatts)))goto done;
     /* write .zattrs path */
     if((stat = nczm_concat(fullpath,Z2ATTRS,&key))) goto done;
     /* Write to map */
@@ -567,7 +565,7 @@ done:
  * @author Dennis Heimbigner
  */
 static int
-build_atts(NC_FILE_INFO_T* file, NCZ_FILE_INFO_T* zfile, NCZMAP* map, NC_OBJ* container, NCindex* attlist, NCjson** jattsp, NCjson** jtypesp)
+build_atts(NC_FILE_INFO_T* file, NCZ_FILE_INFO_T* zfile, NCZMAP* map, NC_OBJ* container, NCindex* attlist, NCjson** jattsp)
 {
     int i,stat = NC_NOERR;
     NCjson* jatts = NULL;
@@ -744,7 +742,7 @@ build_atts(NC_FILE_INFO_T* file, NCZ_FILE_INFO_T* zfile, NCZMAP* map, NC_OBJ* co
     }
 
     if(jattsp) {*jattsp = jatts; jatts = NULL;}
-    if(jtypesp) {*jtypesp = jtypes; jtypes = NULL;}
+//    if(jtypesp) {*jtypesp = jtypes; jtypes = NULL;}
 done:
     nullfree(fullpath);
     nullfree(key);

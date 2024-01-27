@@ -795,8 +795,10 @@ nc4_var_set_ndims(NC_VAR_INFO_T *var, int ndims)
     /* Allocate space for dimension information. */
     if (ndims)
     {
+	if(var->dim != NULL) free(var->dim);
 	if (!(var->dim = calloc(ndims, sizeof(NC_DIM_INFO_T *))))
             return NC_ENOMEM;
+	if(var->dimids != NULL) free(var->dimids);
         if (!(var->dimids = calloc(ndims, sizeof(int))))
             return NC_ENOMEM;
 

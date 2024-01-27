@@ -1249,7 +1249,6 @@ NCZ_computeattrdata(nc_type typehint, nc_type* typeidp, const NCjson* values, si
     size_t typelen;
     nc_type typeid = NC_NAT;
     NCjson* jtext = NULL;
-    int reclaimvalues = 0;
     int isjson = 0; /* 1 => json valued attribute */
     int count = 0; /* no. of attribute values */
 
@@ -1270,15 +1269,15 @@ NCZ_computeattrdata(nc_type typehint, nc_type* typeidp, const NCjson* values, si
 	/* Apply the JSON attribute convention and convert to JSON string */
 	typeid = NC_CHAR;
 	if((stat = NCZ_json_convention_read(values,&jtext))) goto done;
-	values = jtext; jtext = NULL;
-	reclaimvalues = 1;
+        /* Convert the JSON attribute values to the actual netcdf attribute bytes */
+        if((stat = NCZ_attr_convert(jtext,typeid,typelen,&count,buf))) goto done;
+    } else {
+        /* Convert the JSON attribute values to the actual netcdf attribute bytes */
+        if((stat = NCZ_attr_convert(values,typeid,typelen,&count,buf))) goto done;
     }
 
     if((stat = NC4_inq_atomic_type(typeid, NULL, &typelen)))
 	goto done;
-
-    /* Convert the JSON attribute values to the actual netcdf attribute bytes */
-    if((stat = NCZ_attr_convert(values,typeid,typelen,&count,buf))) goto done;
 
     if(typelenp) *typelenp = typelen;
     if(typeidp) *typeidp = typeid; /* return possibly inferred type */
@@ -1287,7 +1286,7 @@ NCZ_computeattrdata(nc_type typehint, nc_type* typeidp, const NCjson* values, si
 
 done:
     ncbytesfree(buf);
-    if(reclaimvalues) NCJreclaim((NCjson*)values); /* we created it */
+    NCJreclaim(jtext); /* we created it */
     return ZUNTRACEX(THROW(stat),"typelen=%d count=%u",(typelenp?*typelenp:0),(countp?*countp:-1));
 }
 
