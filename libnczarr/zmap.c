@@ -5,6 +5,7 @@
 
 #include "zincludes.h"
 #include <stdarg.h>
+#include <stddef.h>
 #include "ncpathmgr.h"
 
 /**************************************************/
@@ -222,7 +223,7 @@ int
 nczm_join(NClist* segments, char** pathp)
 {
     int stat = NC_NOERR;
-    int i;
+    size_t i;
     NCbytes* buf = NULL;
 
     if(segments == NULL)
@@ -508,6 +509,7 @@ done:
     nullfree(base);
     return THROW(stat);    
 }
+
 
 
 /* Remove a given prefix from the front of each given key */
