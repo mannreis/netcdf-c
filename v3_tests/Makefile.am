@@ -27,6 +27,8 @@ DISTCLEANFILES += ${FILES} ${ALLBUILTSRC} ${ALLBUILTSCRIPTS}
 BUILT_SOURCES += ${FILES}
 
 ${FILES}:
+	echo "ALLSRC=${ALLSRC}"
+	echo "FILES=${FILES}"
 	for u in $@ ; do cp -f ${top_srcdir}/nczarr_test/$$u $(top_srcdir)/v3_tests ;  done 
 
 # If valgrind is present, add valgrind targets.

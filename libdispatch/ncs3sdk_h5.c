@@ -704,8 +704,8 @@ parse_listbucketresult(char* xml, unsigned long long xmllen, struct LISTOBJECTSV
     if(resultp) {*resultp = result; result = NULL;}
 
 done:
-    if(result) reclaim_listobjectsv2(result);
     if(doc) ncxml_free(doc);
+    if(result) reclaim_listobjectsv2(result);
     return NCTHROW(stat);
 }
 
