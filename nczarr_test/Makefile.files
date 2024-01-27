@@ -1,0 +1,155 @@
+ALLSRC =
+ALLBUILTSRC =
+ALLBUILTSCRIPTS =
+ALLV3SCRIPTS =
+ALLV2SCRIPTS =
+ALLSCRIPTS =
+ALLBASELINE =
+ALLV3BASELINE =
+ALLV2BASELINE =
+
+ALLSCRIPTS += test_nczarr.sh
+
+ALLSRC += test_utils.c test_utils.h
+ALLSRC += ut_util.c ut_test.c ut_includes.h ut_test.h ut_util.h test_nczarr_utils.h
+
+ALLSRC += ut_map.c ut_mapapi.c ut_json.c
+ALLSRC += test_fillonlyz.c test_notzarr.c
+ALLBUILTSRC += test_quantize.c
+
+# Unlimited Dimension tests
+if USE_HDF5
+ALLSRC += test_zchunks.c test_zchunks2.c test_zchunks3.c
+ALLSRC += test_unlim_io.c
+ALLBUILTSRC += test_unlim_vars.c test_put_vars_two_unlim_dim.c
+endif
+
+if BUILD_UTILITIES
+
+ALLSCRIPTS += run_ut_misc.sh
+ALLSCRIPTS += run_ut_map.sh
+ALLSCRIPTS += run_ut_mapapi.sh
+ALLSCRIPTS += run_ncgen4.sh run_nan.sh
+ALLSCRIPTS += run_quantize.sh
+ALLSCRIPTS += run_purezarr.sh
+ALLSCRIPTS += run_misc.sh
+ALLSCRIPTS += run_jsonconvention.sh
+ALLSCRIPTS += run_strings.sh
+ALLSCRIPTS += run_scalar.sh
+ALLSCRIPTS += run_nulls.sh
+ALLSCRIPTS += run_notzarr.sh
+
+# Unlimited Dimension tests (at least in part)
+ALLBUILTSCRIPTS += run_mud.sh
+
+if USE_HDF5
+ALLBUILTSRC += test_chunking.c
+ALLBUILTSCRIPTS += run_nccopy5.sh
+endif
+
+if USE_HDF5
+ALLSCRIPTS += run_unlim_io.sh run_nccopyz.sh
+endif
+
+if LARGE_FILE_TESTS
+ALLSRC += test_writecaching.c test_readcaching.c
+ALLSCRIPTS += run_cachetest.sh
+endif
+
+if ENABLE_NCZARR_ZIP
+ALLSCRIPTS += run_newformat.sh
+endif
+
+if LARGE_FILE_TESTS
+ALLSRC += test_chunkcases.c
+ALLSCRIPTS += run_chunkcases.sh
+endif
+
+ALLBUILTSRC += test_endians.c
+
+if USE_HDF5
+ALLSCRIPTS += run_fillonlyz.sh
+endif
+
+if BUILD_BENCHMARKS
+ALLSRC += bm_utils.c timer_utils.c test_utils.c bm_utils.h bm_timer.h
+ALLSRC += bm_chunks3.c
+endif # BUILD_BENCHMARKS
+
+if ENABLE_NCZARR_FILTERS
+if ENABLE_FILTER_TESTING
+
+ALLSRC += test_filter_avail.c
+ALLBUILTSRC += test_filter_vlen.c
+ALLBUILTSCRIPTS += run_filter_vlen.sh run_filter_misc.sh
+
+ALLSRC += test_nczfilter.c
+ALLSCRIPTS += run_nczfilter.sh
+
+# Echo filter tests from nc_test4
+ALLSRC += testfilter.c testfilter_misc.c testfilter_order.c testfilter_repeat.c testfilter_multi.c
+ALLSCRIPTS += run_filter.sh 
+ALLBUILTSCRIPTS += run_specific_filters.sh
+
+endif #ENABLE_FILTER_TESTING
+endif #ENABLE_NCZARR_FILTERS
+
+endif #BUILD_UTILITIES
+
+# These programs are used by the test cases
+ALLSRC += zhex.c
+ALLSRC += zisjson.c
+ALLSRC += zmapio.c
+ALLSRC += zs3parse.c
+
+if ENABLE_S3
+ALLSRC += s3util.c
+if ENABLE_S3_TESTALL
+if ENABLE_S3_AWS
+ALLSRC += tst_pure_awssdk.cpp
+endif 	
+endif
+endif
+
+if ENABLE_NCDUMPCHUNKS
+ALLSRC += ncdumpchunks.c
+endif
+
+# V3 specific versions of files
+ALLV3BASELINE += ref_nczarr2zarr.cdl ref_purezarr.cdl ref_xarray.cdl ref_misc2.cdl \
+   	        ref_jsonconvention.cdl ref_jsonconvention.zmap \
+		ref_nulls_zarr.baseline ref_string_zarr.baseline ref_string_nczarr.baseline \
+		ref_zarr_test_data_2d.cdl.gz \
+		ref_groups_regular.cdl ref_tst_nans.dmp ref_bzip2.cdl ref_filtered.cdl \
+		ref_any.cdl ref_multi.cdl
+
+# V2 only
+ALLV2BASELINE += ref_noshape.file.zip ref_power_901_constants.cdl ref_power_901_constants_orig.zip
+
+# Excludes ALLV3BASELINE
+ALLBASELINE += \
+ref_avail1.cdl ref_avail1.dmp ref_avail1.txt \
+ref_byte.cdl ref_byte_fill_value_null.cdl ref_byte_fill_value_null.zarr.zip ref_byte.zarr.zip \
+ref_fillonly.cdl \
+ref_groups.h5 \
+ref_misc1.cdl ref_misc1.dmp \
+ref_ndims.cdl ref_ndims.dmp \
+ref_newformatpure.cdl \
+ref_notzarr.tar.gz \
+ref_nulls.cdl ref_nulls_nczarr.baseline \
+ref_oldformat.cdl ref_oldformat.zip \
+ref_perdimspecs.cdl \
+ref_purezarr_base.cdl \
+ref_quotes.cdl ref_quotes_orig.zip \
+ref_rem.cdl ref_rem.dmp \
+ref_scalar.cdl \
+ref_skip.cdl ref_skip.txt ref_skipw.cdl \
+ref_string.cdl \
+ref_t_meta_dim1.cdl ref_t_meta_var1.cdl \
+ref_ut_json_build.txt ref_ut_json_parse.txt \
+ref_ut_mapapi_create.cdl ref_ut_mapapi_data.cdl ref_ut_mapapi_meta.cdl ref_ut_mapapi_search.txt \
+ref_ut_map_create.cdl ref_ut_map_readmeta2.txt ref_ut_map_readmeta.txt ref_ut_map_search.txt ref_ut_map_writedata.cdl ref_ut_map_writemeta2.cdl ref_ut_map_writemeta.cdl \
+ref_ut_proj.txt \
+ref_ut_testmap_create.cdl \
+ref_whole.cdl ref_whole.txt \
+ref_zarr_test_data.cdl.gz
