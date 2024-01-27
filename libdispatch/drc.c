@@ -4,6 +4,7 @@ See COPYRIGHT for license information.
 */
 
 #include "config.h"
+#include <stddef.h>
 #ifdef HAVE_UNISTD_H
 #include <unistd.h>
 #endif
@@ -193,7 +194,7 @@ rcfreeentry(NCRCentry* t)
 static void
 rcfreeentries(NClist* rc)
 {
-    int i;
+    size_t i;
     for(i=0;i<nclistlength(rc);i++) {
 	NCRCentry* t = (NCRCentry*)nclistget(rc,i);
 	rcfreeentry(t);
@@ -205,7 +206,8 @@ rcfreeentries(NClist* rc)
 static int
 NC_rcload(void)
 {
-    int i,ret = NC_NOERR;
+    size_t i;
+    int ret = NC_NOERR;
     char* path = NULL;
     NCglobalstate* globalstate = NULL;
     NClist* rcfileorder = nclistnew();
@@ -386,8 +388,8 @@ rctrim(char* text)
 static void
 rcorder(NClist* rc)
 {
-    int i;
-    int len = nclistlength(rc);
+    size_t i;
+    size_t len = nclistlength(rc);
     NClist* tmprc = NULL;
     if(rc == NULL || len == 0) return;
     tmprc = nclistnew();
@@ -585,7 +587,7 @@ rcequal(NCRCentry* e1, NCRCentry* e2)
 static int
 rclocatepos(const char* key, const char* hostport, const char* urlpath)
 {
-    int i;
+    size_t i;
     NCglobalstate* globalstate = NC_getglobalstate();
     struct NCRCinfo* info = globalstate->rcinfo;
     NCRCentry* entry = NULL;
@@ -601,7 +603,7 @@ rclocatepos(const char* key, const char* hostport, const char* urlpath)
 
     for(i=0;i<nclistlength(rc);i++) {
       entry = (NCRCentry*)nclistget(rc,i);
-      if(rcequal(entry,&candidate)) return i;
+      if(rcequal(entry,&candidate)) return (int)i;
     }
     return -1;
 }
@@ -743,4 +745,3 @@ storedump(char* msg, NClist* entries)
     fflush(stderr);
 }
 #endif
-

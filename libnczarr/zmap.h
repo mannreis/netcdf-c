@@ -176,6 +176,7 @@ of the implementation.
 #define ZMAP_H
 
 #include "ncexternl.h"
+#include <stddef.h>
 
 #define NCZM_SEP "/"
 
