@@ -11,7 +11,7 @@ TESTS =
 check_PROGRAMS =
 
 # Following files are V3 specific versions
-V3FILES = ${ALLV3BASELINE} ${ALLV3SCRIPTS}
+V3FILES = ${DISTV3BASELINE} ${DISTV3SCRIPTS}
 
 include $(top_srcdir)/nczarr_test/Makefile.files
 include $(top_srcdir)/nczarr_test/Makefile.core
@@ -20,15 +20,13 @@ AM_TESTS_ENVIRONMENT += export NCZARRFORMAT=3;
 
 EXTRA_DIST += CMakeLists.txt ${V3FILES}
 
-FILES = ${ALLSRC} ${ALLSCRIPTS} ${ALLBASELINE} findplugin.sh
+FILES = ${DISTSRC} ${DISTSCRIPTS} ${DISTBASELINE} findplugin.sh
 
-DISTCLEANFILES += ${FILES} ${ALLBUILTSRC} ${ALLBUILTSCRIPTS}
+DISTCLEANFILES += ${FILES} ${DISTBUILTSRC} ${DISTBUILTSCRIPTS}
 
 BUILT_SOURCES += ${FILES}
 
 ${FILES}:
-	echo "ALLSRC=${ALLSRC}"
-	echo "FILES=${FILES}"
 	for u in $@ ; do cp -f ${top_srcdir}/nczarr_test/$$u $(top_srcdir)/v3_tests ;  done 
 
 # If valgrind is present, add valgrind targets.

@@ -330,7 +330,6 @@ objdump(void)
     char* obj = NULL;
     char* content = NULL;
     size_t depth = 0;
-    size_t padlen = 0;
 
     if((stat=nczmap_open(dumpoptions.impl, dumpoptions.infile, NC_NOCLOBBER, 0, NULL, &map)))
         goto done;
@@ -367,7 +366,7 @@ objdump(void)
 	    assert(content != NULL);
 	    if(kind == OK_CHUNK)
 		len = ceildiv(len,dumpoptions.nctype->typesize);
-	    printf("[%d] %s : (%llu)",depth,obj,len);
+	    printf("[%zu] %s : (%llu)",depth,obj,len);
 	    if(kind == OK_CHUNK &&  dumpoptions.nctype->nctype != NC_STRING)
 		printf(" (%s)",dumpoptions.nctype->typename);
 	    printf(" |");
