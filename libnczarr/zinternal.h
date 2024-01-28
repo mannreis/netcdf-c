@@ -97,11 +97,8 @@ Inserted into any .zattrs ? or should it go into the container?
 Inserted into root group zarr.json as an extra attribute.
 _nczarr_superblock: {
     "version": 3.0.0,    
-    "format": 3,
+    "format": 3
 }
-
-Optionally Inserted into any group zarr.json as an extra attribute.
-"_nczarr_attrs": {\"attribute_types\": [{\"name\": \"attr1\", \"configuration\": {\"type\": \"<dtype>\"}}, ...]}
 
 Optionally inserted into any group zarr.json as an attribute:
 "_nczarr_group": "{
@@ -111,12 +108,31 @@ Optionally inserted into any group zarr.json as an attribute:
 }"
 
 Optionally Inserted into any array zarr.json as an attribute:
+````
 "_nczarr_array": "{
-\"dimensions_references\": [\"/g1/g2/d1\", \"/d2\",...],
+\"dimension_references\": [\"/g1/g2/d1\", \"/d2\",...],
 \"type_alias\": "<string indicating special type aliasing>" // optional
 }"
+````
+The *dimension_references* key is an expansion of the "dimensions" key
+found in the *zarr.json* object for an array.
+The problem with "dimensions" is that it specifies a simple name for each
+dimension, whereas netcdf-4 requires that the array references dimension objects
+that may appear in groups anywhere in the file. These references are encoded
+as FQNs "pointing" to a specific dimension declaration (see *_nczarr_group* attribute
+defined previously).
 
-The "type-alias key is used to signal ambiguous dtypes.
+FQN is an acronym for "Fully Qualified Name".
+It is a series of names separated by the "/" character, much
+like a file system path.
+It identifies the group in which the dimension is ostensibly "defined" in the Netcdf sense.
+For example ````/d1```` defines a dimension "d1" defined in the root group.
+Similarly ````/g1/g2/d2```` defines a dimension "d2" defined in the
+group g2, which in turn is a subgroup of group g1, which is a subgroup
+of the root group.
+
+The *type-alias* key is used to annotate the type of an array
+to allow discovery of netcdf-4 specific types.
 Specifically, there are three current cases:
 | dtype | type_alias |
 | ----- | ---------- |
@@ -124,8 +140,16 @@ Specifically, there are three current cases:
 | rn    | string     |
 | uint8 | json       |
 
-Optionally Inserted into any array zarr.json as an extra attribute.
+If, for example, an array's dtype is specified as *uint8*, then it may be that
+it is actually of unsigned 8-bit integer type. But it may actually be of some
+netcdf-4 type that is encoded as *uint8* in order to be recognized by other -- pure zarr--
+implementations. So, for example, if the netcdf-4 type is *char*, then the array's
+dtype is *uint8*, but its type alias is *char*.
+
+
+Optionally Inserted into any group zarr.json or array zarr.json is the extra attribute.
 "_nczarr_attrs": {\"attribute_types\": [{\"name\": \"attr1\", \"configuration\": {\"type\": \"<dtype>\"}}, ...]}
+
 */
 
 #define NCZ_V2_SUPERBLOCK "_nczarr_superblock"

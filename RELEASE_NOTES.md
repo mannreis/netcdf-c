@@ -7,6 +7,7 @@ This file contains a high-level description of this package's evolution. Release
 
 ## 4.9.3 - TBD
 
+* Add experimental support for the Zarr Version 3 storage format. This code willl change as the Zarr Version 3 Specification evolves.
 * Added infrastructure to allow for `CMAKE_UNITY_BUILD`, (thanks \@jschueller).  See [Github #2839](https://github.com/Unidata/netcdf-c/pull/2839) for more information.
 * [cmake] Move dependency management out of the root-level `CMakeLists.txt` into two different files in the `cmake/` folder, `dependencies.cmake` and `netcdf_functions_macros.cmake`. See [Github #2838](https://github.com/Unidata/netcdf-c/pull/2838/) for more information.
 * Fix some problems in handling S3 urls with missing regions. See [Github #2819](https://github.com/Unidata/netcdf-c/pull/2819).

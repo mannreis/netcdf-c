@@ -708,14 +708,13 @@ The content of these objects is the same as the contents of the corresponding ke
 # Appendix F. Zarr Version 3: NCZarr Version 3 Meta-Data Representation. {#nczarr_version3}
 
 For Zarr version 3, the added NCZarr specific metadata is stored in a different way than in Zarr version 2.
-Specifically, the following Netcdf information needs to be captured by NCZarr:
+Specifically, the following Netcdf-4 meta-data information needs to be captured by NCZarr:
     1. Shared dimensions: name and size.
     2. Unlimited dimensions: which dimensions are unlimited.
     3. Attribute types.
-    4. Netcdf types not included in Zarr: currently only "char".
+    4. Netcdf types not included in Zarr: currently "char" and "string".
     5. Zarr types not included in Netcdf: currently only "complex(32|64)"
-As with NCZarr version 2, the above information is captured by adding special dictionary keys in various locations
-in the standard Zarr version 3 objects.
+This extra netcdfd-4 meta-data to attributes so as to not interfere with existing implementations.
 
 ## Supported Types
 Zarr version 3 supports the following "atomic" types:
@@ -725,16 +724,15 @@ It also defines two structured type: complex64 and complex128.
 NCZarr supports all of the atomic types.
 Specialized support is provided for the following
 Netcdf types: char, string.
-Specialized support is also provided for the following
-Zarr types: bool, complex64.
-The type complex128 is not supported.
+The Zarr types bool and  complex64 are not yet supported, but will be added shortly.
+The type complex128 is not supported at all.
 
-The Zarr type "bool" appears in the netcdf types as
+The Zarr type "bool" will appear in the netcdf types as
 the enum type "_bool" whose netcdf declaration is as follows:
 ````
 ubyte enum _bool_t {FALSE=0, TRUE=1};
 ````
-The type complex64 is supported by by defining this compound type:
+The type complex64 will be supported by by defining this compound type:
 ````
 compound _Complex64_t { float64 i; float64 j;}
 ````
@@ -749,25 +747,52 @@ and its maximum size is specified.
 So, the Netcdf types "char" and "string" are stored
 in the Zarr file as of type "uint8" and "r<8*n>", respectively
 where _n_ is the maximum length of the string in bytes (not characters).
-The fact that they represent "char" and "string" is encoded in the "_nczarr_array" key (see below).
+The fact that they represent "char" and "string" is encoded in the "_nczarr_array" attribute (see below).
 
 ## NCZarr Superblock
-The primary repository for NCZarr metadata is in the _zarr.info_ object in the root group of the Zarr file.
-Within that object, the following Dictionary key and corresponding JSON value is stored.
+The *_nczarr_superblock* attribute is used as a useful marker to signal that a file is in fact NCZarr as opposed to Zarr.
+This attribute is stored in the *zarr.info* attributes in the root group of the Zarr file.
+The relevant attribute has the following format:
 ````
 "_nczarr_superblock": {
-    "nczarr_format": "3.0.0",
-    "dimensions": {
-        "<FQN>": {"size": <integer>, "unlimited": 1|0}, "<FQN>": {"size": <integer>, "unlimited": 1|0} ...
-    },
-    "groups": ["<FQN>", "<FQN>", ...],
-    "arrays": ["<FQN>", "<FQN>", ...],
+    "version": "3.0.0",
+    format": 3
 }
 ````
-The "dimensions" key holds information about all the shared dimensions across
-all groups. This aggregation improves performance by not requiring all groups
-to be searched looking for dimension information.
-Similarly, the gross structure of the subgroups and variables (aka arrays) is captured.
+## Group Annotations
+The optional *_nczarr_group* attribute is stored in the attributes of a Zarr group within
+the *zarr.json* object in that group.
+The relevant attribute has the following format:
+````
+"_nczarr_group": {
+\"dimensions\": [{name: <dimname>, size: <integer>, unlimited: 1|0},...],
+\"arrays\": ["<name>",...],
+\"subgroups\": ["<name>",...]
+}
+````
+Its purpose is two-fold:
+1. record the objects immediately within that group
+2. define netcdf-4 dimenension objects within that group.
+
+## Array Annotations
+In order to support Netcdf concepts in Zarr, it may be necessary
+to annotate a Zarr array with extra information.
+The optional *_nczarr_array* attribute is stored in the attributes of a Zarr array within
+the *zarr.json* object in that array.
+The relevant attribute has the following format:
+````
+"_nczarr_array": {
+\"dimension_references\": [\"/g1/g2/d1\", \"/d2\",...],
+\"type_alias\": "<string indicating special type aliasing>" // optional
+}
+````
+The *dimension_references* key is an expansion of the "dimensions" key
+found in the *zarr.json* object for an array.
+The problem with "dimensions" is that it specifies a simple name for each
+dimension, whereas netcdf-4 requires that the array references dimension objects
+that may appear in groups anywhere in the file. These references are encoded
+as FQNs "pointing" to a specific dimension declaration (see *_nczarr_group* attribute
+defined previously).
 
 FQN is an acronym for "Fully Qualified Name".
 It is a series of names separated by the "/" character, much
@@ -778,22 +803,22 @@ Similarly ````/g1/g2/d2```` defines a dimension "d2" defined in the
 group g2, which in turn is a subgroup of group g1, which is a subgroup
 of the root group.
 
-## Array Annotations
-In order to support Netcdf concepts in Zarr, it may be necessary
-to annotate a Zarr array with extra information.
-The form this takes is to add the following key and JSON value
-to the _zarr.info_ array object.
-````
-"_nczarr_array": {
-    "nczarr_format": "3.0.0",
-    "nczarr_type: "char"|"string"
-    }
-}
-````
-The "nczarr_type"_ key indicates how to re-interpret
-the array's type as a corresponding NCZarr/Netcdf type.
+The *type-alias* key is used to annotate the type of an array
+to allow discovery of netcdf-4 specific types.
+Specifically, there are three current cases:
+| dtype | type_alias |
+| ----- | ---------- |
+| uint8 | char       |
+| rn    | string     |
+| uint8 | json       |
 
-## Attribute Typing
+If, for example, an array's dtype is specified as *uint8*, then it may be that
+it is actually of unsigned 8-bit integer type. But it may actually be of some
+netcdf-4 type that is encoded as *uint8* in order to be recognized by other -- pure zarr--
+implementations. So, for example, if the netcdf-4 type is *char*, then the array's
+dtype is *uint8*, but its type alias is *char*.
+
+## Attribute Type Annotation
 In Zarr version 2, attributes are stored in a separate _.zattr_ object.
 In Zarr version 3, group and array attributes are now stored inside
 the corresponding _zarr.info_. object under the dictionary key "attributes".
@@ -801,24 +826,27 @@ Note that this decision is still under discussion and it may be changed
 to store attributes in an object separate from _zarr.info_.
 
 Regardless of where the attributes are stored, and in order to
-support Netcdf typed attributes, the per-attribute information
+support netcdf-4 typed attributes, the per-attribute information
 is stored as a special attribute called _\_nczarr_attrs\__ defined to hold
 NCZarr specific attribute information. Currently, it only holds
 the attribute typing information.
+It can appear in any *zarr.json* object: group or array.
 
-Its JSON form is this:
+Its form is this:
 ````
 "_nczarr_attrs": {
-    "nczarr_format": "3.0.0",
-    {"types": {
-        "<attr name>": <type>,
-        "<attr name>": <type>,
-        ...
-    }
+    "attribute_types": [
+        {"name": "attr1", "configuration": {"type": "<dtype>"}},
+	...
+	]
 }
 ````
-There is one entry for every regular attribute giving the type
+There is one entry for every attribute (including itself) giving the type
 of that attribute.
+It should be noted that Zarr allows the value of an attribute to be an arbitrary
+JSON-encoded structure. In order to support this in netcdf-4, is such a structure
+is encountered as an attribute value, then it typed as *json* (see previously
+described table).
 
 ## Codec Specification
 The Zarr version 3 representation of codecs is slightly different
@@ -840,7 +868,7 @@ intended to be a detailed chronology. Rather, it provides highlights
 that will be of interest to NCZarr users. In order to see exact changes,
 It is necessary to use the 'git diff' command.
 
-## 11/02/2023
+## 01/31/2024
 1. Add description of support for Zarr version 3 as an appendix.
 
 ## 3/10/2023
@@ -862,4 +890,4 @@ include arbitrary JSON expressions; see Appendix D for more details.
 __Author__: Dennis Heimbigner<br>
 __Email__: dmh at ucar dot edu<br>
 __Initial Version__: 4/10/2020<br>
-__Last Revised__: 11/01/2023
+__Last Revised__: 01/31/2024
