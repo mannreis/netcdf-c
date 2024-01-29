@@ -2271,8 +2271,10 @@ AC_CONFIG_FILES([nc_perf/run_par_bm_test.sh], [chmod ugo+x nc_perf/run_par_bm_te
 AC_CONFIG_FILES([nc_perf/run_gfs_test.sh], [chmod ugo+x nc_perf/run_gfs_test.sh])
 AC_CONFIG_FILES([examples/C/run_par_test.sh], [chmod ugo+x examples/C/run_par_test.sh])
 AC_CONFIG_FILES([nc-config], [chmod 755 nc-config])
-# Config and copy into nczarr_test
+# Config and copy into nczarr_test/v3_tests
 AC_CONFIG_FILES(nczarr_test/findplugin.sh:nc_test4/findplugin.in, [chmod ugo+x nczarr_test/findplugin.sh])
+AC_CONFIG_FILES(v3_tests/findplugin.sh:nc_test4/findplugin.in, [chmod ugo+x v3_tests/findplugin.sh])
+
 for fp in unit_test/timer_utils.h unit_test/timer_utils.h unit_test/timer_utils.c nc_test4/test_filter.c nc_test4/test_filter_misc.c nc_test4/tst_multifilter.c nc_test4/test_filter_repeat.c nc_test4/test_filter_order.c ; do
   FN=`basename $fp`
   AC_CONFIG_FILES(nczarr_test/${FN}:${fp})
