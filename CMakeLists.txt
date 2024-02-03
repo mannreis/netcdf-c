@@ -1813,8 +1813,15 @@ configure_file(${CMAKE_CURRENT_SOURCE_DIR}/s3gc.in ${CMAKE_CURRENT_BINARY_DIR}/s
 #####
 # Build and copy nc_test4/findplugin.sh to various places
 #####
-FOR(CC nc_test4 nczarr_test v3_nczarr_test plugins examples/C)
+for(CC nc_test4 nczarr_test v3_tests plugins examples/C)
     configure_file(${CMAKE_CURRENT_SOURCE_DIR}/nc_test4/findplugin.in ${CMAKE_CURRENT_BINARY_DIR}/${CC}/findplugin.sh @ONLY NEWLINE_STYLE LF)
+endforeach()
+
+#####
+# Copy test_nczarr.sh to various places
+#####
+for(CC nczarr_test v3_tests)
+    configure_file(${CMAKE_CURRENT_SOURCE_DIR}/nczarr_test/test_nczarr.in ${CMAKE_CURRENT_BINARY_DIR}/${CC}/test_nczarr.sh @ONLY NEWLINE_STYLE LF)
 ENDFOREACH()
 
 if(ENABLE_BENCHMARKS)

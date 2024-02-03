@@ -8,7 +8,7 @@
 if test "x$srcdir" = x ; then srcdir=`pwd`; fi
 . ../test_common.sh
 
-. "$srcdir/test_nczarr.sh"
+. "${builddir}/test_nczarr.sh"
 
 # Isolate both test and S3
 s3isolate "testdir_ncgen4"
@@ -47,7 +47,7 @@ fvclean() {
 
 difftest() {
 echo ""; echo "*** Test zext=$zext"
-for t in ${ALLTESTS} ; do
+for t in ${TESTS} ; do
    echo "*** Testing: ${t}"
    # determine if we need the specflag set
    # determine properties

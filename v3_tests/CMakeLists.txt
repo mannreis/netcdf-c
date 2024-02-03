@@ -5,29 +5,11 @@
 
 # See netcdf-c/COPYRIGHT file for more info.
 
-SET(abs_top_srcdir ${CMAKE_CURRENT_SOURCE_DIR})
+set(abs_top_srcdir ${CMAKE_CURRENT_SOURCE_DIR})
 
 remove_definitions(-DDLL_EXPORT)
 
-
 # Create nczarr tests from nc_test4 tests
-macro(NCZARR_SH_TEST basename src)
-FILE(READ ${CMAKE_CURRENT_SOURCE_DIR}/../${src}/tst_${basename}.sh SHSOURCE)
-# Make sure the order of prepended lines is correct
-STRING(PREPEND SHSOURCE "TESTNCZARR=1\n")
-STRING(PREPEND SHSOURCE "#!/bin/bash\n")
-# Replace with FILE(CONFIGURE) when cmake 3.18 is in common use
-FILE(WRITE ${CMAKE_CURRENT_BINARY_DIR}/run_${basename}.1 "${SHSOURCE}")
-CONFIGURE_FILE(${CMAKE_CURRENT_BINARY_DIR}/run_${basename}.1 ${CMAKE_CURRENT_BINARY_DIR}/run_${basename}.sh FILE_PERMISSIONS OWNER_WRITE OWNER_READ OWNER_EXECUTE @ONLY NEWLINE_STYLE LF)
-FILE(REMOVE ${CMAKE_CURRENT_BINARY_DIR}/run_${basename}.1)
-endmacro(NCZARR_SH_TEST)
-
-macro(NCZARR_C_TEST basename newname src)
-FILE(READ ${CMAKE_CURRENT_SOURCE_DIR}/../${src}/${basename}.c CSOURCE)
-STRING(PREPEND CSOURCE "#define TESTNCZARR\n")
-FILE(WRITE ${CMAKE_CURRENT_BINARY_DIR}/${newname}.c "${CSOURCE}")
-endmacro(NCZARR_C_TEST)
-
 NCZARR_C_TEST(tst_quantize test_quantize nc_test4)
 NCZARR_C_TEST(tst_filter_vlen test_filter_vlen nc_test4)
 NCZARR_C_TEST(tst_unlim_vars test_unlim_vars nc_test4)
@@ -43,30 +25,41 @@ NCZARR_SH_TEST(filter_vlen nc_test4)
 NCZARR_SH_TEST(mud ncdump)
 NCZARR_SH_TEST(nccopy5 ncdump)
 
-FILE(GLOB COPY_FILES ${CMAKE_CURRENT_SOURCE_DIR}/*.sh
+file(GLOB COPY_FILES ${CMAKE_CURRENT_SOURCE_DIR}/*.sh
 ${CMAKE_CURRENT_SOURCE_DIR}/ref*.cdl
 ${CMAKE_CURRENT_SOURCE_DIR}/ref*.txt
 ${CMAKE_CURRENT_SOURCE_DIR}/ref*.zmap)
 
-FILE(COPY ${COPY_FILES} DESTINATION ${CMAKE_CURRENT_BINARY_DIR}/ FILE_PERMISSIONS OWNER_WRITE OWNER_READ OWNER_EXECUTE)
+file(COPY ${COPY_FILES} DESTINATION ${CMAKE_CURRENT_BINARY_DIR}/ FILE_PERMISSIONS OWNER_WRITE OWNER_READ OWNER_EXECUTE)
 
-IF(USE_X_GETOPT)
-SET(XGETOPTSRC "${CMAKE_CURRENT_SOURCE_DIR}/../libdispatch/XGetopt.c")
-ENDIF()
+if(USE_X_GETOPT)
+set(XGETOPTSRC "${CMAKE_CURRENT_SOURCE_DIR}/../libdispatch/XGetopt.c")
+endif()
 
-IF(ENABLE_TESTS)
+# Built Sources that are copies from nczarr_test
+set(NCZARRFILES run_corrupt.sh run_external.sh run_interop.sh run_chunkcases.sh run_fillonlyz.sh run_filter.sh run_nccopyz.sh run_nczarr_fill.sh run_nczfilter.sh run_newformat.sh run_perf_chunks1.sh run_unlim_io.sh run_ut_map.sh run_ut_mapapi.sh run_ncgen4.sh run_quantize.sh run_purezarr.sh run_misc.sh run_jsonconvention.sh run_strings.sh run_scalar.sh run_nulls.sh run_notzarr.sh)
+
+set(NCZARRFILES ${NCZARRFILES} ref_noshape.file.zip ref_power_901_constants.cdl ref_power_901_constants_orig.zip ref_avail1.cdl ref_avail1.dmp ref_avail1.txt ref_byte.cdl ref_byte_fill_value_null.cdl ref_byte_fill_value_null.zarr.zip ref_byte.zarr.zip ref_fillonly.cdl ref_groups.h5 ref_misc1.cdl ref_misc1.dmp ref_ndims.cdl ref_ndims.dmp ref_newformatpure.cdl ref_notzarr.tar.gz ref_nulls.cdl ref_nulls_nczarr.baseline ref_oldformat.cdl ref_oldformat.zip ref_perdimspecs.cdl ref_purezarr_base.cdl ref_quotes.cdl ref_quotes_orig.zip ref_rem.cdl ref_rem.dmp ref_scalar.cdl ref_skip.cdl ref_skip.txt ref_skipw.cdl ref_string.cdl ref_t_meta_dim1.cdl ref_t_meta_var1.cdl ref_ut_json_build.txt ref_ut_json_parse.txt ref_ut_mapapi_create.cdl ref_ut_mapapi_data.cdl ref_ut_mapapi_meta.cdl ref_ut_mapapi_search.txt ref_ut_map_create.cdl ref_ut_map_readmeta2.txt ref_ut_map_readmeta.txt ref_ut_map_search.txt ref_ut_map_writedata.cdl ref_ut_map_writemeta2.cdl ref_ut_map_writemeta.cdl ref_ut_proj.txt ref_ut_testmap_create.cdl ref_whole.cdl ref_whole.txt ref_zarr_test_data.cdl.gz ref_bzip2.cdl ref_filtered.cdl)
+
+for(NZ ${NCZARRFILES})
+  file(COPY "${netCDF_SOURCE_DIR}/nczarr_test/${NZ}"
+      DESTINATION ${netCDF_BINARY_DIR}/v3_tests/${NZ}"
+      FILE_PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE)
+endforeach()
+
+if(ENABLE_TESTS)
 
   add_library(ut_util STATIC ut_util.c ut_test.c ut_includes.h ut_test.h ${XGETOPTSRC})
-  IF(ENABLE_DLL)
+  if(ENABLE_DLL)
     target_compile_definitions(ut_util PUBLIC -DDLL_EXPORT -DDLL_NETCDF)
-  ENDIF(ENABLE_DLL)
+  endif(ENABLE_DLL)
   target_include_directories(ut_util PUBLIC ../libnczarr ../plugins ${CMAKE_CURRENT_LIST_DIR})
   target_link_libraries(ut_util PUBLIC netcdf ${ALL_TLL_LIBS})
 
   add_library(test_utils STATIC test_utils.c test_utils.h ${XGETOPTSRC})
-  IF(ENABLE_DLL)
+  if(ENABLE_DLL)
     target_compile_definitions(test_utils PUBLIC -DDLL_EXPORT -DDLL_NETCDF)
-  ENDIF(ENABLE_DLL)
+  endif(ENABLE_DLL)
   target_include_directories(test_utils PUBLIC ../libnczarr ../plugins ${CMAKE_CURRENT_LIST_DIR})
   target_link_libraries(test_utils PUBLIC netcdf ${ALL_TLL_LIBS})
 
@@ -75,23 +68,6 @@ IF(ENABLE_TESTS)
     RUNTIME_OUTPUT_DIRECTORY_DEBUG ${CMAKE_CURRENT_BINARY_DIR}
     RUNTIME_OUTPUT_DIRECTORY_RELEASE ${CMAKE_CURRENT_BINARY_DIR}
   )
-
-  macro(build_bin_test_with_util_lib F UTIL_LIB)
-    build_bin_test(${F})
-    IF(ENABLE_DLL)
-      target_compile_definitions(${F} PUBLIC -DDLL_NETCDF)
-    ENDIF(ENABLE_DLL)
-    target_link_libraries(${F} ${UTIL_LIB} ${ALL_TLL_LIBS})
-  endmacro()
-
-  macro(add_bin_test_with_util_lib PREFIX F UTIL_LIB)
-    add_bin_test(${PREFIX} ${F})
-    IF(ENABLE_DLL)
-      target_compile_definitions(${PREFIX}_${F} PUBLIC -DDLL_NETCDF)
-    ENDIF(ENABLE_DLL)
-    target_link_libraries(${PREFIX}_${F} ${UTIL_LIB} ${ALL_TLL_LIBS})
-
-  endmacro()
 
   # Base tests
   # The tests are set up as a combination of shell scripts and executables that
@@ -109,7 +85,7 @@ IF(ENABLE_TESTS)
 #  ADD_BIN_TEST(nczarr_test test_endians ${TSTCOMMONSRC})
 
   # Unlimited Tests
-  IF(USE_HDF5)
+  if(USE_HDF5)
   add_bin_test_with_util_lib(nczarr_test test_unlim_vars test_utils)
   add_bin_test_with_util_lib(nczarr_test test_put_vars_two_unlim_dim test_utils)
   build_bin_test_with_util_lib(test_zchunks ut_util)
@@ -117,68 +93,68 @@ IF(ENABLE_TESTS)
   build_bin_test_with_util_lib(test_zchunks3 ut_util)
   build_bin_test_with_util_lib(test_unlim_io test_utils)
   build_bin_test_with_util_lib(test_chunking test_utils)
-  ADD_SH_TEST(nczarr_test run_nccopyz)
-  ADD_SH_TEST(nczarr_test run_unlim_io)
-  ADD_SH_TEST(nczarr_test run_nccopy5)
-  ADD_SH_TEST(nczarr_test run_mud)
-  ENDIF()
+  add_sh_test(nczarr_test run_nccopyz)
+  add_sh_test(nczarr_test run_unlim_io)
+  add_sh_test(nczarr_test run_nccopy5)
+  add_sh_test(nczarr_test run_mud)
+  endif()
   
-  IF(FALSE) # Obsolete tests
-      BUILD_BIN_TEST(ut_projections ${COMMONSRC})
-      BUILD_BIN_TEST(ut_chunking ${COMMONSRC})
-      BUILD_BIN_TEST(ut_walk ${COMMONSRC})
-  ENDIF()
+  if(FALSE) # Obsolete tests
+      build_bin_test(ut_projections ${COMMONSRC})
+      build_bin_test(ut_chunking ${COMMONSRC})
+      build_bin_test(ut_walk ${COMMONSRC})
+  endif()
 
   # Helper programs for testing
-  BUILD_BIN_TEST(zhex)
+  build_bin_test(zhex)
   build_bin_test_with_util_lib(zisjson ut_util)
-  TARGET_INCLUDE_DIRECTORIES(zisjson PUBLIC ../libnczarr)
+  target_include_directories(zisjson PUBLIC ../libnczarr)
   build_bin_test_with_util_lib(zs3parse ut_util)
-  TARGET_INCLUDE_DIRECTORIES(zs3parse PUBLIC ../libnczarr)
+  target_include_directories(zs3parse PUBLIC ../libnczarr)
   build_bin_test_with_util_lib(zmapio ut_util)
 
-  IF(ENABLE_S3 AND NOT WITH_S3_TESTING STREQUAL "NO")
+  if(ENABLE_S3 AND NOT WITH_S3_TESTING STREQUAL "NO")
   # Helper programs for testing
-    BUILD_BIN_TEST(s3util ${COMMONSRC})
+    build_bin_test(s3util ${COMMONSRC})
   # Pure AWS Test
-    IF(ENABLE_S3_AWS)
-      SET(TMP_CMAKE_CXX_STANDARD ${MAKE_CXX_STANDARD})
-      SET(CMAKE_CXX_STANDARD 11)
-      ADD_EXECUTABLE(tst_pure_awssdk tst_pure_awssdk.cpp)
-      TARGET_LINK_LIBRARIES(tst_pure_awssdk ${AWSSDK_CORE_LIB_FILE})
-      ADD_TEST(tst_pure_awssdk ${EXECUTABLE_PUTPUT_PATH}/tst_pure_awssdk)
-      SET(F tst_pure_awssdk)
-      IF(MSVC)
-        SET_PROPERTY(TEST ${F} PROPERTY FOLDER "tests/")
-        SET_TARGET_PROPERTIES(${F} PROPERTIES RUNTIME_OUTPUT_DIRECTORY
+    if(ENABLE_S3_AWS)
+      set(TMP_CMAKE_CXX_STANDARD ${MAKE_CXX_STANDARD})
+      set(CMAKE_CXX_STANDARD 11)
+      add_executable(tst_pure_awssdk tst_pure_awssdk.cpp)
+      target_link_libraries(tst_pure_awssdk ${AWSSDK_CORE_LIB_FILE})
+      add_test(tst_pure_awssdk ${EXECUTABLE_PUTPUT_PATH}/tst_pure_awssdk)
+      set(F tst_pure_awssdk)
+      if(MSVC)
+        set_property(TEST ${F} PROPERTY FOLDER "tests/")
+        set_target_properties(${F} PROPERTIES RUNTIME_OUTPUT_DIRECTORY
           ${CMAKE_CURRENT_BINARY_DIR})
-        SET_TARGET_PROPERTIES(${F} PROPERTIES RUNTIME_OUTPUT_DIRECTORY_DEBUG
+        set_target_properties(${F} PROPERTIES RUNTIME_OUTPUT_DIRECTORY_DEBUG
           ${CMAKE_CURRENT_BINARY_DIR})
-        SET_TARGET_PROPERTIES(${F} PROPERTIES RUNTIME_OUTPUT_DIRECTORY_RELEASE
+        set_target_properties(${F} PROPERTIES RUNTIME_OUTPUT_DIRECTORY_RELEASE
           ${CMAKE_CURRENT_BINARY_DIR})
-      ENDIF(MSVC)      
+      endif(MSVC)      
 
       SET(CMAKE_CXX_STANDARD ${TMP_CMAKE_CXX_STANDARD})
-    ENDIF(ENABLE_S3_AWS)
-    TARGET_INCLUDE_DIRECTORIES(s3util PUBLIC ../libnczarr)
+    endif(ENABLE_S3_AWS)
+    target_include_directories(s3util PUBLIC ../libnczarr)
   endif()
   
   if(ENABLE_NCDUMPCHUNKS)
     build_bin_test_with_util_lib(ncdumpchunks ut_util)
   endif()
 
-  IF(BUILD_UTILITIES)
+  if(BUILD_UTILITIES)
     add_sh_test(nczarr_test run_ut_map)
     add_sh_test(nczarr_test run_ut_mapapi)
     add_sh_test(nczarr_test run_ut_misc)
     add_sh_test(nczarr_test run_ncgen4)
     if(LARGE_FILE_TESTS)
-      BUILD_BIN_TEST(test_readcaching)
-      BUILD_BIN_TEST(test_writecaching)
-      BUILD_BIN_TEST(test_chunkcases ${TSTCOMMONSRC})
+      build_bin_test(test_readcaching)
+      build_bin_test(test_writecaching)
+      build_bin_test(test_chunkcases ${TSTCOMMONSRC})
       add_sh_test(nczarr_test run_cachetest)
       add_sh_test(nczarr_test run_chunkcases)
-    ENDIF()
+    endif()
 
     add_sh_test(nczarr_test run_purezarr)
     add_sh_test(nczarr_test run_misc)
@@ -194,14 +170,14 @@ IF(ENABLE_TESTS)
     # This has timeout under CMake
 #    if(NOT ISCMAKE)
       add_sh_test(nczarr_test run_interop)
-#    ENDIF()
+#    endif()
     
-    IF(USE_HDF5)
+    if(USE_HDF5)
     add_sh_test(nczarr_test run_fillonlyz)
-    ENDIF()
+    endif()
 
-  IF(ENABLE_NCZARR_FILTERS)
-  IF(ENABLE_FILTER_TESTING)
+  if(ENABLE_NCZARR_FILTERS)
+  if(ENABLE_FILTER_TESTING)
 	  build_bin_test(test_nczfilter)
   	  build_bin_test(test_filter_vlen)
 	  build_bin_test(testfilter)
@@ -209,31 +185,31 @@ IF(ENABLE_TESTS)
 	  build_bin_test(testfilter_multi)
 	  build_bin_test(testfilter_order)
 	  build_bin_test(testfilter_repeat)
-	  ADD_SH_TEST(nczarr_test run_nczfilter)
-	  ADD_SH_TEST(nczarr_test run_filter)
-	  ADD_SH_TEST(nczarr_test run_specific_filters)
-  	  ADD_SH_TEST(nczarr_test run_filter_vlen)
-	  IF(FALSE)
+	  add_sh_test(nczarr_test run_nczfilter)
+	  add_sh_test(nczarr_test run_filter)
+	  add_sh_test(nczarr_test run_specific_filters)
+  	  add_sh_test(nczarr_test run_filter_vlen)
+	  if(FALSE)
 	    # This test is too dangerous to run in a parallel make environment.
             # It causes race conditions. So suppress and only test by hand.
-            ADD_SH_TEST(nczarr_test run_unknown)
-	  ENDIF(FALSE)
-  ENDIF(ENABLE_FILTER_TESTING)
-  ENDIF(ENABLE_NCZARR_FILTERS)
+            add_sh_test(nczarr_test run_unknown)
+	  endif(FALSE)
+  endif(ENABLE_FILTER_TESTING)
+  endif(ENABLE_NCZARR_FILTERS)
 
   if(ENABLE_NCZARR_ZIP)
       add_sh_test(nczarr_test run_newformat)
       # Test various corrupted files
-      ADD_SH_TEST(nczarr_test run_corrupt.sh)
+      add_sh_test(nczarr_test run_corrupt.sh)
   endif()
 
-  IF(FALSE) # Obsolete tests
+  if(FALSE) # Obsolete tests
       add_sh_test(nczarr_test run_ut_chunk)
-  ENDIF()
+  endif()
 
-  ENDIF(BUILD_UTILITIES)
+  endif(BUILD_UTILITIES)
 
-ENDIF(ENABLE_TESTS)
+endif(ENABLE_TESTS)
 
 ## Specify files to be distributed by 'make dist'
 FILE(GLOB CUR_EXTRA_DIST RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_SOURCE_DIR}/*.c ${CMAKE_CURRENT_SOURCE_DIR}/*.h ${CMAKE_CURRENT_SOURCE_DIR}/*.sh ${CMAKE_CURRENT_SOURCE_DIR}/*.cdl)

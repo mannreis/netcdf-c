@@ -282,9 +282,9 @@ run_nccopy5.sh: $(top_srcdir)/ncdump/tst_nccopy5.sh
 	rm -f run_nccopy5.tmp
 
 # Built Sources that are copies over from nczarr_test
-NCZARRFILES += findplugin.sh run_corrupt.sh run_external.sh run_interop.sh run_chunkcases.sh run_fillonlyz.sh run_filter.sh run_nccopyz.sh run_nczarr_fill.sh run_nczfilter.sh run_newformat.sh run_perf_chunks1.sh run_unlim_io.sh test_nczarr.sh run_ut_map.sh run_ut_mapapi.sh run_ncgen4.sh run_quantize.sh run_purezarr.sh run_misc.sh run_jsonconvention.sh run_strings.sh run_scalar.sh run_nulls.sh run_notzarr.sh
+NCZARRFILES += run_corrupt.sh run_external.sh run_interop.sh run_chunkcases.sh run_fillonlyz.sh run_filter.sh run_nccopyz.sh run_nczarr_fill.sh run_nczfilter.sh run_newformat.sh run_perf_chunks1.sh run_unlim_io.sh run_ut_map.sh run_ut_mapapi.sh run_ncgen4.sh run_quantize.sh run_purezarr.sh run_misc.sh run_jsonconvention.sh run_strings.sh run_scalar.sh run_nulls.sh run_notzarr.sh
 
-NCZARRFILES += ref_noshape.file.zip ref_power_901_constants.cdl ref_power_901_constants_orig.zip ref_avail1.cdl ref_avail1.dmp ref_avail1.txt ref_byte.cdl ref_byte_fill_value_null.cdl ref_byte_fill_value_null.zarr.zip ref_byte.zarr.zip ref_fillonly.cdl ref_groups.h5 ref_misc1.cdl ref_misc1.dmp ref_ndims.cdl ref_ndims.dmp ref_newformatpure.cdl ref_notzarr.tar.gz ref_nulls.cdl ref_nulls_nczarr.baseline ref_oldformat.cdl ref_oldformat.zip ref_perdimspecs.cdl ref_purezarr_base.cdl ref_quotes.cdl ref_quotes_orig.zip ref_rem.cdl ref_rem.dmp ref_scalar.cdl ref_skip.cdl ref_skip.txt ref_skipw.cdl ref_string.cdl ref_t_meta_dim1.cdl ref_t_meta_var1.cdl ref_ut_json_build.txt ref_ut_json_parse.txt ref_ut_mapapi_create.cdl ref_ut_mapapi_data.cdl ref_ut_mapapi_meta.cdl ref_ut_mapapi_search.txt ref_ut_map_create.cdl ref_ut_map_readmeta2.txt ref_ut_map_readmeta.txt ref_ut_map_search.txt ref_ut_map_writedata.cdl ref_ut_map_writemeta2.cdl ref_ut_map_writemeta.cdl ref_ut_proj.txt ref_ut_testmap_create.cdl ref_whole.cdl ref_whole.txt ref_zarr_test_data.cdl.gz ref_tst_nans.dmp 
+NCZARRFILES += ref_noshape.file.zip ref_power_901_constants.cdl ref_power_901_constants_orig.zip ref_avail1.cdl ref_avail1.dmp ref_avail1.txt ref_byte.cdl ref_byte_fill_value_null.cdl ref_byte_fill_value_null.zarr.zip ref_byte.zarr.zip ref_fillonly.cdl ref_groups.h5 ref_misc1.cdl ref_misc1.dmp ref_ndims.cdl ref_ndims.dmp ref_newformatpure.cdl ref_notzarr.tar.gz ref_nulls.cdl ref_nulls_nczarr.baseline ref_oldformat.cdl ref_oldformat.zip ref_perdimspecs.cdl ref_purezarr_base.cdl ref_quotes.cdl ref_quotes_orig.zip ref_rem.cdl ref_rem.dmp ref_scalar.cdl ref_skip.cdl ref_skip.txt ref_skipw.cdl ref_string.cdl ref_t_meta_dim1.cdl ref_t_meta_var1.cdl ref_ut_json_build.txt ref_ut_json_parse.txt ref_ut_mapapi_create.cdl ref_ut_mapapi_data.cdl ref_ut_mapapi_meta.cdl ref_ut_mapapi_search.txt ref_ut_map_create.cdl ref_ut_map_readmeta2.txt ref_ut_map_readmeta.txt ref_ut_map_search.txt ref_ut_map_writedata.cdl ref_ut_map_writemeta2.cdl ref_ut_map_writemeta.cdl ref_ut_proj.txt ref_ut_testmap_create.cdl ref_whole.cdl ref_whole.txt ref_zarr_test_data.cdl.gz ref_bzip2.cdl ref_filtered.cdl
 
 ${NCZARRFILES}:
 	for u in $@ ; do rm -f $$u ; cp -f ${top_srcdir}/nczarr_test/$$u ../v3_tests ;  done 
@@ -294,9 +294,10 @@ BUILT_SOURCES += ${NCZARRFILES}
 # Files that are not built
 EXTRA_DIST += CMakeLists.txt
 # V3 specific files
-EXTRA_DIST += ref_nczarr2zarr.cdl ref_purezarr.cdl ref_xarray.cdl ref_misc2.cdl ref_jsonconvention.cdl ref_jsonconvention.zmap ref_nulls_zarr.baseline ref_string_zarr.baseline ref_string_nczarr.baseline ref_zarr_test_data_2d.cdl.gz ref_groups_regular.cdl ref_bzip2.cdl ref_filtered.cdl ref_any.cdl ref_multi.cdl run_nan.sh
+EXTRA_DIST += run_nan.sh
+EXTRA_DIST += ref_nczarr2zarr.cdl ref_purezarr.cdl ref_xarray.cdl ref_misc2.cdl ref_jsonconvention.cdl ref_jsonconvention.zmap ref_nulls_zarr.baseline ref_string_zarr.baseline ref_string_nczarr.baseline ref_zarr_test_data_2d.cdl.gz ref_groups_regular.cdl ref_filtered.cdl ref_any.cdl ref_multi.cdl ref_tst_nans.dmp
 
-DISTCLEANFILES += ${BUILT_SOURCES} 
+DISTCLEANFILES += ${BUILT_SOURCES} ${NCZARRFILES} test_nczarr.sh findplugin.sh
 
 # Remove directories
 clean-local:

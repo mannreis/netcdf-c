@@ -8,7 +8,7 @@
 if test "x$srcdir" = x ; then srcdir=`pwd`; fi
 . ../test_common.sh
 
-. "$srcdir/test_nczarr.sh"
+. "${builddir}/test_nczarr.sh"
 
 # Isolate both test and S3
 s3isolate "testdir_nan"
@@ -19,7 +19,7 @@ set -e
 
 # Location constants
 cdl="$srcdir/../ncdump/cdl"
-expected="$srcdir"
+expected="$srcdir/../ncdump/expected"
 
 # Functions
 

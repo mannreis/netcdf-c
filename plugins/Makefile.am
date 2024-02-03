@@ -39,7 +39,7 @@ LDADD = $(top_builddir)/liblib/libnetcdf.la
 LIBADD = $(top_builddir)/liblib/libnetcdf.la
 endif
 
-EXTRA_DIST = CMakeLists.txt
+EXTRA_DIST = CMakeLists.txt findplugin.in
 
 # The HDF5 filter wrappers
 EXTRA_DIST += \

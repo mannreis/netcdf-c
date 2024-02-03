@@ -2258,9 +2258,9 @@ AC_MSG_NOTICE([generating header files and makefiles])
 AC_CONFIG_FILES(test_common.sh:test_common.in)
 AC_CONFIG_FILES(s3cleanup.sh:s3cleanup.in, [chmod ugo+x s3cleanup.sh])
 AC_CONFIG_FILES(s3gc.sh:s3gc.in, [chmod ugo+x s3gc.sh])
-AC_CONFIG_FILES(nc_test4/findplugin.sh:nc_test4/findplugin.in, [chmod ugo+x nc_test4/findplugin.sh])
-AC_CONFIG_FILES(plugins/findplugin.sh:nc_test4/findplugin.in, [chmod ugo+x plugins/findplugin.sh])
-AC_CONFIG_FILES(examples/C/findplugin.sh:nc_test4/findplugin.in, [chmod ugo+x examples/C/findplugin.sh])
+AC_CONFIG_FILES(nc_test4/findplugin.sh:plugins/findplugin.in, [chmod ugo+x nc_test4/findplugin.sh])
+AC_CONFIG_FILES(plugins/findplugin.sh:plugins/findplugin.in, [chmod ugo+x plugins/findplugin.sh])
+AC_CONFIG_FILES(examples/C/findplugin.sh:plugins/findplugin.in, [chmod ugo+x examples/C/findplugin.sh])
 AC_CONFIG_FILES(ncdap_test/findtestserver.c:ncdap_test/findtestserver.c.in, [chmod ugo+x ncdap_test/findtestserver.c])
 AC_CONFIG_FILES([nc_test/run_pnetcdf_tests.sh:nc_test/run_pnetcdf_tests.sh.in],[chmod ugo+x nc_test/run_pnetcdf_tests.sh])
 AC_CONFIG_FILES(dap4_test/findtestserver4.c:ncdap_test/findtestserver.c.in)
@@ -2271,9 +2271,14 @@ AC_CONFIG_FILES([nc_perf/run_par_bm_test.sh], [chmod ugo+x nc_perf/run_par_bm_te
 AC_CONFIG_FILES([nc_perf/run_gfs_test.sh], [chmod ugo+x nc_perf/run_gfs_test.sh])
 AC_CONFIG_FILES([examples/C/run_par_test.sh], [chmod ugo+x examples/C/run_par_test.sh])
 AC_CONFIG_FILES([nc-config], [chmod 755 nc-config])
+
 # Config and copy into nczarr_test/v3_tests
-AC_CONFIG_FILES(nczarr_test/findplugin.sh:nc_test4/findplugin.in, [chmod ugo+x nczarr_test/findplugin.sh])
-AC_CONFIG_FILES(v3_tests/findplugin.sh:nc_test4/findplugin.in, [chmod ugo+x v3_tests/findplugin.sh])
+AC_CONFIG_FILES(nczarr_test/findplugin.sh:plugins/findplugin.in, [chmod ugo+x nczarr_test/findplugin.sh])
+AC_CONFIG_FILES(v3_tests/findplugin.sh:plugins/findplugin.in, [chmod ugo+x v3_tests/findplugin.sh])
+# Make sure that test_nczarr.sh is in a consistent location
+AC_CONFIG_FILES(nczarr_test/test_nczarr.sh:nczarr_test/test_nczarr.in, [chmod ugo+x nczarr_test/test_nczarr.sh])
+AC_CONFIG_FILES(v3_tests/test_nczarr.sh:nczarr_test/test_nczarr.in, [chmod ugo+x v3_tests/test_nczarr.sh])
+
 
 for fp in unit_test/timer_utils.h unit_test/timer_utils.h unit_test/timer_utils.c nc_test4/test_filter.c nc_test4/test_filter_misc.c nc_test4/tst_multifilter.c nc_test4/test_filter_repeat.c nc_test4/test_filter_order.c ; do
   FN=`basename $fp`

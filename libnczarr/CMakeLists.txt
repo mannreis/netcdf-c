@@ -8,11 +8,11 @@
 #add_compile_options("/showincludes")
 
 # The source files for the HDF5 dispatch layer.
-SET(libnczarr_SOURCES
+set(libnczarr_SOURCES
 zinfer.c
 zformat.c
-zformat3.c
 zformat2.c
+zformat3.c
 zarr.c
 zattr.c
 zxcache.c
@@ -23,7 +23,6 @@ zcvt.c
 zdim.c
 zdispatch.c
 zfile.c
-zfilter.c
 zgrp.c
 zinternal.c
 zmap.c
@@ -36,8 +35,8 @@ zutil.c
 zvar.c
 zwalk.c
 zdebug.c
-zformat.h
 zarr.h
+zformat.h
 zcache.h
 zchunking.h
 zdispatch.h
@@ -50,24 +49,28 @@ zfilter.h
 zdebug.h
 )
 
-IF(ENABLE_NCZARR_ZIP)
-SET(libnczarr_SOURCES ${libnczarr_SOURCES} zmap_zip.c)
-ENDIF()
+if(ENABLE_NCZARR_ZIP)
+set(libnczarr_SOURCES ${libnczarr_SOURCES} zmap_zip.c)
+endif()
 
-IF(ENABLE_S3) 
-SET(libnczarr_SOURCES ${libnczarr_SOURCES} zmap_s3sdk.c)
-ENDIF()
+if(ENABLE_S3) 
+set(libnczarr_SOURCES ${libnczarr_SOURCES} zmap_s3sdk.c)
+endif()
+
+if(ENABLE_NCZARR_FILTERS)
+set(libnczarr_la_SOURCES ${libnczarr_SOURCES} zfilter.c)
+endif()
 
 # Build the Zarr dispatch layer as a library that will be included in
 # the netCDF library.
 
 add_library(nczarr OBJECT ${libnczarr_SOURCES})
 
-TARGET_INCLUDE_DIRECTORIES(nczarr PUBLIC ../libncpoco)
+target_include_directories(nczarr PUBLIC ../libncpoco)
 
-IF(STATUS_PARALLEL)
+if(STATUS_PARALLEL)
     target_link_libraries(nczarr PUBLIC MPI::MPI_C)
-ENDIF(STATUS_PARALLEL)
+endif(STATUS_PARALLEL)
 
 # Remember to package this file for CMake builds.
-ADD_EXTRA_DIST(${libnczarr_SOURCES} CMakeLists.txt)
+add_extra_dist(${libnczarr_SOURCES} CMakeLists.txt)
