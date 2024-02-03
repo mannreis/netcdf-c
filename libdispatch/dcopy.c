@@ -53,7 +53,8 @@ NC_compare_nc_types(int ncid1, int typeid1, int ncid2, int typeid2, int *equalp)
    }
    else
    {
-      int i, ret, equal1;
+      int ret, equal1;
+      size_t i;
       char name1[NC_MAX_NAME];
       char name2[NC_MAX_NAME];
       size_t size1, size2;

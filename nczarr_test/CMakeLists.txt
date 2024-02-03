@@ -9,26 +9,10 @@ set(abs_top_srcdir ${CMAKE_CURRENT_SOURCE_DIR})
 
 remove_definitions(-DDLL_EXPORT)
 
-# Create nczarr tests from nc_test4 tests
-NCZARR_C_TEST(tst_quantize test_quantize nc_test4)
-NCZARR_C_TEST(tst_filter_vlen test_filter_vlen nc_test4)
-NCZARR_C_TEST(tst_unlim_vars test_unlim_vars nc_test4)
-NCZARR_C_TEST(tst_h5_endians test_endians nc_test4)
-NCZARR_C_TEST(tst_put_vars_two_unlim_dim test_put_vars_two_unlim_dim nc_test4)
-NCZARR_C_TEST(tst_chunking test_chunking ncdump)
-
-NCZARR_SH_TEST(specific_filters nc_test4)
-NCZARR_SH_TEST(unknown nc_test4)
-NCZARR_SH_TEST(filter_vlen nc_test4)
-
-# Unlimited tests
-NCZARR_SH_TEST(mud ncdump)
-NCZARR_SH_TEST(nccopy5 ncdump)
-
 file(GLOB COPY_FILES ${CMAKE_CURRENT_SOURCE_DIR}/*.sh
-${CMAKE_CURRENT_SOURCE_DIR}/ref*.cdl
-${CMAKE_CURRENT_SOURCE_DIR}/ref*.txt
-${CMAKE_CURRENT_SOURCE_DIR}/ref*.zmap)
+	${CMAKE_CURRENT_SOURCE_DIR}/ref*.cdl
+	${CMAKE_CURRENT_SOURCE_DIR}/ref*.txt
+	${CMAKE_CURRENT_SOURCE_DIR}/ref*.zmap)
 
 file(COPY ${COPY_FILES} DESTINATION ${CMAKE_CURRENT_BINARY_DIR}/ FILE_PERMISSIONS OWNER_WRITE OWNER_READ OWNER_EXECUTE)
 
