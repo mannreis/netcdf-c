@@ -2275,10 +2275,6 @@ AC_CONFIG_FILES([nc-config], [chmod 755 nc-config])
 # Config and copy into nczarr_test/v3_tests
 AC_CONFIG_FILES(nczarr_test/findplugin.sh:plugins/findplugin.in, [chmod ugo+x nczarr_test/findplugin.sh])
 AC_CONFIG_FILES(v3_tests/findplugin.sh:plugins/findplugin.in, [chmod ugo+x v3_tests/findplugin.sh])
-# Make sure that test_nczarr.sh is in a consistent location
-AC_CONFIG_FILES(nczarr_test/test_nczarr.sh:nczarr_test/test_nczarr.in, [chmod ugo+x nczarr_test/test_nczarr.sh])
-AC_CONFIG_FILES(v3_tests/test_nczarr.sh:nczarr_test/test_nczarr.in, [chmod ugo+x v3_tests/test_nczarr.sh])
-
 
 for fp in unit_test/timer_utils.h unit_test/timer_utils.h unit_test/timer_utils.c nc_test4/test_filter.c nc_test4/test_filter_misc.c nc_test4/tst_multifilter.c nc_test4/test_filter_repeat.c nc_test4/test_filter_order.c ; do
   FN=`basename $fp`

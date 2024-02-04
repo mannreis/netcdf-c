@@ -13,6 +13,7 @@ It covers the following issues.
 * [Inferring File Types](#intern_infer)
 * [Adding a Standard Filter](#intern_filters)
 * [Test Interference](#intern_isolation)
+* [Managing NCZarr Tests](#intern_nczarr_tests)
 
 # 1. Including C++ Code in the netcdf-c Library {#intern_cpp}
 
@@ -763,9 +764,39 @@ This file is called "s3cleanup_\<pid\>.json".
 5. Use the "aws delete-objects" command to delete the keys.
 6. Repeat steps 4 and 5 for each set of 500 keys.
 
+
+# 6. Managing NCZarr Tests {#intern_nczarr_tests}
+
+When testing NCZarr, it is necessary to run tests for (NC)Zarr version 2 (aka V2) and for (NC)Zarr version 3 (aka V3).
+In support of this, there are two test directories: *nczarr_test* and *v3_nczarr_test*.
+When the tests in *nczarr_test* are executed, they default to using Zarr version 2 (=> NCZarr version 2).
+Similarly, when the tests in *v3_nczarr_test* are executed, they default to using Zarr version 3 (=> NCZarr version 3).
+
+It turns out that almost all of the V2 tests can be reused for testing V3.
+So, the tests in *v3_nczarr_test* are copies of the tests in *nczarr_test*.
+It turns out that automake is not easily capable of copying those tests on the fly.
+This is principally because the automake *make distcheck* command does not allow
+modifications to the source directory, but only to the build directory. This means
+that the tests must be heavily modified to handle the two cases where scripts, programs,
+and test data are in *$$\{srcdir\}* versus when they are in *$$\{builddir\}*.
+
+Rather than copying the shared files on the fly, I chose instead to just
+keep copies of the files in both *nczarr_test* and *v3_nczarr_test*.
+The two sets are kept in synch by adding this command:
+````make update_testfiles````.
+This command copies the relevant files from *nczarr_test* -- the base tests --
+to *v3_nczarr_test*.
+So if any test program or script or test input file is modified in *nczarr_test*,
+then *v3_nczarr_test* is kept up-to-date via this process.
+1. make distclean
+2. autoreconf -i --force
+3. ./configure \<options\>
+4. cd v3_test_nczarr
+5. make update_testfiles
+
 # Point of Contact {#intern_poc}
 
 *Author*: Dennis Heimbigner<br>
 *Email*: dmh at ucar dot edu<br>
 *Initial Version*: 12/22/2021<br>
-*Last Revised*: 9/16/2023
+*Last Revised*: 2/4/2024
