@@ -34,7 +34,7 @@ nczmap_features(NCZM_IMPL impl)
 }
 
 int
-nczmap_create(NCZM_IMPL impl, const char *path, int mode, size64_t flags, void* parameters, NCZMAP** mapp)
+nczmap_create(NCZM_IMPL impl, const char *path, mode_t mode, size64_t flags, void* parameters, NCZMAP** mapp)
 {
     int stat = NC_NOERR;
     NCZMAP* map = NULL;
@@ -78,7 +78,7 @@ done:
 }
 
 int
-nczmap_open(NCZM_IMPL impl, const char *path, int mode, size64_t flags, void* parameters, NCZMAP** mapp)
+nczmap_open(NCZM_IMPL impl, const char *path, mode_t mode, size64_t flags, void* parameters, NCZMAP** mapp)
 {
     int stat = NC_NOERR;
     NCZMAP* map = NULL;
@@ -298,7 +298,8 @@ nczm_divide_at(const char* key, int nsegs, char** prefixp, char** suffixp)
     int stat = NC_NOERR;
     char* prefix = NULL;
     char* suffix = NULL;
-    size_t len, i;
+    int len;
+    int i;
     ptrdiff_t delta;
     const char* p;
     int abssegs = (nsegs >= 0 ?nsegs: -nsegs);
@@ -448,7 +449,7 @@ nczm_segment1(const char* path, char** seg1p)
     delta = (q-p);
     if((seg1 = (char*)malloc((size_t)delta+1))==NULL)
         {ret = NC_ENOMEM; goto done;}
-    memcpy(seg1,p,delta);
+    memcpy(seg1,p,(size_t)delta);
     seg1[delta] = '\0';
 
     if(seg1p) {*seg1p = seg1; seg1 = NULL;}

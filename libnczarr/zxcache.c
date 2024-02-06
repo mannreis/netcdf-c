@@ -78,7 +78,7 @@ NCZ_set_var_chunk_cache(int ncid, int varid, size_t cachesize, size_t nelems, fl
     assert(grp && h5);
 
     /* Find the var. */
-    if (!(var = (NC_VAR_INFO_T *)ncindexith(grp->vars, varid)))
+    if (!(var = (NC_VAR_INFO_T *)ncindexith(grp->vars, (size_t)varid)))
         {retval = NC_ENOTVAR; goto done;}
     assert(var && var->hdr.id == varid);
 
@@ -140,7 +140,7 @@ fprintf(stderr,"xxx: adjusting cache for: %s\n",var->hdr.name);
     zcache->chunksize = zvar->chunksize;
     zcache->chunkcount = 1;
     if(var->ndims > 0) {
-	int i;
+	size_t i;
 	for(i=0;i<var->ndims;i++) {
 	    zcache->chunkcount *= var->chunksizes[i];
         }
@@ -176,7 +176,7 @@ NCZ_create_chunk_cache(NC_VAR_INFO_T* var, size64_t chunksize, char dimsep, NCZC
     if((cache = calloc(1,sizeof(NCZChunkCache))) == NULL)
 	{stat = NC_ENOMEM; goto done;}
     cache->var = var;
-    cache->ndims = var->ndims + zvar->scalar;
+    cache->ndims = var->ndims + (size_t)zvar->scalar;
     cache->fillchunk = NULL;
     cache->chunksize = chunksize;
     cache->dimension_separator = dimsep;
@@ -184,7 +184,7 @@ NCZ_create_chunk_cache(NC_VAR_INFO_T* var, size64_t chunksize, char dimsep, NCZC
 
     cache->chunkcount = 1;
     if(var->ndims > 0) {
-	int i;
+	size_t i;
 	for(i=0;i<var->ndims;i++) {
 	    cache->chunkcount *= var->chunksizes[i];
         }
@@ -273,7 +273,7 @@ int
 NCZ_read_cache_chunk(NCZChunkCache* cache, const size64_t* indices, void** datap)
 {
     int stat = NC_NOERR;
-    int rank = cache->ndims;
+    size_t rank = cache->ndims;
     NCZCacheEntry* entry = NULL;
     ncexhashkey_t hkey = 0;
     int created = 0;
@@ -497,7 +497,8 @@ done:
 int
 NCZ_ensure_fill_chunk(NCZChunkCache* cache)
 {
-    int i, stat = NC_NOERR;
+    int stat = NC_NOERR;
+    size_t i;
     NC_VAR_INFO_T* var = cache->var;
     nc_type typeid = var->type_info->hdr.id;
     size_t typesize = var->type_info->size;
@@ -614,7 +615,7 @@ put_chunk(NCZChunkCache* cache, NCZCacheEntry* entry)
 
     if(tid == NC_STRING && !entry->isfixedstring) {
         /* Convert from char* to char[strlen] format */
-        int maxstrlen = NCZ_get_maxstrlen((NC_OBJ*)cache->var);
+        size_t maxstrlen = NCZ_get_maxstrlen((NC_OBJ*)cache->var);
         assert(maxstrlen > 0);
         if((strchunk = malloc((size_t)cache->chunkcount * (size_t)maxstrlen))==NULL) {stat = NC_ENOMEM; goto done;}
         /* copy char* to char[] format */
@@ -768,7 +769,7 @@ get_chunk(NCZChunkCache* cache, NCZCacheEntry* entry)
 
     if(tid == NC_STRING && entry->isfixedstring) {
         /* Convert from char[strlen] to char* format */
-	int maxstrlen = NCZ_get_maxstrlen((NC_OBJ*)cache->var);
+	size_t maxstrlen = NCZ_get_maxstrlen((NC_OBJ*)cache->var);
 	assert(maxstrlen > 0);
 	/* copy char[] to char* format */
 	if((strchunk = (char**)malloc(sizeof(char*)*cache->chunkcount))==NULL)
@@ -800,7 +801,7 @@ NCZ_buildchunkpath(NCZChunkCache* cache, const size64_t* chunkindices, struct Ch
 
     assert(key != NULL);
     /* Get the chunk object name */
-    if((stat = NCZF_buildchunkkey(cache->var->container->nc4_info,cache->ndims, chunkindices, cache->dimension_separator, &chunkname))) goto done;
+    if((stat = NCZF_buildchunkkey(cache->var->container->nc4_info,(int)cache->ndims, chunkindices, cache->dimension_separator, &chunkname))) goto done;
     /* Get the var object key */
     if((stat = NCZ_varkey(cache->var,&varkey))) goto done;
     key->varkey = varkey; varkey = NULL;
@@ -817,7 +818,7 @@ NCZ_dumpxcacheentry(NCZChunkCache* cache, NCZCacheEntry* e, NCbytes* buf)
 {
     char s[8192];
     char idx[64];
-    int i;
+    size_t i;
 
     ncbytescat(buf,"{");
     snprintf(s,sizeof(s),"modified=%u isfiltered=%u indices=",

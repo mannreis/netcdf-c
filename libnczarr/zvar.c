@@ -21,7 +21,7 @@
 static void
 reportchunking(const char* title, NC_VAR_INFO_T* var)
 {
-    int i;
+    size_t i;
     char buf[8192];
 
     buf[0] = '\0'; /* for strlcat */
@@ -69,21 +69,21 @@ reportchunking(const char* title, NC_VAR_INFO_T* var)
 static int
 check_chunksizes(NC_GRP_INFO_T *grp, NC_VAR_INFO_T *var, const size_t *chunksizes)
 {
-    double dprod;
+    size_t dprod;
     size_t type_len;
-    int d;
+    size_t d;
     int retval = NC_NOERR;
 
     if ((retval = nc4_get_typelen_mem(grp->nc4_info, var->type_info->hdr.id, &type_len)))
 	goto done;
     if (var->type_info->nc_type_class == NC_VLEN)
-	dprod = (double)sizeof(nc_hvl_t);
+	dprod = sizeof(nc_hvl_t);
     else
-	dprod = (double)type_len;
+	dprod = type_len;
     for (d = 0; d < var->ndims; d++)
-	dprod *= (double)chunksizes[d];
+	dprod *= chunksizes[d];
 
-    if (dprod > (double) NC_MAX_UINT)
+    if (dprod > NC_MAX_UINT)
 	{retval = NC_EBADCHUNK; goto done;}
 done:
     return retval;
@@ -103,9 +103,10 @@ done:
 int
 ncz_find_default_chunksizes2(NC_GRP_INFO_T *grp, NC_VAR_INFO_T *var)
 {
-    int d;
+    size_t d;
     size_t type_size;
-    float num_values = 1, num_unlim = 0;
+    size_t num_values = 1;
+    size_t num_unlim = 0;
     int retval;
     size_t suggested_size;
 #ifdef LOGGING
@@ -131,7 +132,7 @@ ncz_find_default_chunksizes2(NC_GRP_INFO_T *grp, NC_VAR_INFO_T *var)
     {
 	assert(var->dim[d]);
 	if (! var->dim[d]->unlimited)
-	    num_values *= (float)var->dim[d]->len;
+	    num_values *= var->dim[d]->len;
 	else {
 	    num_unlim++;
 	    var->chunksizes[d] = 1; /* overwritten below, if all dims are unlimited */
@@ -152,7 +153,7 @@ ncz_find_default_chunksizes2(NC_GRP_INFO_T *grp, NC_VAR_INFO_T *var)
 	     "chunksize %ld", __func__, var->hdr.name, d, DEFAULT_CHUNK_SIZE, num_values, type_size, var->chunksizes[0]));
     }
     if (var->ndims > 1 && var->ndims == num_unlim) { /* all dims unlimited */
-	suggested_size = pow((double)DEFAULT_CHUNK_SIZE/type_size, 1.0/(double)(var->ndims));
+	suggested_size = (size_t)pow((double)(DEFAULT_CHUNK_SIZE/type_size), 1.0/(double)(var->ndims));
 	for (d = 0; d < var->ndims; d++)
 	{
 	    var->chunksizes[d] = suggested_size ? suggested_size : 1;
@@ -166,8 +167,8 @@ ncz_find_default_chunksizes2(NC_GRP_INFO_T *grp, NC_VAR_INFO_T *var)
     for (d = 0; d < var->ndims; d++)
 	if (!var->chunksizes[d])
 	{
-	    suggested_size = (pow((double)DEFAULT_CHUNK_SIZE/(num_values * type_size),
-				  1.0/(double)(var->ndims - num_unlim)) * var->dim[d]->len - .5);
+	    suggested_size = (size_t)(pow((double)DEFAULT_CHUNK_SIZE/((double)(num_values * type_size)),
+				  1.0/(double)(var->ndims - num_unlim)) * (double)var->dim[d]->len - .5);
 	    if (suggested_size > var->dim[d]->len)
 		suggested_size = var->dim[d]->len;
 	    var->chunksizes[d] = suggested_size ? suggested_size : 1;
@@ -453,7 +454,7 @@ var->type_info->rc++;
     /* Compute the chunksize cross product */
     zvar->chunkproduct = 1;
     if(!zvar->scalar)
-        {for(d=0;d<var->ndims;d++) {zvar->chunkproduct *= var->chunksizes[d];}}
+        {size_t k; for(k=0;k<var->ndims;k++) {zvar->chunkproduct *= var->chunksizes[k];}}
     zvar->chunksize = zvar->chunkproduct * var->type_info->size;
 
     /* Set cache defaults */
@@ -520,7 +521,7 @@ ncz_def_var_extra(int ncid, int varid, int *shuffle, int *unused1,
     NC_FILE_INFO_T *h5;
     NC_VAR_INFO_T *var;
     NCZ_VAR_INFO_T *zvar;
-    int d;
+    size_t d;
     int retval = NC_NOERR;
     int storage = NC_CHUNKED;
     size_t contigchunksizes[NC_MAX_VAR_DIMS]; /* Fake chunksizes if storage is contiguous or compact */
@@ -548,7 +549,7 @@ ncz_def_var_extra(int ncid, int varid, int *shuffle, int *unused1,
 	{retval = NC_EPERM; goto done;}
 
     /* Find the var. */
-    if (!(var = (NC_VAR_INFO_T *)ncindexith(grp->vars, varid)))
+    if (!(var = (NC_VAR_INFO_T *)ncindexith(grp->vars, (size_t)varid)))
 	{retval = NC_ENOTVAR; goto done;}
     assert(var && var->hdr.id == varid);
 
@@ -951,7 +952,8 @@ ncz_def_var_chunking_ints(int ncid, int varid, int contiguous, int *chunksizesp)
 {
     NC_VAR_INFO_T *var;
     size_t *cs;
-    int i, retval;
+    int retval;
+    size_t i;
 
     /* Get pointer to the var. */
     if ((retval = nc4_find_grp_h5_var(ncid, varid, NULL, NULL, &var)))
@@ -965,7 +967,7 @@ ncz_def_var_chunking_ints(int ncid, int varid, int contiguous, int *chunksizesp)
 
     /* Copy to size_t array. */
     for (i = 0; i < var->ndims; i++)
-	cs[i] = chunksizesp[i];
+	cs[i] = (size_t)chunksizesp[i];
 
     retval = ncz_def_var_extra(ncid, varid, NULL, NULL, NULL, NULL,
 			      &contiguous, cs, NULL, NULL, NULL, NULL, NULL);
@@ -1256,7 +1258,7 @@ NCZ_rename_var(int ncid, int varid, const char *name)
 	return THROW(retval);
 
     /* Get the variable wrt varid */
-    if (!(var = (NC_VAR_INFO_T *)ncindexith(grp->vars, varid)))
+    if (!(var = (NC_VAR_INFO_T *)ncindexith(grp->vars, (size_t)varid)))
 	return NC_ENOTVAR;
 
     /* Check if new name is in use; note that renaming to same name is
@@ -1487,7 +1489,7 @@ static void
 log_dim_info(NC_VAR_INFO_T *var, size64_t *fdims, size64_t *fmaxdims,
 	     size64_t *start, size64_t *count)
 {
-    int d2;
+    size_t d2;
 
     /* Print some debugging info... */
     LOG((4, "%s: var name %s ndims %d", __func__, var->hdr.name, var->ndims));
@@ -1544,7 +1546,8 @@ NCZ_put_vars(int ncid, int varid, const size_t *startp, const size_t *countp,
     size64_t fdims[NC_MAX_VAR_DIMS];
     size64_t start[NC_MAX_VAR_DIMS], count[NC_MAX_VAR_DIMS];
     size64_t stride[NC_MAX_VAR_DIMS];
-    int retval, range_error = 0, i, d2;
+    int retval, range_error = 0;
+    size_t i, d2;
     void *bufr = NULL;
     int bufrd = 0; /* 1 => we allocated bufr */
     int need_to_convert = 0;
@@ -1598,7 +1601,7 @@ NCZ_put_vars(int ncid, int varid, const size_t *startp, const size_t *countp,
 	    fdims[i] = var->dim[i]->len;
 	    start[i] = startp[i];
 	    count[i] = countp ? countp[i] : fdims[i];
-	    stride[i] = stridep ? stridep[i] : 1;
+	    stride[i] = stridep ? (size64_t)stridep[i] : 1;
 
   	    /* Check to see if any counts are zero. */
 	    if (!count[i])
@@ -1850,7 +1853,8 @@ NCZ_get_vars(int ncid, int varid, const size_t *startp, const size_t *countp,
     size64_t stride[NC_MAX_VAR_DIMS];
     int no_read = 0, provide_fill = 0;
     int fill_value_size[NC_MAX_VAR_DIMS];
-    int retval, range_error = 0, i, d2;
+    int retval, range_error = 0;
+    size_t i, d2;
     void *bufr = NULL;
     int need_to_convert = 0;
     size_t len = 1;
@@ -1888,7 +1892,7 @@ NCZ_get_vars(int ncid, int varid, const size_t *startp, const size_t *countp,
 	        return NC_ESTRIDE;
 	    start[i] = startp[i];
 	    count[i] = countp[i];
-	    stride[i] = stridep ? stridep[i] : 1;
+	    stride[i] = stridep ? (size64_t)stridep[i] : 1;
 
 	    /* if any of the count values are zero don't actually read. */
 	    if (count[i] == 0)
@@ -1967,19 +1971,19 @@ NCZ_get_vars(int ncid, int varid, const size_t *startp, const size_t *countp,
 	    if (!no_read)
 	    {
 		if (start[d2] >= (size64_t)fdims[d2])
-		    fill_value_size[d2] = count[d2];
+		    fill_value_size[d2] = (int)count[d2];
 		else if (endindex >= fdims[d2])
-		    fill_value_size[d2] = count[d2] - ((fdims[d2] - start[d2])/stride[d2]);
+		    fill_value_size[d2] = (int)(count[d2] - ((fdims[d2] - start[d2])/stride[d2]));
 		else
 		    fill_value_size[d2] = 0;
-		count[d2] -= fill_value_size[d2];
+		count[d2] -= (size64_t)fill_value_size[d2];
 		if (count[d2] == 0)
 		    no_read++;
 		if (fill_value_size[d2])
 		    provide_fill++;
 	    }
 	    else
-		fill_value_size[d2] = count[d2];
+		fill_value_size[d2] = (int)count[d2];
 	}
 	else /* Dim is not unlimited. */
 	{
@@ -1991,7 +1995,7 @@ NCZ_get_vars(int ncid, int varid, const size_t *startp, const size_t *countp,
 	    if (count[d2] && endindex >= fdims[d2])
 		BAIL_QUIET(NC_EEDGE);
 	    /* Set the fill value boundary */
-	    fill_value_size[d2] = count[d2];
+	    fill_value_size[d2] = (int)count[d2];
 	}
     }
 
@@ -2079,7 +2083,7 @@ NCZ_get_vars(int ncid, int varid, const size_t *startp, const size_t *countp,
 
 	/* How many fill values do we need? */
 	for (fill_len = 1, d2 = 0; d2 < var->ndims; d2++)
-	    fill_len *= (fill_value_size[d2] ? fill_value_size[d2] : 1);
+	    fill_len *= (size_t)(fill_value_size[d2] ? fill_value_size[d2] : 1);
 
 	/* Copy the fill value into the rest of the data buffer. */
 	filldata = (char *)data + real_data_size;
@@ -2387,7 +2391,7 @@ NCZ_write_var_data(NC_FILE_INFO_T* file, NC_VAR_INFO_T* var)
 #ifdef FILLONCLOSE
     /* If fill is enabled, then create missing chunks */
     if(!var->no_fill) {
-        int i;
+        size_t i;
     NCZOdometer* chunkodom =  NULL;
     NCZ_FILE_INFO_T* zfile = (NCZ_FILE_INFO_T*)file->format_file_info;
     NCZMAP* map = zfile->map;

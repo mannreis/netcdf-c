@@ -129,9 +129,8 @@ clean-local: clean-local-check
 .PHONY: clean-local-check
 
 clean-local-check:
-	-rm -rf results
-	-rm -f .dodsrc
-	-rm -fr testdir_* testset_*
+	rm -rf results
+	rm -f .dodsrc
 
 # If valgrind is present, add valgrind targets.
 @VALGRIND_CHECK_RULES@

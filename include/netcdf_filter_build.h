@@ -163,7 +163,7 @@ typedef struct NCZ_codec_t {
     int sort; /* Format of remainder of the struct;
                  Currently always NCZ_CODEC_HDF5 */
     const char* codecid;            /* The name/id of the codec */
-    unsigned int hdf5id; /* corresponding hdf5 id */
+    int hdf5id; /* corresponding hdf5 id */
     void (*NCZ_codec_initialize)(const struct NCproplist* env);
     void (*NCZ_codec_finalize)(const struct NCproplist* env);
     int (*NCZ_codec_to_hdf5)(const struct NCproplist* env, const char* codec, int* idp, size_t* nparamsp, unsigned** paramsp);

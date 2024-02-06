@@ -159,7 +159,7 @@ key "2.4"; etc."
  * @param keyp Return the chunk key string
  */
 int
-NCZF_buildchunkkey(const NC_FILE_INFO_T* file, size_t rank, const size64_t* chunkindices, char dimsep, char** keyp)
+NCZF_buildchunkkey(const NC_FILE_INFO_T* file, int rank, const size64_t* chunkindices, char dimsep, char** keyp)
 {
     int stat = NC_NOERR;
     NCZ_FILE_INFO_T* zfile = NULL;

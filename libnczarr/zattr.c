@@ -55,7 +55,7 @@ ncz_getattlist(NC_GRP_INFO_T *grp, int varid, NC_VAR_INFO_T **varp, NCindex **at
     {
         NC_VAR_INFO_T *var;
 
-        if (!(var = (NC_VAR_INFO_T *)ncindexith(grp->vars, varid)))
+        if (!(var = (NC_VAR_INFO_T *)ncindexith(grp->vars, (size_t)varid)))
             return NC_ENOTVAR;
         assert(var->hdr.id == varid);
 
@@ -125,7 +125,7 @@ ncz_get_att_special(NC_FILE_INFO_T* h5, NC_VAR_INFO_T* var, const char* name,
 
     /* The global reserved attributes */
     if(strcmp(name,NCPROPS)==0) {
-        int len;
+        size_t len;
         if(h5->provenance.ncproperties == NULL)
             {stat = NC_ENOTATT; goto done;}
         if(mem_type == NC_NAT) mem_type = NC_CHAR;
@@ -143,7 +143,7 @@ ncz_get_att_special(NC_FILE_INFO_T* h5, NC_VAR_INFO_T* var, const char* name,
         if(strcmp(name,SUPERBLOCKATT)==0)
             iv = (unsigned long long)h5->provenance.superblockversion;
         else /* strcmp(name,ISNETCDF4ATT)==0 */
-            iv = NCZ_isnetcdf4(h5);
+            iv = (unsigned long long)NCZ_isnetcdf4(h5);
         if(mem_type == NC_NAT) mem_type = NC_INT;
         if(data)
             switch (mem_type) {
@@ -284,8 +284,8 @@ NCZ_del_att(int ncid, int varid, const char *name)
     NC_FILE_INFO_T *h5;
     NC_ATT_INFO_T *att;
     NCindex* attlist = NULL;
-    int i;
-    size_t deletedid;
+    size_t i;
+    int deletedid;
     int retval;
 
     /* Name must be provided. */
@@ -331,7 +331,7 @@ NCZ_del_att(int ncid, int varid, const char *name)
 
     /* Reclaim the content of the attribute */
     if(att->data) {
-	if((retval = NC_reclaim_data_all(h5->controller,att->nc_typeid,att->data,att->len))) return retval;
+	if((retval = NC_reclaim_data_all(h5->controller,att->nc_typeid,att->data,(size_t)att->len))) return retval;
     }
     att->data = NULL;
     att->len = 0;
@@ -521,7 +521,7 @@ ncz_put_att(NC_GRP_INFO_T* grp, int varid, const char *name, nc_type file_type,
         /* For an existing att, if we're not in define mode, the len
            must not be greater than the existing len for classic model. */
         if (!(h5->flags & NC_INDEF) &&
-            len * nc4typelen(file_type) > (size_t)att->len * nc4typelen(att->nc_typeid))
+		len * (size_t)nc4typelen(file_type) > (size_t)att->len * (size_t)nc4typelen(att->nc_typeid))
         {
             if (h5->cmode & NC_CLASSIC_MODEL)
                 return NC_ENOTINDEFINE;
@@ -578,7 +578,7 @@ ncz_put_att(NC_GRP_INFO_T* grp, int varid, const char *name, nc_type file_type,
     {
 	assert(attsave.data == NULL);
 	attsave.data = att->data;
-	attsave.len = att->len;
+	attsave.len = (size_t)att->len;
         att->data = NULL;
     }
 
@@ -697,7 +697,7 @@ ncz_put_att(NC_GRP_INFO_T* grp, int varid, const char *name, nc_type file_type,
 
     att->dirty = NC_TRUE;
     att->created = NC_FALSE;
-    att->len = len;
+    att->len = (int)len;
     
     /* Mark attributes on variable dirty, so they get written */
     if(var)
@@ -722,8 +722,8 @@ exit:
         if(attsave.data != NULL) {
             assert(attsave.len > 0);
 	    if(att->data)
-                (void)NC_reclaim_data_all(h5->controller,attsave.type,att->data,att->len);
-	    att->len = attsave.len; att->data = attsave.data;
+                (void)NC_reclaim_data_all(h5->controller,attsave.type,att->data,(size_t)att->len);
+	    att->len = (int)attsave.len; att->data = attsave.data;
         }
         if(fillsave.data != NULL) {
             assert(fillsave.len > 0);
@@ -1014,7 +1014,7 @@ int
 ncz_create_fillvalue(NC_VAR_INFO_T* var)
 {
     int stat = NC_NOERR;
-    int i;
+    size_t i;
     NC_ATT_INFO_T* fv = NULL;
 
     /* Have the var's attributes been read? */
@@ -1070,7 +1070,7 @@ ncz_makeattr(NC_OBJ* container, NCindex* attlist, const char* name, nc_type type
     att->format_att_info = zatt;
     /* Fill in the attribute's type and value  */
     att->nc_typeid = typeid;
-    att->len = len;
+    att->len = (int)len;
     att->data = clone; clone = NULL;
     att->dirty = NC_TRUE;
     if(attp) {*attp = att; att = NULL;}
@@ -1160,7 +1160,7 @@ NCZ_read_attrs(NC_FILE_INFO_T* file, NC_OBJ* container, const NCjson* jatts, con
                 /* case 2: name = _ARRAY_DIMENSIONS, sort==NCVAR, flags & HIDDENATTRFLAG */
                 if(strcmp(ap->name,NC_XARRAY_DIMS)==0 && var != NULL && (ra->flags & HIDDENATTRFLAG)) {
                     /* store for later */
-                    int i;
+                    size_t i;
                     assert(NCJsort(ap->values) == NCJ_ARRAY);
                     if((zvar->xarray = nclistnew())==NULL) {stat = NC_ENOMEM; goto done;}
                     for(i=0;i<NCJarraylength(ap->values);i++) {
@@ -1187,9 +1187,9 @@ NCZ_read_attrs(NC_FILE_INFO_T* file, NC_OBJ* container, const NCjson* jatts, con
             if(isfillvalue)
                 fillvalueatt = att;
             if(ismaxstrlen && att->nc_typeid == NC_INT)
-                zvar->maxstrlen = ((int*)att->data)[0];
+                zvar->maxstrlen = ((size_t*)att->data)[0];
             if(isdfaltmaxstrlen && att->nc_typeid == NC_INT)
-                zfile->default_maxstrlen = ((int*)att->data)[0];
+                zfile->default_maxstrlen = ((size_t*)att->data)[0];
         }
     }
     
@@ -1250,7 +1250,7 @@ NCZ_computeattrdata(nc_type typehint, nc_type* typeidp, const NCjson* values, si
     nc_type typeid = NC_NAT;
     NCjson* jtext = NULL;
     int isjson = 0; /* 1 => json valued attribute */
-    int count = 0; /* no. of attribute values */
+    size_t count = 0; /* no. of attribute values */
 
     ZTRACE(3,"typehint=%d typeid=%d values=|%s|",typehint,*typeidp,NCJtotext(values));
 
@@ -1364,11 +1364,11 @@ done:
 */
 
 int
-NCZ_attr_convert(const NCjson* src, nc_type typeid, size_t typelen, int* countp, NCbytes* dst)
+NCZ_attr_convert(const NCjson* src, nc_type typeid, size_t typelen, size_t* countp, NCbytes* dst)
 {
     int stat = NC_NOERR;
-    int i;
-    int count = 0;
+    size_t i;
+    size_t count = 0;
 
     ZTRACE(3,"src=%s typeid=%d typelen=%u",NCJtotext(src),typeid,typelen);
 
@@ -1422,7 +1422,8 @@ done:
 static int
 NCZ_charify(const NCjson* src, NCbytes* buf)
 {
-    int i, stat = NC_NOERR;
+    int stat = NC_NOERR;
+    size_t i;
     struct NCJconst jstr = NCJconst_empty;
 
     if(NCJsort(src) != NCJ_ARRAY) { /* singleton */

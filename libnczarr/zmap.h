@@ -206,6 +206,10 @@ typedef size64_t NCZM_FEATURES;
 #define NCZM_UNIMPLEMENTED 1 /* Unknown/ unimplemented */
 #define NCZM_WRITEONCE 2     /* Objects can only be written once */
 
+#ifndef HAVE_MODE_T
+typedef int mode_t;
+#endif
+
 /*
 For each dataset, we create what amounts to a class
 defining data and the API function implementations.
@@ -218,10 +222,11 @@ so we can cast to this form; avoids need for
 a separate per-implementation malloc piece.
 
 */
+
 typedef struct NCZMAP {
     NCZM_IMPL format;
     char* url;
-    int mode;
+    mode_t mode;
     size64_t flags; /* Passed in by caller */
     struct NCZMAP_API* api;
 } NCZMAP;
@@ -251,8 +256,8 @@ struct NCZMAP_API {
 typedef struct NCZMAP_DS_API {
     int version;
     NCZM_FEATURES features;
-    int (*create)(const char *path, int mode, size64_t constraints, void* parameters, NCZMAP** mapp);
-    int (*open)(const char *path, int mode, size64_t constraints, void* parameters, NCZMAP** mapp);
+    int (*create)(const char *path, mode_t mode, size64_t constraints, void* parameters, NCZMAP** mapp);
+    int (*open)(const char *path, mode_t mode, size64_t constraints, void* parameters, NCZMAP** mapp);
     int (*truncate)(const char* url);
 } NCZMAP_DS_API;
 
@@ -375,8 +380,8 @@ Close a map
 EXTERNL int nczmap_close(NCZMAP* map, int deleteit);
 
 /* Create/open and control a dataset using a specific implementation */
-EXTERNL int nczmap_create(NCZM_IMPL impl, const char *path, int mode, size64_t constraints, void* parameters, NCZMAP** mapp);
-EXTERNL int nczmap_open(NCZM_IMPL impl, const char *path, int mode, size64_t constraints, void* parameters, NCZMAP** mapp);
+EXTERNL int nczmap_create(NCZM_IMPL impl, const char *path, mode_t mode, size64_t constraints, void* parameters, NCZMAP** mapp);
+EXTERNL int nczmap_open(NCZM_IMPL impl, const char *path, mode_t mode, size64_t constraints, void* parameters, NCZMAP** mapp);
 
 #ifdef ENABLE_S3
 EXTERNL void NCZ_s3finalize(void);

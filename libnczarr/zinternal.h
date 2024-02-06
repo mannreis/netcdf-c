@@ -259,7 +259,7 @@ typedef struct NCZ_VAR_INFO {
     size64_t chunkproduct; /* product of chunksizes */
     size64_t chunksize; /* chunkproduct * typesize */
     int order; /* 1=>column major, 0=>row major (default); not currently enforced */
-    size_t scalar;
+    int scalar;
     struct NCZChunkCache* cache;
     struct NClist* xarray; /* names from _ARRAY_DIMENSIONS */
     char dimension_separator; /* '.' | '/' */
@@ -352,7 +352,7 @@ int ncz_makeattr(NC_OBJ*, NCindex* attlist, const char* name, nc_type typid, siz
 int NCZ_computeattrinfo(const char* name, nc_type atype, nc_type typehint, int purezarr, const NCjson* values, nc_type* typeidp, size_t* typelenp, size_t* lenp, void** datap);
 int NCZ_computeattrdata(nc_type typehint, nc_type* typeidp, const NCjson* values, size_t* typelenp, size_t* countp, void** datap);
 int NCZ_read_attrs(NC_FILE_INFO_T* file, NC_OBJ* container, const NCjson* jatts, const NCjson* jatypes);
-int NCZ_attr_convert(const NCjson* src, nc_type typeid, size_t typelen, int* countp, NCbytes* dst);
+int NCZ_attr_convert(const NCjson* src, nc_type typeid, size_t typelen, size_t* countp, NCbytes* dst);
 
 /* zvar.c */
 int ncz_gettype(NC_FILE_INFO_T*, NC_GRP_INFO_T*, int xtype, NC_TYPE_INFO_T** typep);

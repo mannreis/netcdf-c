@@ -609,7 +609,7 @@ done:
 */
 
 int
-ncz2_nctype2dtype(nc_type nctype, int endianness, int purezarr, int len, char** dnamep)
+ncz2_nctype2dtype(nc_type nctype, int endianness, int purezarr, size_t len, char** dnamep)
 {
     char dname[64];
     const char* dtype = NULL;
@@ -750,7 +750,7 @@ done:
 */
 
 int
-ncz3_nctype2dtype(nc_type nctype, int purezarr, int strlen, char** dnamep, const char** tagp)
+ncz3_nctype2dtype(nc_type nctype, int purezarr, size_t strlen, char** dnamep, const char** tagp)
 {
     char dname[64];
     const char* dtype = NULL;
@@ -1047,9 +1047,9 @@ int
 NCZ_swapatomicdata(size_t datalen, void* data, int typesize)
 {
     int stat = NC_NOERR;
-    int i;
+    size_t i;
 
-    assert(datalen % typesize == 0);
+    assert(datalen % (size_t)typesize == 0);
 
     if(typesize == 1) goto done;
 
@@ -1062,7 +1062,7 @@ NCZ_swapatomicdata(size_t datalen, void* data, int typesize)
         case 8: swapinline64(p); break;
         default: break;
 	}
-	i += typesize;
+	i += (size_t)typesize;
     }
 done:
     return THROW(stat);
@@ -1166,10 +1166,10 @@ done:
 /* Get max str len for a variable or grp */
 /* Has side effect of setting values in the
    internal data structures */
-int
+size_t
 NCZ_get_maxstrlen(NC_OBJ* obj)
 {
-    int maxstrlen = 0;
+    size_t maxstrlen = 0;
     assert(obj->sort == NCGRP || obj->sort == NCVAR);
     if(obj->sort == NCGRP) {
         NC_GRP_INFO_T* grp = (NC_GRP_INFO_T*)obj;
@@ -1189,7 +1189,7 @@ NCZ_get_maxstrlen(NC_OBJ* obj)
 }
 
 int
-NCZ_fixed2char(const void* fixed, char** charp, size_t count, int maxstrlen)
+NCZ_fixed2char(const void* fixed, char** charp, size_t count, size_t maxstrlen)
 {
     size_t i;
     unsigned char* sp = NULL;
@@ -1211,7 +1211,7 @@ NCZ_fixed2char(const void* fixed, char** charp, size_t count, int maxstrlen)
 }
 
 int
-NCZ_char2fixed(const char** charp, void* fixed, size_t count, int maxstrlen)
+NCZ_char2fixed(const char** charp, void* fixed, size_t count, size_t maxstrlen)
 {
     size_t i;
     unsigned char* p = fixed;
@@ -1279,7 +1279,8 @@ checksimplejson(NCjson* json, int depth)
 int
 NCZ_iscomplexjson(const NCjson* json, nc_type typehint)
 {
-    int i, stat = 0;
+    int stat = 0;
+    size_t i;
 
     switch (NCJsort(json)) {
     case NCJ_ARRAY:
@@ -1347,7 +1348,8 @@ loopexit:
 int
 NCZ_makeFQN(NC_GRP_INFO_T* parent, NC_OBJ* object, NCbytes* fqn)
 {
-    int i, stat = NC_NOERR;
+    int stat = NC_NOERR;
+    size_t i;
     NClist* segments = nclistnew();
     NC_GRP_INFO_T* grp = NULL;
     char* escaped = NULL;
@@ -1390,7 +1392,8 @@ done:
 int
 NCZ_locateFQN(NC_GRP_INFO_T* parent, const char* fqn, NC_SORT sort, NC_OBJ** objectp)
 {
-    int i,ret = NC_NOERR;
+    int ret = NC_NOERR;
+    size_t i;
     NC_GRP_INFO_T* grp = NULL;
     NC_OBJ* object = NULL;
     NClist* segments = nclistnew();
@@ -1530,8 +1533,8 @@ cmp_strings(const void* a1, const void* a2)
 {
     const char** s1 = (const char**)a1;
     const char** s2 = (const char**)a2;
-    size_t slen1 = strlen(*s1);
-    size_t slen2 = strlen(*s2);
+    int slen1 = (int)strlen(*s1);
+    int slen2 = (int)strlen(*s2);
     if(slen1 != slen2) return (slen1 - slen2);
     return strcmp(*s1,*s2);
 }

@@ -3,7 +3,7 @@
 if test "x$srcdir" = x ; then srcdir=`pwd`; fi
 . ../test_common.sh
 
-. ${srcdir}/../nczarr_test/test_nczarr.sh
+. ${srcdir}/test_nczarr.sh
 
 set -e
 
@@ -69,7 +69,7 @@ $TC -d 0,0 -c 2,2 -s 0,0 -e 2,2 -v 17 -Ocw "$file"
 ${NCDUMP} -n tmp_unlim_io2 tmp_unlim_io2.nc >tmp_unlim_io2.nc.txt
 ${NCDUMP} -n tmp_unlim_io2 "$file" >tmp_unlim_io2.${zext}.txt
 diff -b tmp_unlim_io2.nc.txt tmp_unlim_io2.${zext}.txt
-${NCDUMPCHUNKS} -v v "$file"
+${execdir}/ncdumpchunks -v v "$file"
 }
 
 testcase3() {

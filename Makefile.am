@@ -110,7 +110,7 @@ endif
 
 # Build Cloud Storage if desired.
 if ENABLE_NCZARR
-ZARR_TEST_DIRS = nczarr_test v3_tests
+ZARR_TEST_DIRS = nczarr_test v3_nczarr_test
 ZARR = libnczarr
 endif
 
@@ -218,8 +218,11 @@ if ENABLE_S3_TESTALL
 	mv ${abs_top_builddir}/tmp_@PLATFORMUID@.uids ${abs_top_builddir}/s3cleanup_@PLATFORMUID@.uids
 endif
 
-if ENABLE_S3_TESTALL
+clean-local:
+	rm -fr alltests_*
+
 distclean-local:
+if ENABLE_S3_TESTALL
 	rm -f ${abs_top_builddir}/s3cleanup_@PLATFORMUID@.uids
 endif
 

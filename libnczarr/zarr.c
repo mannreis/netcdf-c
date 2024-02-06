@@ -80,7 +80,7 @@ ncz_create_dataset(NC_FILE_INFO_T* file, NC_GRP_INFO_T* root, NClist* urlcontrol
     }
 
     /* initialize map handle*/
-    if((stat = NCZ_get_map(file,uri,nc->mode,zfile->flags,NULL,&zfile->map))) goto done;
+    if((stat = NCZ_get_map(file,uri,(mode_t)nc->mode,zfile->flags,NULL,&zfile->map))) goto done;
 
     /* And get the format dispatcher */
     if((stat = NCZ_get_formatter(file, (const NCZ_Formatter**)&zfile->dispatcher))) goto done;
@@ -150,7 +150,7 @@ ncz_open_dataset(NC_FILE_INFO_T* file, NClist* urlcontrols)
     }
 
     /* initialize map handle*/
-    if((stat = NCZ_get_map(file,uri,nc->mode,zfile->flags,NULL,&zfile->map))) goto done;
+    if((stat = NCZ_get_map(file,uri,(mode_t)nc->mode,zfile->flags,NULL,&zfile->map))) goto done;
 
     /* And get the format dispatcher */
     if((stat = NCZ_get_formatter(file, (const NCZ_Formatter**)&zfile->dispatcher))) goto done;
@@ -309,7 +309,7 @@ applycontrols(NCZ_FILE_INFO_T* zinfo)
     int stat = NC_NOERR;
     const char* value = NULL;
     NClist* modelist = nclistnew();
-    int noflags = 0; /* track non-default negative flags */
+    size64_t noflags = 0; /* track non-default negative flags */
 
     if((value = controllookup(zinfo->urlcontrols,"mode")) != NULL) {
 	if((stat = NCZ_comma_parse(value,modelist))) goto done;

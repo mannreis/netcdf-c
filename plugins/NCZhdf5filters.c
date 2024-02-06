@@ -277,7 +277,7 @@ NCZ_shuffle_modify_parameters(const NCproplist* env, int* idp, size_t* vnparamsp
     if((stat = nc_inq_var((int)ncid,(int)varid,vname,&vtype,NULL,NULL,NULL))) goto done;
 
     /* Get the typesize */
-    if((stat = nc_inq_type(ncid,vtype,NULL,&typesize))) goto done;
+    if((stat = nc_inq_type((int)ncid,vtype,NULL,&typesize))) goto done;
 
     if((params=(unsigned*)malloc(sizeof(unsigned)))==NULL)
         {stat = NC_ENOMEM; goto done;}
@@ -604,13 +604,13 @@ NCZ_szip_modify_parameters(const NCproplist* env, int* idp, size_t* vnparamsp, u
     /* Get number of elements for the dataspace;  use
        total number of elements in the chunk to define the new 'scanline' size */
     /* Compute chunksize */
-    if((ret_value = nc_inq_var_chunking((int)ncid,varid,&storage,chunklens))) goto done;
+    if((ret_value = nc_inq_var_chunking((int)ncid,(int)varid,&storage,chunklens))) goto done;
     if(storage != NC_CHUNKED) {ret_value = NC_EFILTER; goto done;}
     npoints = 1;
     for(i=0;i<ndims;i++) npoints *= chunklens[i];
 
     /* Get datatype's endianness order */
-    if((ret_value = nc_inq_var_endian((int)ncid,varid,&dtype_order))) goto done;
+    if((ret_value = nc_inq_var_endian((int)ncid,(int)varid,&dtype_order))) goto done;
 
     if((params = (unsigned*)malloc(wnparams*sizeof(unsigned)))==NULL)
         {ret_value = NC_ENOMEM; goto done;}
@@ -618,7 +618,7 @@ NCZ_szip_modify_parameters(const NCproplist* env, int* idp, size_t* vnparamsp, u
     params[H5Z_SZIP_PARM_PPB] = vparams[H5Z_SZIP_PARM_PPB];
 
     /* Set "local" parameter for this dataset's "bits-per-pixel" */
-    params[H5Z_SZIP_PARM_BPP] = dtype_precision;
+    params[H5Z_SZIP_PARM_BPP] = (unsigned)dtype_precision;
 
     /* Adjust scanline if it is smaller than number of pixels per block or
        if it is bigger than maximum pixels per scanline, or there are more than

@@ -62,14 +62,14 @@
 #define NCZM_FILE_V1 1
 
 #ifdef S_IRUSR
-static int NC_DEFAULT_CREATE_PERMS =
+static mode_t NC_DEFAULT_CREATE_PERMS =
            (S_IRUSR|S_IWUSR        |S_IRGRP|S_IWGRP);
-static int NC_DEFAULT_RWOPEN_PERMS =
+static mode_t NC_DEFAULT_RWOPEN_PERMS =
            (S_IRUSR|S_IWUSR        |S_IRGRP|S_IWGRP);
-static int NC_DEFAULT_ROPEN_PERMS =
+static mode_t NC_DEFAULT_ROPEN_PERMS =
 //           (S_IRUSR                |S_IRGRP);
            (S_IRUSR|S_IWUSR        |S_IRGRP|S_IWGRP);
-static int NC_DEFAULT_DIR_PERMS =
+static mode_t NC_DEFAULT_DIR_PERMS =
   	   (S_IRUSR|S_IWUSR|S_IXUSR|S_IRGRP|S_IXGRP|S_IWGRP);
 #else
 static int NC_DEFAULT_CREATE_PERMS = 0660;
@@ -154,7 +154,7 @@ zfileinitialize(void)
     if(!zfinitialized) {
         ZTRACE(5,NULL);
 	const char* env = NULL;
-	int perms = 0;
+	mode_t perms = 0;
 	env = getenv("NC_DEFAULT_CREATE_PERMS");
 	if(env != NULL && strlen(env) > 0) {
 	    if(sscanf(env,"%d",&perms) == 1) NC_DEFAULT_CREATE_PERMS = perms;
@@ -180,7 +180,7 @@ zfileinitialize(void)
 */
 
 static int
-zfilecreate(const char *path, int mode, size64_t flags, void* parameters, NCZMAP** mapp)
+zfilecreate(const char *path, mode_t mode, size64_t flags, void* parameters, NCZMAP** mapp)
 {
     int stat = NC_NOERR;
     char* canonpath = NULL;
@@ -257,7 +257,7 @@ done:
 */
 
 static int
-zfileopen(const char *path, int mode, size64_t flags, void* parameters, NCZMAP** mapp)
+zfileopen(const char *path, mode_t mode, size64_t flags, void* parameters, NCZMAP** mapp)
 {
     int stat = NC_NOERR;
     char* canonpath = NULL;
@@ -686,7 +686,7 @@ static int
 zfcreategroup(ZFMAP* zfmap, const char* key, int nskip)
 {
     int stat = NC_NOERR;
-    size_t i;
+    int i;
     int len;
     char* fullpath = NULL;
     NCbytes* path = ncbytesnew();
@@ -695,14 +695,14 @@ zfcreategroup(ZFMAP* zfmap, const char* key, int nskip)
     ZTRACE(5,"map=%s key=%s nskip=%d",zfmap->map.url,key,nskip);
     if((stat=nczm_split(key,segments)))
 	goto done;    
-    len = nclistlength(segments);
+    len = (int)nclistlength(segments);
     len -= nskip; /* leave off last nskip segments */
     ncbytescat(path,zfmap->root); /* We need path to be absolute */
     /* open and optionally create the root directory */	
     if((stat = platformcreatedir(zfmap->map.mode,ncbytescontents(path)))) goto done;
     /* Create subsidary groups (if any) */
     for(i=0;i<len;i++) {
-	const char* seg = nclistget(segments,i);
+	const char* seg = nclistget(segments,(size_t)i);
 	ncbytescat(path,"/");
 	ncbytescat(path,seg);
 	/* open and optionally create the directory */	
@@ -869,7 +869,7 @@ platformcreatefile(mode_t mode, const char* canonpath, FD* fd)
     int stat = NC_NOERR;
     int ioflags = 0;
     int createflags = 0;
-    int permissions = NC_DEFAULT_ROPEN_PERMS;
+    mode_t permissions = NC_DEFAULT_ROPEN_PERMS;
 
     ZTRACE(6,"map=%s canonpath=%s",zfmap->map.url,canonpath);
     
@@ -910,7 +910,7 @@ platformopenfile(mode_t mode, const char* canonpath, FD* fd)
 {
     int stat = NC_NOERR;
     int ioflags = 0;
-    int permissions = 0;
+    mode_t permissions = 0;
 
     ZTRACE(6,"map=%s canonpath=%s",zfmap->map.url,canonpath);
 
@@ -1227,9 +1227,9 @@ platformseek(FD* fd, int pos, size64_t* sizep)
     ret = NCfstat(fd->fd, &statbuf);    
     if(ret < 0)
 	{ret = platformerr(errno); goto done;}
-    if(sizep) size = *sizep; else size = 0;
+    if(sizep) size = (off_t)*sizep; else size = 0;
     newsize = lseek(fd->fd,size,pos);
-    if(sizep) *sizep = newsize;
+    if(sizep) *sizep = (size64_t)newsize;
 done:
     errno = 0;
     return ZUNTRACEX(ret,"sizep=%llu",*sizep);
@@ -1250,7 +1250,7 @@ platformread(FD* fd, size64_t count, void* content)
         ssize_t red;
         if((red = read(fd->fd,readpoint,need)) <= 0)
 	    {stat = errno; goto done;}
-        need -= red;
+        need -= (size_t)red;
 	readpoint += red;
     }
 done:
@@ -1273,7 +1273,7 @@ platformwrite(FD* fd, size64_t count, const void* content)
         ssize_t red = 0;
         if((red = write(fd->fd,(void*)writepoint,need)) <= 0)	
 	    {ret = NC_EACCESS; goto done;}
-        need -= red;
+        need -= (size_t)red;
 	writepoint += red;
     }
 done:

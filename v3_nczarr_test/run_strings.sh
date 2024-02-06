@@ -3,7 +3,7 @@
 if test "x$srcdir" = x ; then srcdir=`pwd`; fi 
 . ../test_common.sh
 
-. "$srcdir/../nczarr_test/test_nczarr.sh"
+. "${srcdir}/test_nczarr.sh"
 
 # This shell script tests support for the NC_STRING type
 
@@ -26,7 +26,7 @@ fileargs tmp_string_nczarr "mode=nczarr,$zext"
 nczarrurl="$fileurl"
 nczarrfile="$file"
 
-# setupp
+# setup
 deletemap $zext $zarrfile
 deletemap $zext $nczarrfile
 

@@ -96,6 +96,7 @@ captureuid() {
 unset MATCHKEYS
 for key in $ALLKEYS ; do
     case "$key" in
+        "$S3TESTSUBTREE/alltests_"*) captureuid "alltests" ;;
         "$S3TESTSUBTREE/nczarr_test_"*) captureuid "nczarr_test" ;;
         "$S3TESTSUBTREE/v3_nczarr_test_"*) captureuid "v3_nczarr_test" ;;
         "$S3TESTSUBTREE/v3_tests_"*) captureuid "v3_tests" ;;

@@ -16,11 +16,11 @@ static unsigned int optimize = 0;
 extern int NCZ_buildchunkkey(size_t R, const size64_t* chunkindices, char** keyp);
 
 /* 0 => no debug */
-static unsigned int wdebug = 1;
+static int wdebug = 1;
 
 /* Forward */
 static int NCZ_walk(NCZProjection** projv, NCZOdometer* chunkodom, NCZOdometer* slpodom, NCZOdometer* memodom, const struct Common* common, void* chunkdata);
-static int rangecount(NCZChunkRange range);
+static size64_t rangecount(NCZChunkRange range);
 static int readfromcache(void* source, size64_t* chunkindices, void** chunkdata);
 static int iswholechunk(struct Common* common,NCZSlice*);
 static int wholechunk_indices(struct Common* common, NCZSlice* slices, size64_t* chunkindices);
@@ -88,7 +88,8 @@ NCZ_transferslice(NC_VAR_INFO_T* var, int reading,
 		  size64_t* start, size64_t* count, size64_t* stride,
 		  void* memory, nc_type typecode)
 {
-    int r,stat = NC_NOERR;
+    int stat = NC_NOERR;
+    size_t r;
     size64_t dimlens[NC_MAX_VAR_DIMS];
     unsigned char isunlimited[NC_MAX_VAR_DIMS];
     size64_t chunklens[NC_MAX_VAR_DIMS];
@@ -156,7 +157,7 @@ NCZ_transferslice(NC_VAR_INFO_T* var, int reading,
     }
 
     if(wdebug >= 1) {
-        fprintf(stderr,"\trank=%d",common.rank);
+        fprintf(stderr,"\trank=%zu",common.rank);
         if(!common.scalar) {
   	    fprintf(stderr," dimlens=%s",nczprint_vector(common.rank,dimlens));
             fprintf(stderr," chunklens=%s",nczprint_vector(common.rank,chunklens));
@@ -214,13 +215,13 @@ NCZ_transfer(struct Common* common, NCZSlice* slices)
     */     
 
     if(wdebug >= 2)
-	fprintf(stderr,"slices=%s\n",nczprint_slices(common->rank,slices));
+	fprintf(stderr,"slices=%s\n",nczprint_slices((int)common->rank,slices));
 
     if((stat = NCZ_projectslices(common, slices, &chunkodom)))
 	goto done;
 
     if(wdebug >= 4) {
-	fprintf(stderr,"allprojections:\n%s",nczprint_allsliceprojections(common->rank,common->allprojections)); fflush(stderr);
+	fprintf(stderr,"allprojections:\n%s",nczprint_allsliceprojections((int)common->rank,common->allprojections)); fflush(stderr);
     }
 
     wholechunk = iswholechunk(common,slices);
@@ -271,7 +272,7 @@ NCZ_transfer(struct Common* common, NCZSlice* slices)
     /* iterate over the odometer: all combination of chunk
        indices in the projections */
     for(;nczodom_more(chunkodom);) {
-	int r;
+	size_t r;
 	size64_t* chunkindices = NULL;
         NCZSlice slpslices[NC_MAX_VAR_DIMS];
         NCZSlice memslices[NC_MAX_VAR_DIMS];
@@ -298,7 +299,7 @@ NCZ_transfer(struct Common* common, NCZSlice* slices)
 	if(wdebug > 0) {
   	    fprintf(stderr,"Selected projections:\n");
 	    for(r=0;r<common->rank;r++) {
-  	        fprintf(stderr,"\t[%d] %s\n",r,nczprint_projection(*proj[r]));
+  	        fprintf(stderr,"\t[%zu] %s\n",r,nczprint_projection(*proj[r]));
 		shape[r] = proj[r]->iocount;
 	    }
 	    fprintf(stderr,"\tshape=%s\n",nczprint_vector(common->rank,shape));
@@ -359,8 +360,8 @@ wdebug2(const struct Common* common, unsigned char* slpptr, unsigned char* mempt
     unsigned char* membase = common->memory;
     unsigned slpoff = (unsigned)(slpptr - slpbase);
     unsigned memoff = (unsigned)(memptr - membase);
-    unsigned slpidx = slpoff / common->typesize;
-    unsigned memidx = memoff / common->typesize;
+    unsigned slpidx = slpoff / (unsigned)common->typesize;
+    unsigned memidx = memoff / (unsigned)common->typesize;
     unsigned value;
 
     fprintf(stderr,"wdebug2: %s: [%u/%d] %u->%u",
@@ -517,7 +518,7 @@ transfern(const struct Common* common, unsigned char* slpptr, unsigned char* mem
 	    }
 	}
         if(common->swap && xtype < NC_STRING)
-            NCZ_swapatomicdata(len,memptr,common->typesize);
+            NCZ_swapatomicdata(len,memptr,(int)common->typesize);
     } else { /*writing*/
 unsigned char* srcbase = (common->reading?chunkdata:common->memory);
 unsigned srcoff = (unsigned)(memptr - srcbase);
@@ -534,7 +535,7 @@ unsigned srcidx = srcoff / sizeof(unsigned); (void)srcidx;
 	    }
 	}
         if(common->swap && xtype < NC_STRING)
-            NCZ_swapatomicdata(len,slpptr,common->typesize);
+            NCZ_swapatomicdata(len,slpptr,(int)common->typesize);
     }
 done:
     return THROW(stat);
@@ -577,7 +578,7 @@ NCZ_projectslices(struct Common* common,
                   NCZOdometer** odomp)
 {
     int stat = NC_NOERR;
-    int r;
+    size_t r;
     NCZOdometer* odom = NULL;
     NCZSliceProjections* allprojections = NULL;
     NCZChunkRange ranges[NC_MAX_VAR_DIMS];
@@ -605,7 +606,7 @@ NCZ_projectslices(struct Common* common,
 
     /* Compute the shape vector */
     for(r=0;r<common->rank;r++) {
-        int j;
+        size_t j;
         size64_t iocount = 0;
         NCZProjection* projections = allprojections[r].projections;
         for(j=0;j<allprojections[r].count;j++) {
@@ -641,7 +642,7 @@ done:
 /***************************************************/
 /* Utilities */
 
-static int
+static size64_t
 rangecount(NCZChunkRange range)
 {
     return (range.stop - range.start);
@@ -654,7 +655,7 @@ size64_t
 NCZ_computelinearoffset(size_t R, const size64_t* indices, const size64_t* dimlens)
 {
       size64_t offset;
-      int i;
+      size_t i;
 
       offset = 0;
       for(i=0;i<R;i++) {
@@ -684,10 +685,10 @@ NCZ_offset2indices(size_t R, size64_t offset, const size64_t* dimlens, size64_t*
 /* Unit test entry points */
 
 int
-NCZ_chunkindexodom(int rank, const NCZChunkRange* ranges, size64_t* chunkcounts, NCZOdometer** odomp)
+NCZ_chunkindexodom(size_t rank, const NCZChunkRange* ranges, size64_t* chunkcounts, NCZOdometer** odomp)
 {
     int stat = NC_NOERR;
-    int r;
+    size_t r;
     NCZOdometer* odom = NULL;
     size64_t start[NC_MAX_VAR_DIMS];
     size64_t stop[NC_MAX_VAR_DIMS];
@@ -728,7 +729,7 @@ NCZ_clearcommon(struct Common* common)
 static int
 iswholechunk(struct Common* common, NCZSlice* slices)
 {
-    int i;
+    size_t i;
     
     /* Check that slices cover a whole chunk */
     for(i=0;i<common->rank;i++) {
@@ -745,7 +746,7 @@ iswholechunk(struct Common* common, NCZSlice* slices)
 static int
 wholechunk_indices(struct Common* common, NCZSlice* slices, size64_t* chunkindices)
 {
-    int i;
+    size_t i;
     for(i=0;i<common->rank;i++)
 	chunkindices[i] = (slices[i].start / common->chunklens[i]);
     return NC_NOERR;

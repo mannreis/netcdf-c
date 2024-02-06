@@ -35,7 +35,7 @@ typedef struct NCZ_Formatter {
     int (*readmeta)  (NC_FILE_INFO_T* file);
     int (*writemeta) (NC_FILE_INFO_T* file);
     int (*readattrs) (NC_FILE_INFO_T* file, NC_OBJ* container, const NCjson* jatts, const NCjson* jtypes, struct NCZ_AttrInfo**);
-    int (*buildchunkkey)(size_t rank, const size64_t* chunkindices, char dimsep, char** keyp);
+    int (*buildchunkkey)(int rank, const size64_t* chunkindices, char dimsep, char** keyp);
     int (*codec2hdf) (const NC_FILE_INFO_T* file, const NC_VAR_INFO_T* var, const NCjson* jfilter, NCZ_Filter* filter, struct NCZ_Plugin* plugin);
     int (*hdf2codec) (const NC_FILE_INFO_T* file, const NC_VAR_INFO_T* var, NCZ_Filter* filter);
 } NCZ_Formatter;
@@ -61,7 +61,7 @@ extern int NCZF_readattrs(NC_FILE_INFO_T* file, NC_OBJ* container, const NCjson*
 extern int NCZF_codec2hdf(const NC_FILE_INFO_T* file, const NC_VAR_INFO_T* var, const NCjson* jfilter, NCZ_Filter* filter, struct NCZ_Plugin* plugin);
 extern int NCZF_hdf2codec(const NC_FILE_INFO_T* file, const NC_VAR_INFO_T* var, NCZ_Filter* filter);
 
-extern int NCZF_buildchunkkey(const NC_FILE_INFO_T* file, size_t rank, const size64_t* chunkindices, char dimsep, char** keyp);
+extern int NCZF_buildchunkkey(const NC_FILE_INFO_T* file, int rank, const size64_t* chunkindices, char dimsep, char** keyp);
 
 /* Define known dispatch tables and initializers */
 /* Each handles a specific NCZarr format + Pure Zarr */
@@ -75,7 +75,7 @@ extern const NCZ_Formatter* NCZ_formatter3; /* NCZarr V3 dispatch table => Zarr 
 /**************************************************/
 
 /* Use inference to get map and the formatter */
-extern int NCZ_get_map(NC_FILE_INFO_T* file, NCURI* url, int mode, size64_t constraints, void* params, NCZMAP** mapp);
+extern int NCZ_get_map(NC_FILE_INFO_T* file, NCURI* url, mode_t mode, size64_t constraints, void* params, NCZMAP** mapp);
 extern int NCZ_get_formatter(NC_FILE_INFO_T* file, const NCZ_Formatter** formatterp);
 
 /* Misc */

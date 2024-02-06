@@ -66,9 +66,9 @@ EXTERNL int NCZ_readdict(NCZMAP* zmap, const char* key, NCjson** jsonp);
 EXTERNL int NCZ_readarray(NCZMAP* zmap, const char* key, NCjson** jsonp);
 EXTERNL int ncz_nctypedecode(const char* snctype, nc_type* nctypep);
 
-EXTERNL int ncz2_nctype2dtype(nc_type nctype, int endianness, int purezarr,int len, char** dnamep);
+EXTERNL int ncz2_nctype2dtype(nc_type nctype, int endianness, int purezarr, size_t len, char** dnamep);
 EXTERNL int ncz2_dtype2nctype(const char* dtype, nc_type typehint, int purezarr, nc_type* nctypep, int* endianp, size_t* typelenp);
-EXTERNL int ncz3_nctype2dtype(nc_type nctype, int purezarr, int strlen, char** dnamep, const char** tagp);
+EXTERNL int ncz3_nctype2dtype(nc_type nctype, int purezarr, size_t strlen, char** dnamep, const char** tagp);
 EXTERNL int ncz3_dtype2nctype(const char* dtype, const char* hint, nc_type* nctypep, size_t* typelenp);
 
 EXTERNL int NCZ_inferattrtype(const NCjson* value, nc_type typehint, nc_type* typeidp);
@@ -88,9 +88,9 @@ EXTERNL int NCZ_ischunkname(const char* name,char dimsep);
 EXTERNL char* NCZ_chunkpath(struct ChunkKey key);
 EXTERNL int NCZ_reclaim_fill_value(NC_VAR_INFO_T* var);
 EXTERNL int NCZ_copy_fill_value(NC_VAR_INFO_T* var, void** dstp);
-EXTERNL int NCZ_get_maxstrlen(NC_OBJ* obj);
-EXTERNL int NCZ_fixed2char(const void* fixed, char** charp, size_t count, int maxstrlen);
-EXTERNL int NCZ_char2fixed(const char** charp, void* fixed, size_t count, int maxstrlen);
+EXTERNL size_t NCZ_get_maxstrlen(NC_OBJ* obj);
+EXTERNL int NCZ_fixed2char(const void* fixed, char** charp, size_t count, size_t maxstrlen);
+EXTERNL int NCZ_char2fixed(const char** charp, void* fixed, size_t count, size_t maxstrlen);
 EXTERNL int NCZ_copy_data(NC_FILE_INFO_T* file, NC_VAR_INFO_T* var, const void* memory, size_t count, int reading, void* copy);
 EXTERNL int NCZ_iscomplexjson(const NCjson* value, nc_type typehint);
 EXTERNL int NCZ_iscomplexjsontext(size_t textlen, const char* text, NCjson** jsonp);

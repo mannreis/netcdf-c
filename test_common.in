@@ -212,18 +212,26 @@ cd $builddir
 # Parallel make can cause inter-test interference (mostly because of historical naming issues).
 # As a protection against this, the isolate() function supports the creation of an
 # isolation directory in which created products are stored.
-# Cleanup can be accomplished by deleting the whole isolation directory.
-# The name of the isolation directory is by convention "testdir_<random>".
+# The top level isolation directory is by convention "testdir_<random>".
 # The isolation dir is created within the ${builddir} directory.
 # The <random> is a generated 32 bit unsigned random integer to make the chance
 # of collision very small.
 # Process ID was not used because of the small but real chance of collision.
+# Within the top-level isolation directory, each test directory creates its own
+# isolation directory. So, for example, the "nczarr_test" test directory
+# create a directory "nczarr_test" under the top-level isolation directory.
+# Thus it creates a directory whose path is "testdir_<random>/nczarr_test".
+# Finally, note that cleanup can be accomplished by deleting the
+# whole isolation directory: testdir_<random>.
 
 isolate() {
   if test "x${ISOPATH}" = x ; then
+      # Get the root directory for these tests
+      ISOTESTDIR=`pwd`
+      ISOTESTDIR=`basename ${ISOTESTDIR}`
+      if test "x$NOISOPATH" = x ; then ISOUID="${TESTUID}"; else ISOUID="0"; fi    
+      ISOPATH="${top_builddir}/alltests_${ISOUID}/${ISOTESTDIR}"
       ISODIR="$1"
-      ISOPATH="${builddir}"
-      if test "x$NOISOPATH" = x ; then ISOPATH="${ISOPATH}_${TESTUID}"; fi    
       ISOPATH="${ISOPATH}/${ISODIR}"
       rm -fr $ISOPATH
       mkdir -p $ISOPATH

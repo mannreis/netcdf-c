@@ -105,7 +105,7 @@ NCZ_s3finalize(void)
 }
 
 static int
-zs3create(const char *path, int mode, size64_t flags, void* parameters, NCZMAP** mapp)
+zs3create(const char *path, mode_t mode, size64_t flags, void* parameters, NCZMAP** mapp)
 {
     int stat = NC_NOERR;
     ZS3MAP* z3map = NULL;
@@ -185,7 +185,7 @@ no obvious way to test for existence.
 So, we assume that the dataset must have
 some content. We look for that */
 static int
-zs3open(const char *path, int mode, size64_t flags, void* parameters, NCZMAP** mapp)
+zs3open(const char *path, mode_t mode, size64_t flags, void* parameters, NCZMAP** mapp)
 {
     int stat = NC_NOERR;
     ZS3MAP* z3map = NULL;
@@ -428,7 +428,8 @@ but it possible that it is not.
 static int
 zs3list(NCZMAP* map, const char* prefix, NClist* matches)
 {
-    int i,stat = NC_NOERR;
+    int stat = NC_NOERR;
+    size_t i;
     ZS3MAP* z3map = (ZS3MAP*)map;
     char** list = NULL;
     size_t nkeys;
@@ -463,11 +464,11 @@ assert(newkey[0] != '/');
         }
 	/* Now remove duplicates */
 	for(i=0;i<nclistlength(tmp);i++) {
-	    int j;
+	    size_t j;
 	    int duplicate = 0;
-	    const char* is = nclistget(tmp,i);
+	    const char* is = (char*)nclistget(tmp,i);
 	    for(j=0;j<nclistlength(matches);j++) {
-	        const char* js = nclistget(matches,j);
+	        const char* js = (char*)nclistget(matches,j);
 	        if(strcmp(js,is)==0) {duplicate = 1; break;} /* duplicate */
 	    }	    
 	    if(!duplicate)
@@ -520,12 +521,12 @@ zs3listall(NCZMAP* map, const char* prefix, NClist* matches)
     if(nkeys > 0) {
 	/* remove duplicates and prefix */
 	for(i=0;i<nkeys;i++) {
-	    int j;
+	    size_t j;
 	    int duplicate = 0;
 	    char* is = list[i];
     	    if(strcmp(is,prefix)==0) {list[i] = NULL; nullfree(is); continue;}
 	    for(j=0;j<nclistlength(matches);j++) {
-	        char* js = nclistget(matches,j);
+	        char* js = (char*)nclistget(matches,j);
 	        if(strcmp(js,is)==0) {duplicate = 1; break;} /* duplicate */
 	    }	    
 	    if(!duplicate) {

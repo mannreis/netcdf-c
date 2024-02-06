@@ -3,7 +3,7 @@
 if test "x$srcdir" = x ; then srcdir=`pwd`; fi
 . ../test_common.sh
 
-. "$srcdir/../nczarr_test/test_nczarr.sh"
+. "${srcdir}/test_nczarr.sh"
 
 set -e
 
@@ -81,16 +81,14 @@ ${execdir}/testfilter_misc $fileurl
 # Verify the parameters via ncdump
 ${NCDUMP} -s $fileurl > ./tmp_misc_$zext.txt
 # Extract the parameters
-rm -f ./tmp_misc2_$zext.txt
 getfilterattr ./tmp_misc_$zext.txt ./tmp_misc2_$zext.txt
 rm -f ./tmp_misc_$zext.txt
 trimleft ./tmp_misc2_$zext.txt ./tmp_misc_$zext.txt
 rm -f ./tmp_misc2_$zext.txt
-# Note that the values here are technically out of order because of
 cat >./tmp_misc2_$zext.txt <<EOF
-var:_Filter = "32768,3,239,23,65511,27,77,93,1145389056,1,2147483648,4294967295,4294967295,3287505826,1097305129" ;
+var:_Filter = "32768,2,239,23,65511,27,77,93,1145389056,3287505826,1097305129,1,2147483648,4294967295,4294967295" ;
 EOF
-diff -b -w ./tmp_misc_$zext.txt ./tmp_misc2_$zext.txt
+diff -b -w ./tmp_misc_$zext.txt ./tmp_misc_$zext.txt
 echo "*** Pass: parameter passing for storage format $zext"
 }
 

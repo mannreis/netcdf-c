@@ -298,7 +298,7 @@ NCZ_addfilter(NC_FILE_INFO_T* file, NC_VAR_INFO_T* var, unsigned int id, size_t 
     if(zvar->incompletefilters == NULL) zvar->incompletefilters = (void*)nclistnew();
 
     /* Before anything else, find the matching plugin */
-    if((stat = NCZ_plugin_loaded(id,&plugin))) goto done;
+    if((stat = NCZ_plugin_loaded((int)id,&plugin))) goto done;
     if(plugin == NULL) {
 	stat = THROW(NC_ENOFILTER);
 	goto done;
@@ -333,7 +333,7 @@ NCZ_addfilter(NC_FILE_INFO_T* file, NC_VAR_INFO_T* var, unsigned int id, size_t 
 	nullfree(fi->hdf5.working.params);
         /* Fill in the hdf5 */
         fi->hdf5 = hdf5_empty; /* struct copy */
-	fi->hdf5.id = id;
+	fi->hdf5.id = (int)id;
         /* Capture the visible parameters */
         fi->hdf5.visible.nparams = nparams;
         if(nparams > 0) {
@@ -354,14 +354,15 @@ done:
 int
 NCZ_filter_remove(NC_VAR_INFO_T* var, unsigned int id)
 {
-    int k, stat = NC_NOERR;
+    int stat = NC_NOERR;
+    size_t k;
     NClist* flist = (NClist*)var->filters;
 
     ZTRACE(6,"var=%s id=%u",var->hdr.name,id);
     /* Walk backwards */
     for(k=nclistlength(flist)-1;k>=0;k--) {
 	struct NCZ_Filter* f = (struct NCZ_Filter*)nclistget(flist,k);
-        if(f->hdf5.id == id) {
+        if(f->hdf5.id == (int)id) {
 	    /* Remove from variable */
     	    nclistremove(flist,k);
 	    /* Reclaim */
@@ -391,7 +392,7 @@ NCZ_filter_lookup(NC_VAR_INFO_T* var, unsigned int id, struct NCZ_Filter** specp
     for(i=0;i<nclistlength(flist);i++) {
 	NCZ_Filter* spec = nclistget(flist,i);
 	assert(spec != NULL);
-	if(spec->hdf5.id == id && !FILTERINCOMPLETE(spec)) {
+	if(spec->hdf5.id == (int)id && !FILTERINCOMPLETE(spec)) {
 	    if(specp) *specp = spec;
 	    break;
 	}
@@ -539,7 +540,7 @@ NCZ_def_var_filter(int ncid, int varid, unsigned int id, size_t nparams,
 	     * than the number of elements in a chunk of data. */
             size_t num_elem = 1;
             int d;
-            for (d = 0; d < var->ndims; d++)
+            for (d = 0; d < (int)var->ndims; d++)
                 if (var->dim[d]->len)
 		    num_elem *= var->dim[d]->len;
             /* Pixels per block must be <= number of elements. */
@@ -588,7 +589,7 @@ NCZ_inq_var_filter_ids(int ncid, int varid, size_t* nfiltersp, unsigned int* ids
 	size_t k;
 	for(k=0;k<nfilters;k++) {
 	    struct NCZ_Filter* f = (struct NCZ_Filter*)nclistget(flist,k);
-            ids[k] = f->hdf5.id;
+            ids[k] = (unsigned int)(f->hdf5.id);
 	}
     }
     if(nfiltersp) *nfiltersp = nfilters;
@@ -723,17 +724,19 @@ NCZ_filter_finalize(void)
     }
     /* Reclaim the codec defaults */
     if(nclistlength(plugins.codec_defaults) > 0) {
-        for(i=0;i<nclistlength(plugins.codec_defaults);i++) {
-	    struct CodecAPI* ca = (struct CodecAPI*)nclistget(plugins.codec_defaults,i);
+	size_t j;
+        for(j=0;j<nclistlength(plugins.codec_defaults);j++) {
+	    struct CodecAPI* ca = (struct CodecAPI*)nclistget(plugins.codec_defaults,j);
     	    nullfree(ca);
 	}
     }
     /* Reclaim the defaults library contents; Must occur as last act */
     if(nclistlength(plugins.default_libs) > 0) {
-        for(i=0;i<nclistlength(plugins.default_libs);i++) {
-	    NCPSharedLib* l = (NCPSharedLib*)nclistget(plugins.default_libs,i);
+	size_t j;
+        for(j=0;j<nclistlength(plugins.default_libs);j++) {
+	    NCPSharedLib* l = (NCPSharedLib*)nclistget(plugins.default_libs,j);
 #ifdef DEBUGL
-   fprintf(stderr,">>> DEBUGL: NCZ_filter_finalize: reclaim default_lib[i]=%p\n",l);
+   fprintf(stderr,">>> DEBUGL: NCZ_filter_finalize: reclaim default_lib[j]=%p\n",l);
 #endif
     	    if(l != NULL) (void)ncpsharedlibfree(l);
 	}
@@ -1622,9 +1625,9 @@ ensure_working(NC_FILE_INFO_T* file, NC_VAR_INFO_T* var, NCZ_Filter* filter)
 #endif
         if(filter->plugin && filter->plugin->codec.codec->NCZ_modify_parameters) {
 	    NCproplist* props = ncplistnew();
-	    ncplistadd(props,"zarr_format",zfile->zarr.zarr_format);
-    	    ncplistadd(props,"fileid",ncidfor(var));
-    	    ncplistadd(props,"varid",var->hdr.id);
+	    ncplistadd(props,"zarr_format",(uintptr_t)zfile->zarr.zarr_format);
+    	    ncplistadd(props,"fileid",(size_t)ncidfor(var));
+    	    ncplistadd(props,"varid",(uintptr_t)var->hdr.id);
 	    stat = filter->plugin->codec.codec->NCZ_modify_parameters(props,&filter->hdf5.id,
 				&filter->hdf5.visible.nparams, &filter->hdf5.visible.params,
 				&filter->hdf5.working.nparams, &filter->hdf5.working.params);

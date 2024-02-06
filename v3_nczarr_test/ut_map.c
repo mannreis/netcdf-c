@@ -3,6 +3,7 @@
  *      See netcdf/COPYRIGHT file for copying and redistribution conditions.
  */
 
+#include "ncconfigure.h"
 #include "ut_includes.h"
 
 #undef DEBUG
@@ -121,6 +122,31 @@ simpledelete(void)
 	goto done;
 
 done:
+    return THROW(stat);
+}
+
+static int
+search(void)
+{
+    int i,stat = NC_NOERR;
+    NCZMAP* map = NULL;
+    NClist* objects = nclistnew();
+
+    if((stat = nczmap_open(impl,url,0,0,NULL,&map)))
+	goto done;
+
+    /* Do a recursive search on root to get all object keys */
+    if((stat=ut_search(map,"/",objects))) goto done;
+
+    /* Print out the list */
+    for(i=0;i<nclistlength(objects);i++) {
+	const char* key = nclistget(objects,i);
+	printf("[%d] %s\n",i,key);
+    }
+
+done:
+    (void)nczmap_close(map,0);
+    nclistfreeall(objects);
     return THROW(stat);
 }
 
@@ -274,7 +300,7 @@ readdata(void)
     NCZMAP* map = NULL;
     char* path = NULL;
     int data1[DATA1LEN];
-    int i;
+    size64_t i;
     size64_t chunklen, totallen;
     char* data1p = NULL; /* byte level pointer into data1 */
 
@@ -309,7 +335,7 @@ readdata(void)
     /* Validate */
     for(i=0;i<DATA1LEN;i++) {
 	if(data1[i] != i) {
-	    fprintf(stderr,"data mismatch: is: %d should be: %d\n",data1[i],i);
+	    fprintf(stderr,"data mismatch: is: %d should be: %llu\n",data1[i],i);
 	    stat = NC_EINVAL;
 	    goto done;
 	}
@@ -319,71 +345,5 @@ done:
     /* Do not delete so we can look at it with ncdump */
     (void)nczmap_close(map,0);
     nullfree(path);
-    return THROW(stat);
-}
-
-static int
-searchR(NCZMAP* map, int depth, const char* prefix0, NClist* objects)
-{
-    int i,stat = NC_NOERR;
-    NClist* matches = nclistnew();
-    char prefix[4096]; /* only ok because we know testdata */
-    size_t prefixlen;
-    
-    nclistpush(objects,strdup(prefix0));
-
-    prefix[0] = '\0';
-    strlcat(prefix,prefix0,sizeof(prefix));
-    prefixlen = strlen(prefix);
-
-    /* get next level object keys **below** the prefix: should have form: <name> */
-    switch (stat = nczmap_search(map, prefix, matches)) {
-    case NC_NOERR: break;
-    case NC_ENOOBJECT: stat = NC_NOERR; break;/* prefix is not an object */
-    default: goto done;
-    }
-    /* recurse */
-    for(i=0;i<nclistlength(matches);i++) {
-	const char* key = nclistget(matches,i);
-	/* ensure trailing '/' */
-        if(prefix[prefixlen-1] != '/')
-	    strlcat(prefix,"/",sizeof(prefix));
-	strlcat(prefix,key,sizeof(prefix));
-        if((stat = searchR(map,depth+1,prefix,objects))) goto done;
-	/* restore prefix */
-	prefix[prefixlen] = '\0';
-	if(stat != NC_NOERR)
-	    goto done;
-    }
-done:
-    nclistfreeall(matches);
-    return THROW(stat);
-}
-
-static int
-search(void)
-{
-    int i,stat = NC_NOERR;
-    NCZMAP* map = NULL;
-    NClist* objects = nclistnew();
-
-    if((stat = nczmap_open(impl,url,0,0,NULL,&map)))
-	goto done;
-
-    /* Do a recursive search on root to get all object keys */
-    if((stat=searchR(map,0,"/",objects)))
-	goto done;
-    /* Sort */
-    ut_sortlist(objects);
-    /* Print out the list */
-    for(i=0;i<nclistlength(objects);i++) {
-	const char* key = nclistget(objects,i);
-	printf("[%d] %s\n",i,key);
-    }
-
-done:
-    /* Do not delete so later tests can use it */
-    (void)nczmap_close(map,0);
-    nclistfreeall(objects);
     return THROW(stat);
 }

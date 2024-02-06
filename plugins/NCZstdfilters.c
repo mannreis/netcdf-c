@@ -345,8 +345,8 @@ NCZ_blosc_modify_parameters(const NCproplist* env, int* idp, size_t* vnparamsp, 
     if((stat = nc_inq_type((int)ncid,vtype,NULL,&typesize))) goto done;
 
     /* Compute chunksize */
-    if((chunklens = (size_t*)calloc(ndims,sizeof(size_t)))==NULL) goto done;
-    if((stat = nc_inq_var_chunking((int)ncid,varid,&storage,chunklens))) goto done;
+    if((chunklens = (size_t*)calloc((size_t)ndims,sizeof(size_t)))==NULL) goto done;
+    if((stat = nc_inq_var_chunking((int)ncid,(int)varid,&storage,chunklens))) goto done;
     if(storage != NC_CHUNKED) {stat = NC_EFILTER; goto done;}
     chunksize = typesize;
     for(i=0;i<ndims;i++) chunksize *= chunklens[i];
@@ -359,7 +359,7 @@ NCZ_blosc_modify_parameters(const NCproplist* env, int* idp, size_t* vnparamsp, 
     params[1] = BLOSC_VERSION_FORMAT;
     params[2] = (unsigned)typesize;
 
-    params[3] = chunksize;
+    params[3] = (unsigned)chunksize;
     params[4] = params[4];
     params[5] = params[5];
     params[6] = params[6];

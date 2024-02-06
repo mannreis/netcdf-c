@@ -274,7 +274,8 @@ NCZ_write_ncproperties(NC_FILE_INFO_T* h5)
 #ifdef SUPPRESSNCPROPERTY
     return NC_NOERR;
 #else /*!SUPPRESSNCPROPERTY*/
-    int i,stat = NC_NOERR;
+    int stat = NC_NOERR;
+    size_t i;
     NC4_Provenance* prov = &h5->provenance;
     NC_ATT_INFO_T* ncprops = NULL;
     NCindex* attlist = NULL;
@@ -305,7 +306,7 @@ NCZ_write_ncproperties(NC_FILE_INFO_T* h5)
         if((stat=nc4_att_list_add(attlist,NCPROPS,&ncprops)))
 	    goto done;
 	ncprops->nc_typeid = NC_CHAR;
-	ncprops->len = strlen(prov->ncproperties);
+	ncprops->len = (int)strlen(prov->ncproperties);
 	if((ncprops->data = strdup(prov->ncproperties)) == NULL)
 	    {stat = NC_ENOMEM; goto done;}
 	ncprops->dirty = 1;

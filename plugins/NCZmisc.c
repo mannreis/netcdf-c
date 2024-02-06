@@ -190,9 +190,9 @@ NCZ_misc_hdf5_to_codec(const NCproplist* env, int id, size_t nparams, const unsi
 
     jlen = sizeof(json);
     if(zarrformat == 2) {
-        count = snprintf(json,sizeof(json),"{\"id\": \"%s\"",NCZ_misc_codec.codecid);
+        count = (size_t)snprintf(json,sizeof(json),"{\"id\": \"%s\"",NCZ_misc_codec.codecid);
         for(i=0;i<14;i++) {
-            size_t len = snprintf(value,sizeof(value),", \"%s\": \"%u\"",fields[i],params[i]);
+            size_t len = (size_t)snprintf(value,sizeof(value),", \"%s\": \"%u\"",fields[i],params[i]);
 	    count += len; assert(jlen > count);
 	    strcat(json,value);
         }

@@ -58,7 +58,7 @@ typedef struct NCjson {
     int sort;     /* of this object */
     char* string; /* sort != DICT|ARRAY */
     struct NCjlist {
-	    int len;
+	    size_t len;
 	    struct NCjson** contents;
     } list; /* sort == DICT|ARRAY */
 } NCjson;

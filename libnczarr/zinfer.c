@@ -274,7 +274,7 @@ NCZ_infer_storage_type(NC_FILE_INFO_T* file, NCZ_FILE_INFO_T* zfile, NCURI* url,
 		zip_t* archive = NULL;
 	        int zerrno = ZIP_ER_OK;
 	        /* Open the file */
-                archive =  zip_open(url->path,zipflags,&zerrno);
+                archive =  zip_open(url->path,(int)zipflags,&zerrno);
 		if(archive != NULL) {
 		    impl = NCZM_ZIP;
 		    zip_close(archive);
@@ -304,7 +304,7 @@ Figure out the storage type and create and return a corresponding map.
 */
 
 int
-NCZ_get_map(NC_FILE_INFO_T* file, NCURI* url, int mode, size64_t constraints, void* params, NCZMAP** mapp)
+NCZ_get_map(NC_FILE_INFO_T* file, NCURI* url, mode_t mode, size64_t constraints, void* params, NCZMAP** mapp)
 {
     int stat = NC_NOERR;
     int create = 0;

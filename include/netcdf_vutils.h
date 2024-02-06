@@ -15,8 +15,8 @@ typedef struct VList {
 
 typedef struct VString {
   int nonextendible; /* 1 => fail if an attempt is made to extend this string*/
-  unsigned int alloc;
-  unsigned int length;
+  unsigned alloc;
+  unsigned length;
   char* content;
 } VString;
 
@@ -55,7 +55,7 @@ static void
 vlistexpand(VList* l)
 {
   void** newcontent = NULL;
-  size_t newsz;
+  unsigned newsz;
 
   if(l == NULL) return;
   newsz = (l->length * 2) + 1; /* basically double allocated space */
@@ -132,7 +132,7 @@ static void
 vsexpand(VString* vs)
 {
   char* newcontent = NULL;
-  size_t newsz;
+  unsigned newsz;
 
   if(vs == NULL) return;
   assert(vs->nonextendible == 0);
@@ -154,7 +154,7 @@ vsappendn(VString* vs, const char* elem, unsigned n)
 {
   size_t need;
   assert(vs != NULL && elem != NULL);
-  if(n == 0) {n = strlen(elem);}
+  if(n == 0) {n = (unsigned)strlen(elem);}
   need = vs->length + n;
   if(vs->nonextendible) {
      /* Space must already be available */

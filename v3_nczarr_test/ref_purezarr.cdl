@@ -1,9 +1,9 @@
 netcdf tmp_purezarr {
 dimensions:
-	_zdim_2 = 2 ;
-	_zdim_5 = 5 ;
+ 	x = 2 ;
+ 	y = 5 ;
 variables:
-	int i(_zdim_2, _zdim_5) ;
+	int i(x, y) ;
 data:
 
  i =
