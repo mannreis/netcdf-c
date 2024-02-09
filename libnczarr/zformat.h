@@ -9,6 +9,25 @@
 #ifndef ZFORMAT_H
 #define ZFORMAT_H
 
+/*
+Notes on internal architecture.
+
+Zarr version 2 vs Zarr version 3 is handled by using
+a dispatch table mechanism similar to the dispatch
+mechanism used in netcdf_dispatch.h to choose the
+netcdf file format.
+
+The dispatcher is defined by the type NCZ_Formatter.
+That dispatcher allows the Zarr format independent code
+to be isolated from the Zarr format specific code.
+The table has the following groups of entries:
+1. open/create/close
+2. misc. actions -- e.g. building chunk keys and converting between the Zarr codec and an HDF5 filter.
+3. reading metadata -- use the JSON metadata of a file to a fill in the tree of an instance of NC_FILE_INFO_T.
+4. writing metadata -- use an NC_FILE_INFO_T tree to build and write the JSON metadata of a file.
+*/
+
+
 /* This is the version of the formatter table. It should be changed
  * when new functions are added to the formatter table. */
 #ifndef NCZ_FORMATTER_VERSION
@@ -21,7 +40,6 @@
 
 /* Opaque */
 struct NCZ_Plugin;
-struct NCZ_Outline;
 
 /* This is the dispatch table, with a pointer to each netCDF
  * function. */
@@ -32,12 +50,23 @@ typedef struct NCZ_Formatter {
     int (*create)    (NC_FILE_INFO_T* file, NCURI* uri, NCZMAP* map);
     int (*open)      (NC_FILE_INFO_T* file, NCURI* uri, NCZMAP* map);
     int (*close)     (NC_FILE_INFO_T* file);
+
+    /* Read meta-data elements */
     int (*readmeta)  (NC_FILE_INFO_T* file);
-    int (*writemeta) (NC_FILE_INFO_T* file);
-    int (*readattrs) (NC_FILE_INFO_T* file, NC_OBJ* container, const NCjson* jatts, const NCjson* jtypes, struct NCZ_AttrInfo**);
-    int (*buildchunkkey)(int rank, const size64_t* chunkindices, char dimsep, char** keyp);
+
+    /* write meta-data elements */
+    int (*writemeta)  (NC_FILE_INFO_T* file);
+
+    /* Type converters */
+    int (*nctype2dtype)(nc_type nctype, int endianness, int purezarr, size_t len, char** dnamep, const char** tagp);
+    int (*dtype2nctype)(const char* dtype , const char* dalias, nc_type* nctypep, size_t* typelenp, int* endianp);
+
+    /* Codec converters */
     int (*codec2hdf) (const NC_FILE_INFO_T* file, const NC_VAR_INFO_T* var, const NCjson* jfilter, NCZ_Filter* filter, struct NCZ_Plugin* plugin);
     int (*hdf2codec) (const NC_FILE_INFO_T* file, const NC_VAR_INFO_T* var, NCZ_Filter* filter);
+
+    /* Misc. */
+    int (*buildchunkkey)(int rank, const size64_t* chunkindices, char dimsep, char** keyp);
 } NCZ_Formatter;
 
 #if defined(__cplusplus)
@@ -52,11 +81,13 @@ extern int NCZF_finalize(void);
 
 extern int NCZF_create(NC_FILE_INFO_T* file, NCURI* uri, NCZMAP* map);
 extern int NCZF_open(NC_FILE_INFO_T* file, NCURI* uri, NCZMAP* map);
-extern int NCZF_readmeta(NC_FILE_INFO_T* file);
-extern int NCZF_writemeta(NC_FILE_INFO_T* file);
 extern int NCZF_close(NC_FILE_INFO_T* file);
     
-extern int NCZF_readattrs(NC_FILE_INFO_T* file, NC_OBJ* container, const NCjson* jatts, const NCjson* jtypes, struct NCZ_AttrInfo**);
+extern int NCZF_readmeta(NC_FILE_INFO_T* file);
+extern int NCZF_writemeta(NC_FILE_INFO_T* file);
+
+extern int NCZF_nctype2dtype(NC_FILE_INFO_T* file, nc_type nctype, int endianness, int purezarr, size_t len, char** dnamep, const char** tagp);
+extern int NCZF_dtype2nctype(NC_FILE_INFO_T* file, const char* dtype , const char* dalias, nc_type* nctypep, size_t* typelenp, int* endianp);
 
 extern int NCZF_codec2hdf(const NC_FILE_INFO_T* file, const NC_VAR_INFO_T* var, const NCjson* jfilter, NCZ_Filter* filter, struct NCZ_Plugin* plugin);
 extern int NCZF_hdf2codec(const NC_FILE_INFO_T* file, const NC_VAR_INFO_T* var, NCZ_Filter* filter);
@@ -69,7 +100,6 @@ extern int NCZF_buildchunkkey(const NC_FILE_INFO_T* file, int rank, const size64
    so fixes to one may need to be propagated to the other dispatchers.
 */
 
-extern const NCZ_Formatter* NCZ_formatter1; /* NCZarr V1 dispatch table => Zarr V2 */
 extern const NCZ_Formatter* NCZ_formatter2; /* NCZarr V2 dispatch table => Zarr V2 */
 extern const NCZ_Formatter* NCZ_formatter3; /* NCZarr V3 dispatch table => Zarr V3*/
 /**************************************************/
@@ -77,9 +107,6 @@ extern const NCZ_Formatter* NCZ_formatter3; /* NCZarr V3 dispatch table => Zarr 
 /* Use inference to get map and the formatter */
 extern int NCZ_get_map(NC_FILE_INFO_T* file, NCURI* url, mode_t mode, size64_t constraints, void* params, NCZMAP** mapp);
 extern int NCZ_get_formatter(NC_FILE_INFO_T* file, const NCZ_Formatter** formatterp);
-
-/* Misc */
-extern void NCZ_freeoutline(struct NCZ_Outline*);
 
 #if defined(__cplusplus)
 }

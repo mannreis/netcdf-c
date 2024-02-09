@@ -40,32 +40,14 @@ ncz_getattlist(NC_GRP_INFO_T *grp, int varid, NC_VAR_INFO_T **varp, NCindex **at
 
     assert(grp && attlist && file && zinfo);
 
-    if (varid == NC_GLOBAL)
-    {
-        /* Do we need to read the atts? */
-        if (!grp->atts_read) {
-	    assert(zinfo->zarr.zarr_format == 2);
-	    if((retval=NCZ_read_attrs(file,(NC_OBJ*)grp,NULL,NULL))) goto done;
-	}
-        if (varp)
-            *varp = NULL;
+    if (varid == NC_GLOBAL) {
+        if (varp) *varp = NULL;
         *attlist = grp->att;
-    }
-    else
-    {
+    } else {
         NC_VAR_INFO_T *var;
-
-        if (!(var = (NC_VAR_INFO_T *)ncindexith(grp->vars, (size_t)varid)))
-            return NC_ENOTVAR;
+        if (!(var = (NC_VAR_INFO_T *)ncindexith(grp->vars, (size_t)varid))) return NC_ENOTVAR;
         assert(var->hdr.id == varid);
-
-        /* Do we need to read the atts? */
-        if (!var->atts_read) {
-	    assert(zinfo->zarr.zarr_format == 2);
-	    if((retval=NCZ_read_attrs(file,(NC_OBJ*)var,NULL,NULL))) goto done;
-	}
-        if (varp)
-            *varp = var;
+        if (varp) *varp = var;
         *attlist = var->att;
     }
 done:
@@ -1082,130 +1064,6 @@ done:
 	nullfree(zatt);
     }
     return THROW(stat);
-}
-
-/**
-Find the attributes and attrbute types in json form
-and then create them in the appropriate container.
-@param file
-@param container Group or Variable.
-@param jatts the Attributes in json format or NULL if needs retrieval.
-@param jatypes the Attributes types 
-*/
-
-int
-NCZ_read_attrs(NC_FILE_INFO_T* file, NC_OBJ* container, const NCjson* jatts, const NCjson* jatypes)
-{
-    int stat = NC_NOERR;
-    size_t alen = 0;
-    struct NCZ_AttrInfo* ainfo = NULL;
-    struct NCZ_AttrInfo* ap = NULL;
-    NCZ_FILE_INFO_T* zfile = NULL;
-    NC_VAR_INFO_T* var = NULL;
-    NCZ_VAR_INFO_T* zvar = NULL;
-    NC_GRP_INFO_T* grp = NULL;
-    NC_ATT_INFO_T* att = NULL;
-    NC_ATT_INFO_T* fillvalueatt = NULL;
-    NCindex* attlist = NULL;
-    size_t len, typelen;
-    void* data = NULL;
-    int purezarr;
-    nc_type typehint = NC_NAT;
-    nc_type typeid = NC_NAT;
-
-    ZTRACE(3,"file=%s container=%s",file->controller->path,container->name);
-
-    zfile = (NCZ_FILE_INFO_T*)file->format_file_info;
-    purezarr = (zfile->flags & FLAG_PUREZARR)?1:0;
-
-    if(container->sort == NCGRP) {
-	grp = ((NC_GRP_INFO_T*)container);
-	attlist =  grp->att;
-    } else {
-	var = ((NC_VAR_INFO_T*)container);
-	zvar = (NCZ_VAR_INFO_T*)(var->format_var_info);
-	attlist =  var->att;
-    }
-
-    /* Read the attribute info */
-    if((stat=NCZF_readattrs(file,container,jatts,jatypes,&ainfo))) goto done;
-
-    if(ainfo != NULL) {
-	/* Create the attributes (watching out for special attributes) */
-        for(alen=0,ap=ainfo;ap->name;ap++,alen++) {
-            /* Iterate over the attributes to create the in-memory attributes */
-            /* Watch for special cases: _FillValue and  _ARRAY_DIMENSIONS (xarray), etc. */
-            const NC_reservedatt* ra = NULL;
-            int isfillvalue = 0;
-            int isdfaltmaxstrlen = 0;
-            int ismaxstrlen = 0;
-            /* See if this is a notable attribute */
-            if(var != NULL && strcmp(ap->name,NC_ATT_FILLVALUE)==0) isfillvalue = 1;
-	    if(grp != NULL && grp->parent == NULL && strcmp(ap->name,NC_NCZARR_DEFAULT_MAXSTRLEN_ATTR)==0)
-                isdfaltmaxstrlen = 1;
-            if(var != NULL && strcmp(ap->name,NC_NCZARR_MAXSTRLEN_ATTR)==0)
-                ismaxstrlen = 1;
-            /* Check for _nczarr_attrs */
-            if(strcmp(ap->name,NCZ_V2_ATTR)==0 || strcmp(ap->name,NCZ_V3_ATTR)==0) continue; /*ignore it*/
-    
-            /* See if this is reserved attribute */
-            ra = NC_findreserved(ap->name);
-            if(ra != NULL) {
-                /* case 1: name = _NCProperties, grp=root, varid==NC_GLOBAL */
-                if(strcmp(ap->name,NCPROPS)==0 && grp != NULL && file->root_grp == grp) {
-                    /* Setup provenance */
-                    if(!NCJisatomic(ap->values)) {stat = (THROW(NC_ENCZARR)); goto done;} /*malformed*/
-                    if((stat = NCZ_read_provenance(file,ap->name,NCJstring(ap->values)))) goto done;
-                }
-                /* case 2: name = _ARRAY_DIMENSIONS, sort==NCVAR, flags & HIDDENATTRFLAG */
-                if(strcmp(ap->name,NC_XARRAY_DIMS)==0 && var != NULL && (ra->flags & HIDDENATTRFLAG)) {
-                    /* store for later */
-                    size_t i;
-                    assert(NCJsort(ap->values) == NCJ_ARRAY);
-                    if((zvar->xarray = nclistnew())==NULL) {stat = NC_ENOMEM; goto done;}
-                    for(i=0;i<NCJarraylength(ap->values);i++) {
-                        const NCjson* k = NCJith(ap->values,i);
-                        assert(k != NULL && NCJisatomic(k));
-                        nclistpush(zvar->xarray,strdup(NCJstring(k)));
-                    }
-                }
-                /* case other: if attribute is hidden */
-                if(ra->flags & HIDDENATTRFLAG) continue; /* ignore it */
-            }
-            typehint = NC_NAT;
-            if(isfillvalue)
-                typehint = var->type_info->hdr.id ; /* if unknown use the var's type for _FillValue */
-            /* Create the attribute */
-            /* Collect the attribute's type and value  */
-            if((stat = NCZ_computeattrinfo(ap->name,ap->nctype,typehint,purezarr,ap->values,
-                                       &typeid,&typelen,&len,&data)))
-                    goto done;
-            if((stat = ncz_makeattr(container,attlist,ap->name,typeid,len,data,&att))) goto done;
-            /* No longer need this copy of the data */
-            if((stat = NC_reclaim_data_all(file->controller,att->nc_typeid,data,len))) goto done;
-            data = NULL;
-            if(isfillvalue)
-                fillvalueatt = att;
-            if(ismaxstrlen && att->nc_typeid == NC_INT)
-                zvar->maxstrlen = ((size_t*)att->data)[0];
-            if(isdfaltmaxstrlen && att->nc_typeid == NC_INT)
-                zfile->default_maxstrlen = ((size_t*)att->data)[0];
-        }
-    }
-    
-    /* Some attributes can be computed from the variable's metadata */    
-
-    /* Create _FillValue from the Variable's metadata */
-    if(fillvalueatt == NULL && container->sort == NCVAR) {
-        /* If we have not read a _FillValue, then go ahead and create it */
-       if((stat = ncz_create_fillvalue((NC_VAR_INFO_T*)container))) goto done;
-    }
-    NCZ_setatts_read(container); /* Remember that we have read the atts for this var or group. */
-done:
-    NCZ_freeAttrInfoVec(ainfo);
-    if(data != NULL)
-        stat = NC_reclaim_data(file->controller,att->nc_typeid,data,len);
-    return ZUNTRACE(THROW(stat));
 }
 
 /*

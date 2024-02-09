@@ -11,6 +11,56 @@
 
 /**************************************************/
 
+/* Mnemonics */
+#define NOENDIAN -1
+
+/**************************************************/
+
+/* Table for converting nc_type to dtype+alias */
+static const struct ZTNCYPE2DTYPEV3 {
+    const char* zarr; /* Must be a legitimate Zarr V3 type */
+    size_t typelen;
+    const char* type_alias;
+} zv3nctype2dtype[N_NCZARR_TYPES] = {
+/* nc_type       Pure Zarr   typelen    NCZarr */
+/*NC_NAT*/      {NULL,          0,      NULL},
+/*NC_BYTE*/     {"int8",        1,      NULL},
+/*NC_CHAR*/     {"uint8",       1,      "char"},
+/*NC_SHORT*/    {"int16",       2,      NULL},
+/*NC_INT*/      {"int32",       4,      NULL},
+/*NC_FLOAT*/    {"float32",     4,      NULL},
+/*NC_DOUBLE*/   {"float64",     8,      NULL},
+/*NC_UBYTE*/    {"uint8",       1,      NULL},
+/*NC_USHORT*/   {"uint16",      2,      NULL},
+/*NC_UINT*/     {"uint32",      4,      NULL},
+/*NC_INT64*/    {"int64",       8,      NULL},
+/*NC_UINT64*/   {"uint64",      8,      NULL},
+/*NC_STRING*/   {"r%u",         0,      "string"},
+/*NC_JSON*/     {"uint8",       1,      "json"} /* NCZarr internal type */
+};
+
+/* Table for converting dtype to nc_type */
+static const struct ZDTYPE2NCTYPEV3 {
+    const char* dtype; /* Must be a legitimate Zarr V3 type */
+    size_t typelen;
+} zv3dtype2nctype[N_NCZARR_TYPES] = {
+/* nc_type       dtype   typelen  */
+/*NC_NAT*/      {NULL,          0},
+/*NC_BYTE*/     {"int8",        1},
+/*NC_CHAR*/     {"char ",       1},
+/*NC_SHORT*/    {"int16",       2},
+/*NC_INT*/      {"int32",       4},
+/*NC_FLOAT*/    {"float32",     4},
+/*NC_DOUBLE*/   {"float64",     8},
+/*NC_UBYTE*/    {"uint8",       1},
+/*NC_USHORT*/   {"uint16",      2},
+/*NC_UINT*/     {"uint32",      4},
+/*NC_INT64*/    {"int64",       8},
+/*NC_UINT64*/   {"uint64",      8},
+/*NC_STRING*/   {"string",      0},
+/*NC_JSON*/     {"json",        1}
+};
+
 /**************************************************/
 /* Big endian Bytes filter */
 static const char* NCZ_Bytes_Big_Text = "{\"name\": \"bytes\", \"configuration\": {\"endian\": \"big\"}}";
@@ -30,10 +80,10 @@ static int ZF3_writemeta(NC_FILE_INFO_T* file);
 static int ZF3_readmeta(NC_FILE_INFO_T* file);
 static int ZF3_readattrs(NC_FILE_INFO_T* file, NC_OBJ* container, const NCjson* jatts, const NCjson* jatypes, struct NCZ_AttrInfo**);
 static int ZF3_buildchunkkey(int rank, const size64_t* chunkindices, char dimsep, char** keyp);
-#ifdef ENABLE_NCZARR_FILTERS
 static int ZF3_hdf2codec(const NC_FILE_INFO_T* file, const NC_VAR_INFO_T* var, NCZ_Filter* filter);
 static int ZF3_codec2hdf(const NC_FILE_INFO_T* file, const NC_VAR_INFO_T* var, const NCjson* jfilter, NCZ_Filter* filter, NCZ_Plugin* plugin);
-#endif
+static int ZF3_nctype2dtype(nc_type nctype, int endianness, int purezarr, size_t len, char** dnamep, const char** tagp);
+static int ZF3_dtype2nctype(const char* dtype , const char* dalias, nc_type* nctypep, size_t* typelenp, int* endianp);
 
 static int write_grp(NC_FILE_INFO_T* file, NC_GRP_INFO_T* grp);
 static int write_var_meta(NC_FILE_INFO_T* file, NCZ_FILE_INFO_T* zfile, NCZMAP* map, NC_VAR_INFO_T* var);
@@ -390,7 +440,7 @@ write_var_meta(NC_FILE_INFO_T* file, NCZ_FILE_INFO_T* zfile, NCZMAP* map, NC_VAR
     {	/* compute the type name */
 	int atomictype = var->type_info->hdr.id;
 	assert(atomictype > 0 && atomictype <= NC_MAX_ATOMIC_TYPE);
-	if((stat = ncz3_nctype2dtype(atomictype,purezarr,NCZ_get_maxstrlen((NC_OBJ*)var),&dtypename,&dtypehint))) goto done;
+	if((stat = ZF3_nctype2dtype(atomictype,NOENDIAN,purezarr,NCZ_get_maxstrlen((NC_OBJ*)var),&dtypename,&dtypehint))) goto done;
 	NCJinsertstring(jvar,"data_type",dtypename);
 	nullfree(dtypename); dtypename = NULL;
     }
@@ -696,7 +746,7 @@ build_atts(NC_FILE_INFO_T* file, NCZ_FILE_INFO_T* zfile, NC_OBJ* container, NCin
 
 	    if(!purezarr) {
 		/* Collect the corresponding dtype */
-		if((stat = ncz3_nctype2dtype(internaltype,purezarr,typesize,&dtype,&dtypehint))) goto done;
+		if((stat = ZF3_nctype2dtype(internaltype,NOENDIAN,purezarr,typesize,&dtype,&dtypehint))) goto done;
 		jtype = build_attr_type_dict(a->hdr.name,(dtypehint==NULL?(const char*)dtype:dtypehint));
 		nullfree(dtype); dtype = NULL;
 		NCJappend(jtypes,jtype);
@@ -895,7 +945,7 @@ ZF3_readattrs(NC_FILE_INFO_T* file, NC_OBJ* container, const NCjson* jatts, cons
 		if(jcfg == NULL || NCJsort(jcfg) != NCJ_DICT) {stat = (THROW(NC_ENCZARR)); goto done;}
 		NCJcheck(NCJdictget(jcfg,"type",&jatype));
 		if(jatype == NULL) {stat = (THROW(NC_ENCZARR)); goto done;}
-		if((stat = ncz3_dtype2nctype(NULL,NCJstring(jatype),&nctype,NULL))) goto done;
+		if((stat = ZF3_dtype2nctype(NULL,NCJstring(jatype),&nctype,NULL,NULL))) goto done;
 		/* find the matching ainfo entry */
 		for(j=0;j<natts;j++) {
 		    if(ainfo[j].name != NULL && strcmp(ainfo[j].name,NCJstring(jname)) == 0) {
@@ -1297,7 +1347,7 @@ read_var1(NC_FILE_INFO_T* file, NC_GRP_INFO_T* grp, const char* varname)
     {
 	NCJcheck(NCJdictget(jvar,"data_type",&jvalue));
 	/* Convert dtype to nc_type */
-	if((stat = ncz3_dtype2nctype(NCJstring(jvalue),(jhint==NULL?NULL:NCJstring(jhint)),&vtype,&vtypelen))) goto done;
+	if((stat = ZF3_dtype2nctype(NCJstring(jvalue),(jhint==NULL?NULL:NCJstring(jhint)),&vtype,&vtypelen,NULL))) goto done;
 	if(vtype > NC_NAT && vtype <= NC_MAX_ATOMIC_TYPE) { /* Disallows NC_JSON */
 	    /* Locate the NC_TYPE_INFO_T object */
 	    if((stat = ncz_gettype(file,grp,vtype,&var->type_info))) goto done;
@@ -1877,7 +1927,7 @@ NCZ_jtypes2atypes(int purezarr, const NCjson* jattrs, const NCjson* jtypes, nc_t
 	    const NCjson* jtype = NULL;
 	    /* Get the nc_type */
 	    NCJdictget(jtypes,NCJstring(akey),&jtype);
-	    if((stat = ncz3_dtype2nctype(NCJstring(jtype),&atypes[i],NULL))) goto done;
+	    if((stat = ZF3_dtype2nctype(NCJstring(jtype),&atypes[i],NULL))) goto done;
 	}
     }
     if(atypesp) {*atypesp = atypes; atypes = NULL;}
@@ -2210,12 +2260,11 @@ done:
 
 /* JSON Parse/unparse of filter codecs */
 
-#ifdef ENABLE_NCZARR_FILTERS
 int
 ZF3_hdf2codec(const NC_FILE_INFO_T* file, const NC_VAR_INFO_T* var, NCZ_Filter* filter)
 {
     int stat = NC_NOERR;
-
+#ifdef ENABLE_NCZARR_FILTERS
     /* Convert the HDF5 id + visible parameters to the codec form */
 
     /* Clear any previous codec */
@@ -2232,6 +2281,7 @@ ZF3_hdf2codec(const NC_FILE_INFO_T* file, const NC_VAR_INFO_T* var, NCZ_Filter* 
 	{stat = NC_EFILTER; goto done;}
 
 done:
+#endif /*ENABLE_NCZARR_FILTERS*/
     return THROW(stat);
 }
 
@@ -2240,6 +2290,7 @@ int
 ZF3_codec2hdf(const NC_FILE_INFO_T* file, const NC_VAR_INFO_T* var, const NCjson* jfilter, NCZ_Filter* filter, NCZ_Plugin* plugin)
 {
     int stat = NC_NOERR;
+#ifdef ENABLE_NCZARR_FILTERS
     const NCjson* jvalue = NULL;
     
     assert(jfilter != NULL);
@@ -2271,11 +2322,114 @@ ZF3_codec2hdf(const NC_FILE_INFO_T* file, const NC_VAR_INFO_T* var, const NCjson
     }
     
 done:
+#endif /*ENABLE_NCZARR_FILTERS*/
     return THROW(stat);
 }
-#endif /*ENABLE_NCZARR_FILTERS*/
 
 /**************************************************/
+/* Type Converters */
+
+/**
+@internal Given an nc_type+purezarr+MAXSTRLEN, produce the corresponding Zarr v3 dtype string.
+@param nctype     - [in] nc_type
+@param purezarr   - [in] 1=>pure zarr, 0 => nczarr
+@param strlen     - [in] max string length
+@param namep      - [out] pointer to hold pointer to the dtype; user frees
+@param tagp       - [out] pointer to hold pointer to the nczarr tag
+@return NC_NOERR
+@return NC_EINVAL
+@author Dennis Heimbigner
+*/
+
+static int
+ZF3_nctype2dtype(nc_type nctype, int endianness, int purezarr, size_t strlen, char** dnamep, const char** tagp)
+{
+    char dname[64];
+    const char* dtype = NULL;
+    const char* tag = NULL;
+
+    NC_UNUSED(endianness);
+    
+    if(nctype <= NC_NAT || nctype > N_NCZARR_TYPES) return NC_EINVAL;
+    dtype = zv3nctype2dtype[nctype].zarr;
+    tag = zv3nctype2dtype[nctype].type_alias;
+    snprintf(dname,sizeof(dname),dtype,strlen*8);
+    if(dnamep) *dnamep = strdup(dname);
+    if(tagp) *tagp = tag;
+    return NC_NOERR;		
+}
+
+/*
+@internal Convert a Zarr v3 data_type spec to a corresponding nc_type.
+@param dtype    - [in] dtype to convert
+@param dalias   - [in] alias of dtype
+@param nctypep  - [out] hold corresponding type
+@param typelenp - [out] hold corresponding type size (for fixed length strings)
+@return NC_NOERR
+@return NC_EINVAL
+@author Dennis Heimbigner
+*/
+
+static int
+ZF3_dtype2nctype(const char* dtype , const char* dalias, nc_type* nctypep, size_t* typelenp, int* endianp)
+{
+    int stat = NC_NOERR;
+    nc_type nctype = NC_NAT;
+    size_t typelen = 0;
+
+    NC_UNUSED(endianp);
+
+    if(nctypep) *nctypep = NC_NAT;
+    if(typelenp) *typelenp = 0;
+
+    /* handle netcdf type aliases */
+    if(dalias != NULL) { 
+	if(strcmp(dalias,"string")==0) {
+	    nctype = NC_STRING;	    
+	    if(dtype != NULL) {
+	        if(1 != sscanf(dtype,"r%zu",&typelen)) {stat = NC_ENCZARR; goto done;}
+		if((typelen % 8) != 0) {stat = NC_ENCZARR; goto done;}
+		typelen = typelen / 8; /* convert bits to bytes */
+	    }
+	} else if(strcmp(dalias,"char")==0) {
+	    nctype = NC_CHAR;
+	    typelen = 1;
+	} else if(strcmp(dalias,"json")==0) {
+	    nctype = NC_JSON;
+	    typelen = 0;
+	    /* short circuit handling of rn */
+	} else
+	    {dtype = dalias; dalias = NULL;}
+    }
+    /* Special case */
+    if(nctype == NC_NAT && (1 == sscanf(dtype,"r%zu",&typelen))) {
+	nctype = NC_STRING;
+   	if((typelen % 8) != 0) {stat = NC_ENCZARR; goto done;}
+	typelen = typelen / 8; /* convert bits to bytes */
+    }
+    if(nctype == NC_NAT) {
+	int i, match;
+	assert(dtype != NULL && dalias == NULL);
+	for(match=0,i=0;i<N_NCZARR_TYPES;i++) {
+	    if(zv3dtype2nctype[i].dtype == NULL) continue; /* NC_NAT only */
+	    if(strcmp(zv3dtype2nctype[i].dtype,dtype)==0) {
+                nctype = i;
+                typelen = zv3dtype2nctype[i].typelen;
+		match = 1;
+		break;
+	    }
+	}
+	if(!match) {stat = NC_ENOTZARR; goto done;}
+    }
+    if(nctypep) *nctypep = nctype;
+    if(typelenp) *typelenp = typelen;
+
+done:
+    return THROW(stat);
+}
+
+/*************************************************/
+
 
 /**
 Given a group path, collect the immediate
@@ -2413,15 +2567,11 @@ static const NCZ_Formatter NCZ_formatter3_table = {
     ZF3_close,
     ZF3_readmeta,
     ZF3_writemeta,
-    ZF3_readattrs,
-    ZF3_buildchunkkey,
-#ifdef ENABLE_NCZARR_FILTERS
+    ZF3_nctype2dtype,
+    ZF3_dtype2nctype,
     ZF3_codec2hdf,
     ZF3_hdf2codec,
-#else
-    NULL,
-    NULL,
-#endif
+    ZF3_buildchunkkey,
 };
 
 const NCZ_Formatter* NCZ_formatter3 = &NCZ_formatter3_table;

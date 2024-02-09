@@ -196,7 +196,8 @@ ncplistnew(void)
 OPTSTATIC int
 ncplistfree(NCproplist* plist)
 {
-    int i,stat = NC_NOERR;
+    int stat = NC_NOERR;
+    size_t i;
     if(plist == NULL) goto done;
     if(plist->properties != NULL) {
         for(i=0;i<plist->count;i++) {

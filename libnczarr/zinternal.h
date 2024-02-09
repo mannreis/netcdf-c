@@ -203,6 +203,7 @@ struct NCZMAP;
 struct NCZChunkCache;
 struct NCZ_Formatter;
 struct NCproplist;
+struct NCZ_META_HDR;
 
 /**************************************************/
 /* Define annotation data for NCZ objects */
@@ -232,11 +233,13 @@ typedef struct NCZ_FILE_INFO {
 #		define FLAG_XARRAYDIMS  8
     NCZM_IMPL mapimpl;
     struct NCZ_Formatter* dispatcher;
+    struct NCZ_META_HDR* metastate; /* Hold per-format state */
 } NCZ_FILE_INFO_T;
 
 /* This is a struct to handle the dim metadata. */
 typedef struct NCZ_DIM_INFO {
     NCZcommon common;
+    struct NCZ_META_HDR* metastate; /* Hold per-format state */
 } NCZ_DIM_INFO_T;
 
 /** Struct to hold ZARR-specific info for attributes. */
@@ -251,6 +254,7 @@ typedef struct NCZ_GRP_INFO {
        they may be in several places depending on the format. */
     char* grppath;
     NCjson* jatts; /* JSON encoding of the attributes; do not reclaim */
+    struct NCZ_META_HDR* metastate; /* Hold per-format state */
 } NCZ_GRP_INFO_T;
 
 /* Struct to hold ZARR-specific info for a variable. */
@@ -269,6 +273,7 @@ typedef struct NCZ_VAR_INFO {
     NCjson* jarray; /* Zarr.json; reclaim */
     const NCjson* jzarray; /* _nczarr_array: contains dimensions, attribute types, and storage type; do not reclaim */
     NCjson* jatts; /* JSON encoding of the attributes; do not reclaim */
+    struct NCZ_META_HDR* metastate; /* Hold per-format state */
 } NCZ_VAR_INFO_T;
 
 /* Struct to hold ZARR-specific info for a field. */
