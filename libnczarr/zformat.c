@@ -88,14 +88,14 @@ NCZF_hdf2codec(const NC_FILE_INFO_T* file, const NC_VAR_INFO_T* var, NCZ_Filter*
 }
 
 int
-NCZF_codec2hdf(const NC_FILE_INFO_T* file, const NC_VAR_INFO_T* var, const NCjson* jfilter, NCZ_Filter* filter, struct NCZ_Plugin* plugin)
+NCZF_codec2hdf(const NC_FILE_INFO_T* file, const NCjson* jfilter, NCZ_Filter* filter, struct NCZ_Plugin* plugin)
 {
     int stat = NC_NOERR;
     NCZ_FILE_INFO_T* zfile = NULL;
     
     zfile = (NCZ_FILE_INFO_T*)file->format_file_info;
     assert(zfile != NULL);
-    stat = zfile->dispatcher->codec2hdf(file,var,jfilter,filter,plugin);
+    stat = zfile->dispatcher->codec2hdf(file,jfilter,filter,plugin);
     return THROW(stat);
 }
 

@@ -250,9 +250,6 @@ typedef struct  NCZ_ATT_INFO {
 /* Struct to hold ZARR-specific info for a group. */
 typedef struct NCZ_GRP_INFO {
     NCZcommon common;
-    /* We need the key for accessing the grp's attributes since
-       they may be in several places depending on the format. */
-    char* grppath;
     NCjson* jatts; /* JSON encoding of the attributes; do not reclaim */
     struct NCZ_META_HDR* metastate; /* Hold per-format state */
 } NCZ_GRP_INFO_T;
@@ -269,7 +266,6 @@ typedef struct NCZ_VAR_INFO {
     char dimension_separator; /* '.' | '/' */
     NClist* incompletefilters;
     size_t maxstrlen; /* max length of strings for this variable */
-    char* varpath; /* Path to the variable */
     NCjson* jarray; /* Zarr.json; reclaim */
     const NCjson* jzarray; /* _nczarr_array: contains dimensions, attribute types, and storage type; do not reclaim */
     NCjson* jatts; /* JSON encoding of the attributes; do not reclaim */

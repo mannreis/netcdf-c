@@ -217,25 +217,25 @@ static int pluginnamecheck(const char* name);
  */
 
 int
-NCZ_filter_freelists(NC_VAR_INFO_T* var)
+NCZ_var_filters_free(NC_VAR_INFO_T* var)
 {
     size_t i;
     int stat=NC_NOERR;
     NClist* filters = NULL;
     NCZ_VAR_INFO_T* zvar = (NCZ_VAR_INFO_T*)var->format_var_info;
 
-    ZTRACE(6,"var=%s",var->hdr.name);
-    filters = (NClist*)var->filters;
-    if(filters == NULL) goto done;
-    /* Free the filter list elements */
-    for(i=0;i<nclistlength(filters);i++) {
-	struct NCZ_Filter* spec = nclistget(filters,i);
-	if((stat = NCZ_filter_free(spec))) goto done;
-    }
-    nclistfree(filters);
+    if((stat = NCZ_filter_freelist((NClist*)var->filters))) goto done;
     var->filters = NULL;
-    /* Free the incomplete filters */
-    filters = (NClist*)zvar->incompletefilters;
+    if((stat = NCZ_filter_freelist(zvar->incompletefilters))) goto done;
+    zvar->incompletefilters = NULL;
+done:
+    return THROW(stat);
+}
+
+int
+NCZ_filter_freelist(NClist* filters)
+{
+    ZTRACE(6,"var=%s",var->hdr.name);
     if(filters == NULL) goto done;
     /* Free the filter list elements */
     for(i=0;i<nclistlength(filters);i++) {
@@ -243,7 +243,6 @@ NCZ_filter_freelists(NC_VAR_INFO_T* var)
 	if((stat = NCZ_filter_free(spec))) goto done;
     }
     nclistfree(filters);
-    zvar->incompletefilters = NULL;
 done:
     return ZUNTRACE(stat);
 }
@@ -900,6 +899,7 @@ done:
     return ZUNTRACEX(stat,"codec=%s",NULLIFY(filter->codec.codec));
 }
 
+#if 0
 /* Build filter from parsed Zarr metadata */
 int
 NCZ_filter_build(const NC_FILE_INFO_T* file, NC_VAR_INFO_T* var, const NCjson* jfilter, int chainindex)
@@ -963,6 +963,7 @@ done:
     NCZ_filter_free(filter);
     return ZUNTRACE(stat);
 }
+#endif /*0*/
 
 /**************************************************/
 /* Filter loading */
