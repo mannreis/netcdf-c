@@ -94,14 +94,20 @@ EXTERNL int NCZ_char2fixed(const char** charp, void* fixed, size_t count, size_t
 EXTERNL int NCZ_copy_data(NC_FILE_INFO_T* file, NC_VAR_INFO_T* var, const void* memory, size_t count, int reading, void* copy);
 EXTERNL int NCZ_iscomplexjson(const NCjson* value, nc_type typehint);
 EXTERNL int NCZ_iscomplexjsontext(size_t textlen, const char* text, NCjson** jsonp);
-EXTERNL int NCZ_makeFQN(NC_GRP_INFO_T* parent, NC_OBJ* object, NCbytes* fqn);
-EXTERNL int NCZ_locateFQN(NC_GRP_INFO_T* parent, const char* fqn, NC_SORT sort, NC_OBJ** objectp);
+EXTERNL int NCZ_makeFQN(NC_GRP_INFO_T* parent, const char* objname, NCbytes* fqn);
+EXTERNL int NCZ_locateFQN(NC_GRP_INFO_T* parent, const char* fqn, NC_SORT sort, NC_OBJ** objectp, char** basenamep);
 EXTERNL char* NCZ_deescape(const char* s);
 EXTERNL char* NCZ_backslashescape(const char* s);
 EXTERNL int NCZ_sortstringlist(void* vec, size_t count);
 EXTERNL int NCZ_sortpairlist(void* vec, size_t count);
 EXTERNL void NCZ_freeAttrInfoVec(struct NCZ_AttrInfo* ainfo);
 EXTERNL void NCZ_setatts_read(NC_OBJ* container);
+EXTERNL int NCZ_computedimrefs(NC_FILE_INFO_T* file, NC_GRP_INFO_T* parent, size_t ndims,
+				size64_t* shapes,
+				char** dimnames,
+				char** dimfqns);
+EXTERNL int NCZ_decodesizet64vec(const NCjson* jshape, size64_t* shapes);
+EXTERNL int NCZ_decodesizetvec(const NCjson* jshape, size_t* shapes);
 
 /* zwalk.c */
 EXTERNL int NCZ_read_chunk(int ncid, int varid, size64_t* zindices, void* chunkdata);

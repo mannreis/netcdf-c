@@ -17,6 +17,7 @@
 
 #include "zincludes.h"
 #include "zfilter.h"
+#include "zfill.h"
 
 /* Forward */
 
@@ -656,75 +657,18 @@ ncz_find_grp_var_att(int ncid, int varid, const char *name, int attnum,
 int
 NCZ_ensure_fill_value(NC_VAR_INFO_T *var)
 {
-    size_t size;
-    int retval = NC_NOERR;
-    NC_FILE_INFO_T *h5 = var->container->nc4_info;
+    int stat = NC_NOERR;
 
     if(var->no_fill)
         return NC_NOERR;
 
-#if 0 /*LOOK*/
-    /* Find out how much space we need for this type's fill value. */
-    if (var->type_info->nc_type_class == NC_VLEN)
-        size = sizeof(nc_vlen_t);
-    else if (var->type_info->nc_type_class == NC_STRING)
-        size = sizeof(char *);
-    else
-#endif
-
-    if ((retval = nc4_get_typelen_mem(h5, var->type_info->hdr.id, &size))) goto done;
-    assert(size);
-
     /* If the user has set a fill_value for this var, use, otherwise find the default fill value. */
-
-    if (var->fill_value == NULL) {
-	/* initialize the fill_value to the default */
-	/* Allocate the fill_value space. */
-        if((var->fill_value = calloc(1, size))==NULL)
-	    {retval = NC_ENOMEM; goto done;}
-        if((retval = nc4_get_default_fill_value(var->type_info, var->fill_value))) {
-            /* Note: release memory, but don't return error on failure */
-	    (void)NCZ_reclaim_fill_value(var);
-	    retval = NC_NOERR;
-	    goto done;
-        }
-    }
+    if((stat = NCZ_set_fill_value(var->container->nc4_info,var,var->no_fill,var->fill_value))) goto done;
     assert(var->fill_value != NULL);
 
     LOG((4, "Found a fill value for var %s", var->hdr.name));
-#if 0 /*LOOK*/
-	/* Need to copy both vlen and a single basetype */
-        if (var->type_info->nc_type_class == NC_VLEN)
-        {
-            nc_vlen_t *in_vlen = (nc_vlen_t *)(var->fill_value);
-	    nc_vlen-t *fv_vlen = (nc_vlen_t *)fill;
-            size_t basetypesize = 0;
-
-            if((retval=nc4_get_typelen_mem(h5, var->type_info->u.v.base_nc_typeid, &basetypesize)))
-                return retval;
-
-            fv_vlen->len = in_vlen->len;
-            if (!(fv_vlen->p = malloc(basetypesize * in_vlen->len)))
-            {
-                free(*fillp);
-                *fillp = NULL;
-                return NC_ENOMEM;
-            }
-            memcpy(fv_vlen->p, in_vlen->p, in_vlen->len * basetypesize);
-        }
-        else if (var->type_info->nc_type_class == NC_STRING)
-        {
-            if (*(char **)var->fill_value)
-                if (!(**(char ***)fillp = strdup(*(char **)var->fill_value)))
-                {
-                    free(*fillp);
-                    *fillp = NULL;
-                    return NC_ENOMEM;
-                }
-        }
-#endif /*0*/
 done:
-    return retval;
+    return THROW(stat);
 }
 
 #ifdef LOGGING

@@ -9,8 +9,9 @@
  * @author Dennis Heimbigner, Ed Hartnett
  */
 
-#include "zincludes.h"
 #include <math.h> /* For pow() used below. */
+#include "zincludes.h"
+#include "zfill.h"
 
 /* Mnemonics */
 #define CREATE 0
@@ -522,7 +523,7 @@ ncz_def_var_extra(int ncid, int varid, int *shuffle, int *unused1,
     NC_VAR_INFO_T *var;
     NCZ_VAR_INFO_T *zvar;
     size_t d;
-    int retval = NC_NOERR;
+    int stat = NC_NOERR;
     int storage = NC_CHUNKED;
     size_t contigchunksizes[NC_MAX_VAR_DIMS]; /* Fake chunksizes if storage is contiguous or compact */
 
@@ -540,17 +541,17 @@ ncz_def_var_extra(int ncid, int varid, int *shuffle, int *unused1,
 	   );
 
     /* Find info for this file and group, and set pointer to each. */
-    if ((retval = nc4_find_nc_grp_h5(ncid, NULL, &grp, &h5)))
+    if ((stat = nc4_find_nc_grp_h5(ncid, NULL, &grp, &h5)))
 	goto done;
     assert(grp && h5);
 
     /* Trying to write to a read-only file? No way, Jose! */
     if (h5->no_write)
-	{retval = NC_EPERM; goto done;}
+	{stat = NC_EPERM; goto done;}
 
     /* Find the var. */
     if (!(var = (NC_VAR_INFO_T *)ncindexith(grp->vars, (size_t)varid)))
-	{retval = NC_ENOTVAR; goto done;}
+	{stat = NC_ENOTVAR; goto done;}
     assert(var && var->hdr.id == varid);
 
     zvar = var->format_var_info;
@@ -563,19 +564,19 @@ ncz_def_var_extra(int ncid, int varid, int *shuffle, int *unused1,
 #ifndef HDF5_SUPPORTS_PAR_FILTERS
     if (h5->parallel == NC_TRUE)
 	if (nclistlength(((NClist*)var->filters)) > 0  || fletcher32 || shuffle)
-	    {retval = NC_EINVAL; goto done;}
+	    {stat = NC_EINVAL; goto done;}
 #endif
 #endif
 
     /* If the HDF5 dataset has already been created, then it is too
      * late to set all the extra stuff. */
     if (var->created)
-        {retval = NC_ELATEDEF; goto done;}
+        {stat = NC_ELATEDEF; goto done;}
 
 #if 0
     /* Check compression options. */
     if (deflate && !deflate_level)
-	{retval = NC_EINVAL; goto done;}
+	{stat = NC_EINVAL; goto done;}
 
     /* Valid deflate level? */
     if (deflate)
@@ -583,17 +584,17 @@ ncz_def_var_extra(int ncid, int varid, int *shuffle, int *unused1,
 	if (*deflate)
 	    if (*deflate_level < NC_MIN_DEFLATE_LEVEL ||
 		*deflate_level > NC_MAX_DEFLATE_LEVEL)
-		{retval = NC_EINVAL; goto done;}
+		{stat = NC_EINVAL; goto done;}
 
 	/* For scalars, just ignore attempt to deflate. */
 	if (!var->ndims)
 	    goto done;
 
 	/* If szip is in use, return an error. */
-	if ((retval = nc_inq_var_szip(ncid, varid, &option_mask, NULL)))
+	if ((stat = nc_inq_var_szip(ncid, varid, &option_mask, NULL)))
 	    goto done;
 	if (option_mask)
-	    {retval = NC_EINVAL; goto done;}
+	    {stat = NC_EINVAL; goto done;}
 
 	/* Set the deflate settings. */
 	var->storage = NC_CONTIGUOUS;
@@ -606,18 +607,18 @@ ncz_def_var_extra(int ncid, int varid, int *shuffle, int *unused1,
 
     /* Shuffle filter? */
     if (shuffle && *shuffle) {
-	    retval = nc_inq_var_filter_info(ncid,varid,H5Z_FILTER_SHUFFLE,NULL,NULL);
-	    if(!retval || retval == NC_ENOFILTER) {
-	        if((retval = NCZ_def_var_filter(ncid,varid,H5Z_FILTER_SHUFFLE,0,NULL))) return retval;
+	    stat = nc_inq_var_filter_info(ncid,varid,H5Z_FILTER_SHUFFLE,NULL,NULL);
+	    if(!stat || stat == NC_ENOFILTER) {
+	        if((stat = NCZ_def_var_filter(ncid,varid,H5Z_FILTER_SHUFFLE,0,NULL))) return stat;
                 var->storage = NC_CHUNKED;
 	    }
     }
 
     /* Fletcher32 checksum error protection? */
     if (fletcher32 && fletcher32) {
-	retval = nc_inq_var_filter_info(ncid,varid,H5Z_FILTER_FLETCHER32,NULL,NULL);
-	if(!retval || retval == NC_ENOFILTER) {
-	    if((retval = NCZ_def_var_filter(ncid,varid,H5Z_FILTER_FLETCHER32,0,NULL))) return retval;
+	stat = nc_inq_var_filter_info(ncid,varid,H5Z_FILTER_FLETCHER32,NULL,NULL);
+	if(!stat || stat == NC_ENOFILTER) {
+	    if((stat = NCZ_def_var_filter(ncid,varid,H5Z_FILTER_FLETCHER32,0,NULL))) return stat;
             var->storage = NC_CHUNKED;
 	    }
     }
@@ -633,11 +634,11 @@ ncz_def_var_extra(int ncid, int varid, int *shuffle, int *unused1,
 	{
 #ifdef NCZARR_FILTERS
 	    if (nclistlength(((NClist*)var->filters)) > 0)
-		{retval = NC_EINVAL; goto done;}
+		{stat = NC_EINVAL; goto done;}
 #endif
 	    for (d = 0; d < var->ndims; d++) {
 		if (var->dim[d]->unlimited)
-		    {retval = NC_EINVAL; goto done;}
+		    {stat = NC_EINVAL; goto done;}
 	        contigchunksizes[d] = var->dim[d]->len; /* Fake a single big chunk */
 	    }
 	    chunksizes = (const size_t*)contigchunksizes;
@@ -645,7 +646,7 @@ ncz_def_var_extra(int ncid, int varid, int *shuffle, int *unused1,
 	}
 
 	if (storage == NC_CHUNKED && var->ndims == 0) {
-	    {retval = NC_EINVAL; goto done;}
+	    {stat = NC_EINVAL; goto done;}
 	} else if (storage == NC_CHUNKED && var->ndims > 0) {
 	    var->storage = NC_CHUNKED;
 	    
@@ -654,14 +655,14 @@ ncz_def_var_extra(int ncid, int varid, int *shuffle, int *unused1,
 	    if (chunksizes)
 	    {
 		/* Check the chunksizes for validity. */
-		if ((retval = check_chunksizes(grp, var, chunksizes)))
+		if ((stat = check_chunksizes(grp, var, chunksizes)))
 		    goto done;
 
 		/* Ensure chunksize is smaller than dimension size */
 		for (d = 0; d < var->ndims; d++)
 		    if (!var->dim[d]->unlimited && var->dim[d]->len > 0 &&
 			chunksizes[d] > var->dim[d]->len)
-			{retval = NC_EBADCHUNK; goto done;}
+			{stat = NC_EBADCHUNK; goto done;}
 	    }
 	}
 
@@ -681,7 +682,7 @@ ncz_def_var_extra(int ncid, int varid, int *shuffle, int *unused1,
 	    }
 	    /* If chunksizes == NULL or anyzero then use defaults */
 	    if(chunksizes == NULL || anyzero) { /* Use default chunking */
-		if ((retval = ncz_find_default_chunksizes2(grp, var)))
+		if ((stat = ncz_find_default_chunksizes2(grp, var)))
 		    goto done;
 	    }
 	    assert(var->chunksizes != NULL);
@@ -692,7 +693,7 @@ ncz_def_var_extra(int ncid, int varid, int *shuffle, int *unused1,
             zvar->chunksize = zvar->chunkproduct * var->type_info->size;
 	}
 	/* Adjust cache */
-        if((retval = NCZ_adjust_var_cache(var))) goto done;
+        if((stat = NCZ_adjust_var_cache(var))) goto done;
     
 #ifdef LOGGING
 	{
@@ -711,7 +712,7 @@ ncz_def_var_extra(int ncid, int varid, int *shuffle, int *unused1,
 	     * by HDF5 and will cause a HDF5 error later. */
 	    if (*no_fill)
 		if (var->type_info->hdr.id == NC_STRING)
-		    {retval = NC_EINVAL; goto done;}
+		    {stat = NC_EINVAL; goto done;}
 
 	    /* Set the no-fill mode. */
 	    var->no_fill = NC_TRUE;
@@ -727,24 +728,11 @@ ncz_def_var_extra(int ncid, int varid, int *shuffle, int *unused1,
 	LOG((4, "Copying fill value into metadata for variable %s",
 	     var->hdr.name));
 
-	/* If there's a _FillValue attribute, delete it. */
-	retval = NCZ_del_att(ncid, varid, _FillValue);
-	if (retval && retval != NC_ENOTATT)
-	    goto done;
+	/* (over-) write the NC_VAR_INFO_T.fill_value */	
+	if((stat = NCZ_set_fill_value(h5,var,*no_fill,fill_value))) goto done;
 
-        /* Create a _FillValue attribute; will also fill in var->fill_value */
-	if ((retval = nc_put_att(ncid, varid, _FillValue, var->type_info->hdr.id,
-				 1, fill_value)))
-	    goto done;
-        /* Reclaim any existing fill_chunk */
-        if((retval = NCZ_reclaim_fill_chunk(zvar->cache))) goto done;
-	var->fill_val_changed = 1;
-    } else if (var->fill_value && no_fill && (*no_fill)) { /* Turning off fill value? */
-        /* If there's a _FillValue attribute, delete it. */
-        retval = NCZ_del_att(ncid, varid, _FillValue);
-        if (retval && retval != NC_ENOTATT) return retval;
-	if((retval = NCZ_reclaim_fill_value(var))) return retval;
-	var->fill_val_changed = 1;
+        /* synchronize to Attribute */
+	if((stat = NCZ_copy_var_to_fillatt(h5,var))) goto done;
     }
 
     /* Is the user setting the endianness? */
@@ -766,7 +754,7 @@ ncz_def_var_extra(int ncid, int varid, int *shuffle, int *unused1,
 	case NC_UINT64:
 	    break;
 	default:
-	    {retval = NC_EINVAL; goto done;}
+	    {stat = NC_EINVAL; goto done;}
 	}
 	var->type_info->endianness = *endianness;
 	/* Propagate */
@@ -834,7 +822,7 @@ ncz_def_var_extra(int ncid, int varid, int *shuffle, int *unused1,
     }
 
 done:
-    return ZUNTRACE(retval);
+    return ZUNTRACE(stat);
 }
 
 /**

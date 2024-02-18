@@ -103,8 +103,6 @@ zclose_group(NC_GRP_INFO_T *grp)
 
     /* Close the zarr.json. */
     zgrp = grp->format_grp_info;
-    nullfree(zgrp->grppath);
-    
     nullfree(zgrp);
     grp->format_grp_info = NULL; /* avoid memory errors */
 
@@ -175,10 +173,9 @@ NCZ_zclose_var1(NC_VAR_INFO_T* var)
     if(var->type_info) (void)zclose_type(var->type_info);
     if(zvar->cache) NCZ_free_chunk_cache(zvar->cache);
     /* reclaim xarray */
-    if(zvar->xarray) nclistfreeall(zvar->xarray);
+    if(zvar->dimension_names) nclistfreeall(zvar->dimension_names);
 
     /* Reclaim misc. fields */
-    nullfree(zvar->varpath);
     NCJreclaim(zvar->jarray);
     
     /* Reclaim the object */

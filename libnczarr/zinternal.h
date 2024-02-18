@@ -88,7 +88,7 @@ Inserted into any .zarray
 }"
 Inserted into any .zattrs ? or should it go into the container?
 "_nczarr_attrs": "{
-\"types\": {\"attr1\": \"<i4\", \"attr2\": \"<i1\",...}
+\"types\": {\"attr1\": \"<i4\", \"attr2\": \"json\", \"attr2\": \"char\",...}
 }
 */
 
@@ -112,6 +112,7 @@ Optionally Inserted into any array zarr.json as an attribute:
 "_nczarr_array": "{
 \"dimension_references\": [\"/g1/g2/d1\", \"/d2\",...],
 \"type_alias\": "<string indicating special type aliasing>" // optional
+\"maxstrlen\": "<integer>" // optional
 }"
 ````
 The *dimension_references* key is an expansion of the "dimensions" key
@@ -262,7 +263,7 @@ typedef struct NCZ_VAR_INFO {
     int order; /* 1=>column major, 0=>row major (default); not currently enforced */
     int scalar;
     struct NCZChunkCache* cache;
-    struct NClist* xarray; /* names from _ARRAY_DIMENSIONS */
+    struct NClist* dimension_names; /* names from _ARRAY_DIMENSIONS or dimension_names key */
     char dimension_separator; /* '.' | '/' */
     NClist* incompletefilters;
     size_t maxstrlen; /* max length of strings for this variable */
@@ -348,12 +349,13 @@ int NCZ_zclose_var1(NC_VAR_INFO_T* var);
 
 /* zattr.c */
 int ncz_getattlist(NC_GRP_INFO_T *grp, int varid, NC_VAR_INFO_T **varp, NCindex **attlist);
-int ncz_create_fillvalue(NC_VAR_INFO_T* var);
-int ncz_makeattr(NC_OBJ*, NCindex* attlist, const char* name, nc_type typid, size_t len, void* values, NC_ATT_INFO_T**);
+int ncz_create_fillvalue(NC_FILE_INFO_T* file, NC_VAR_INFO_T* var);
 int NCZ_computeattrinfo(const char* name, nc_type atype, nc_type typehint, int purezarr, const NCjson* values, nc_type* typeidp, size_t* typelenp, size_t* lenp, void** datap);
-int NCZ_computeattrdata(nc_type typehint, nc_type* typeidp, const NCjson* values, size_t* typelenp, size_t* countp, void** datap);
+int NCZ_computeattrdata(nc_type* typeidp, const NCjson* values, size_t* typelenp, size_t* countp, void** datap);
 int NCZ_read_attrs(NC_FILE_INFO_T* file, NC_OBJ* container, const NCjson* jatts, const NCjson* jatypes);
 int NCZ_attr_convert(const NCjson* src, nc_type typeid, size_t typelen, size_t* countp, NCbytes* dst);
+int ncz_makeattr(NC_FILE_INFO_T* file, NC_OBJ* container, const char* name, nc_type typeid, size_t len, void* values, NC_ATT_INFO_T** attp);
+int NCZ_attr_delete(NC_FILE_INFO_T* file, NCindex* attlist, const char* name);
 
 /* zvar.c */
 int ncz_gettype(NC_FILE_INFO_T*, NC_GRP_INFO_T*, int xtype, NC_TYPE_INFO_T** typep);

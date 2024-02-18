@@ -11,7 +11,7 @@
  */
 
 #include "zincludes.h"
-#include <stddef.h>
+#include "znc4.h"
 
 #undef DEBUG
 
@@ -829,36 +829,6 @@ NCZ_chunkpath(struct ChunkKey key)
     return path;    
 }
 
-int
-NCZ_reclaim_fill_value(NC_VAR_INFO_T* var)
-{
-    int stat = NC_NOERR;
-    if(var->fill_value) {
-	int tid = var->type_info->hdr.id;
-	stat = NC_reclaim_data_all(var->container->nc4_info->controller,tid,var->fill_value,1);
-	var->fill_value = NULL;
-    }
-    /* Reclaim any existing fill_chunk */
-    if(!stat) stat = NCZ_reclaim_fill_chunk(((NCZ_VAR_INFO_T*)var->format_var_info)->cache);
-    return stat;
-}
-
-int
-NCZ_copy_fill_value(NC_VAR_INFO_T* var, void**  dstp)
-{
-    int stat = NC_NOERR;
-    int tid = var->type_info->hdr.id;
-    void* dst = NULL;
-
-    if(var->fill_value) {
-	if((stat = NC_copy_data_all(var->container->nc4_info->controller,tid,var->fill_value,1,&dst))) goto done;
-    }
-    if(dstp) {*dstp = dst; dst = NULL;}
-done:
-    if(dst) (void)NC_reclaim_data_all(var->container->nc4_info->controller,tid,dst,1);
-    return stat;
-}
-
 
 /* Get max str len for a variable or grp */
 /* Has side effect of setting values in the
@@ -1043,7 +1013,7 @@ loopexit:
 
 /* Caller must free return value */
 int
-NCZ_makeFQN(NC_GRP_INFO_T* parent, NC_OBJ* object, NCbytes* fqn)
+NCZ_makeFQN(NC_GRP_INFO_T* parent, const char* objname, NCbytes* fqn)
 {
     int stat = NC_NOERR;
     size_t i;
@@ -1052,7 +1022,7 @@ NCZ_makeFQN(NC_GRP_INFO_T* parent, NC_OBJ* object, NCbytes* fqn)
     char* escaped = NULL;
 
     /* Add in the object name */
-    if((escaped = NCZ_backslashescape(object->name))==NULL) goto done;
+    if((escaped = NCZ_backslashescape(objname))==NULL) goto done;
     nclistpush(segments,escaped);
     escaped = NULL;
 
@@ -1087,7 +1057,7 @@ done:
 @return NC_EXXX
 */
 int
-NCZ_locateFQN(NC_GRP_INFO_T* parent, const char* fqn, NC_SORT sort, NC_OBJ** objectp)
+NCZ_locateFQN(NC_GRP_INFO_T* parent, const char* fqn, NC_SORT sort, NC_OBJ** objectp, char** basenamep)
 {
     int ret = NC_NOERR;
     size_t i;
@@ -1114,6 +1084,8 @@ NCZ_locateFQN(NC_GRP_INFO_T* parent, const char* fqn, NC_SORT sort, NC_OBJ** obj
     /* Find an object to match the sort and last segment */
     do {
 	const char* segment = (const char*)nclistget(segments,count-1); /* last segment */
+	/* pass up to the caller */
+	if(basenamep) *basenamep = strdup(segment);
         object = ncindexlookup(grp->children,segment);
         if(object != NULL && (sort == NCNAT || sort == NCGRP)) break; /* match */
         object = ncindexlookup(grp->dim,segment);
@@ -1284,4 +1256,221 @@ NCZ_setatts_read(NC_OBJ* container)
         ((NC_GRP_INFO_T*)container)->atts_read = 1;
     else /* container->sort == NCVAR */
         ((NC_VAR_INFO_T*)container)->atts_read = 1;
+}
+
+#if 0
+/*
+Given a list of segments, find corresponding group.
+*/
+static int
+locategroup(NC_FILE_INFO_T* file, size_t nsegs, NClist* segments, NC_GRP_INFO_T** grpp)
+{
+    int found, stat = NC_NOERR;
+    size_t i, j;
+    NC_GRP_INFO_T* grp = NULL;
+
+    grp = file->root_grp;
+    for(i=0;i<nsegs;i++) {
+        const char* segment = nclistget(segments,i);
+        char norm_name[NC_MAX_NAME];
+        found = 0;
+        if((stat = nc4_check_name(segment,norm_name))) goto done;
+        for(j=0;j<ncindexsize(grp->children);j++) {
+            NC_GRP_INFO_T* subgrp = (NC_GRP_INFO_T*)ncindexith(grp->children,j);
+            if(strcmp(subgrp->hdr.name,norm_name)==0) {
+                grp = subgrp;
+                found = 1;
+                break;
+            }
+        }
+        if(!found) {stat = NC_ENOGRP; goto done;}
+    }
+    /* grp should be group of interest */
+    if(grpp) *grpp = grp;
+
+done:
+    return THROW(stat);
+}
+#endif
+
+#if 0
+static int
+parsedimrefs(NC_FILE_INFO_T* file, size_t rank, char** dimnames, size64_t* shape, NC_DIM_INFO_T** dims, int create)
+{
+    int stat = NC_NOERR;
+    size_t i;
+    NClist* segments = NULL;
+
+    for(i=0;i<rank;i++) {
+        NC_GRP_INFO_T* g = NULL;
+        NC_DIM_INFO_T* d = NULL;
+        size_t j;
+        const char* dimpath = dimnames[i];
+        const char* dimname = NULL;
+
+        /* Locate the corresponding NC_DIM_INFO_T* object */
+        nclistfreeall(segments);
+        segments = nclistnew();
+        if((stat = ncz_splitkey(dimpath,segments)))
+            goto done;
+        if((stat=locategroup(file,nclistlength(segments)-1,segments,&g)))
+            goto done;
+        /* Lookup the dimension */
+        dimname = nclistget(segments,nclistlength(segments)-1);
+        d = NULL;
+        dims[i] = NULL;
+        for(j=0;j<ncindexsize(g->dim);j++) {
+            d = (NC_DIM_INFO_T*)ncindexith(g->dim,j);
+            if(strcmp(d->hdr.name,dimname)==0) {
+                dims[i] = d;
+                break;
+            }
+        }
+        if(dims[i] == NULL && create) {
+            /* If not found and create then create it */
+	    if((stat = ncz4_create_dim(file,file->root_grp,dimname,shape[i],0,&dims[i]))) goto done;
+        } else {
+            /* Verify consistency */
+            if(dims[i]->len != shape[i])
+                {stat = NC_EDIMSIZE; goto done;}
+        }
+        assert(dims[i] != NULL);
+    }
+done:
+    nclistfreeall(segments);
+    return THROW(stat);
+}
+#endif
+
+/**
+Given the following:
+1. shape of a variable as a vector of integers [in]
+2. rank of the variable [in[
+3. set of dim names as simple names [in]
+4. set of fqns for each dimension [out]
+then create fqns for the dimension names.
+If the dimension does not exist, then use an anonymous name.
+
+We have two sources for the dimension names for this variable.
+1. the "dimension_names" inside the zarr.json (V3) dictionary;
+   this is the simple dimension name.
+2. the xarray "_ARRAY_DIMENSIONS" (V2) attribute as the simple dimension names.
+3. the "dimension_references" key inside the _nczarr_array dictionary;
+   this contains FQNs for the dimensions.
+
+If purezarr, then we only have #1 or #2. In that case, for each name in "dimension_names",
+we need to do the following:
+1. get the i'th size from the "shape" vector.
+2. if the i'th simple dimension name is null, then set the name to "_Anonymous_Dim<n>",
+   where n is the size from the shape vector.
+3. compute an equivalent of "dimension_references" by assuming that each simple dimension
+   name maps to an FQN in the current group containing the given variable.
+
+In any case, we now have an FQN for each dimension reference for the var.
+
+@param file
+@param grp containing var
+@param ndims rank of the variable
+@param shapes the shape of the var
+@param dimnames the simple names of the vars' dimensions (from xarray(v2), dimension_names(v3), or anonymous.
+@param dimfqns the fqns of the dimensions of the var
+@return NC_NOERR|NC_EXXX
+*/
+int
+NCZ_computedimrefs(NC_FILE_INFO_T* file, NC_GRP_INFO_T* grp,
+               size_t ndims,
+	       size64_t* shape,
+	       char** dimnames0,
+	       char** dimfqns)
+{
+    int stat = NC_NOERR;
+    size_t i;
+    int purezarr = 0;
+    NCZ_FILE_INFO_T* zfile = (NCZ_FILE_INFO_T*)file->format_file_info;
+    char zdimname[NC_MAX_NAME];
+    char* dimnames[NC_MAX_VAR_DIMS];
+    NCbytes* fqn = ncbytesnew();
+    
+    ZTRACE(3,"file=%s var=%s purezarr=%d ndims=%d shape=%s",
+        file->controller->path,var->hdr.name,purezarr,ndims,nczprint_vector(ndims,shape));
+
+    if(zfile->flags & FLAG_PUREZARR) purezarr = 1;
+
+    if(purezarr) {
+        assert(dimfqns != NULL);
+        for(i=0;i<ndims;i++) {
+	    assert(dimfqns[0] == NULL);
+	    if(dimnames0 == NULL || dimnames0[i] == NULL) {
+	        /* create anonymous dimension names */
+	        snprintf(zdimname,sizeof(zdimname),"%s_%llu",NCDIMANON,shape[i]);
+	        dimnames[i] = strdup(zdimname);
+	    } else { /* => dimnames0 != NULL && dimnames0[i] != NULL) */
+		assert(dimnames0 != NULL && dimnames0[i] != NULL);
+                dimnames[i] = nulldup(dimnames0[i]);
+	    }
+            /* convert dimension_names to FQNs */
+	    if((stat = NCZ_makeFQN(grp, dimnames[i], fqn))) goto done;
+            dimfqns[i] = ncbytesextract(fqn);
+         }
+    }
+done:
+    ncbytesfree(fqn);
+    NCZ_freestringvec(ndims,dimnames);
+    return ZUNTRACE(THROW(stat));
+}
+
+/* Convert a list of integer strings to size64_t integers */
+int
+NCZ_decodesizet64vec(const NCjson* jshape, size64_t* shapes)
+{
+    int stat = NC_NOERR;
+    size_t i;
+    
+    for(i=0;i<NCJarraylength(jshape);i++) {
+	struct ZCVT zcvt;
+	nc_type typeid = NC_NAT;
+	NCjson* jv = NCJith(jshape,i);
+	if((stat = NCZ_json2cvt(jv,&zcvt,&typeid))) goto done;
+	switch (typeid) {
+	case NC_INT64:
+	    if(zcvt.int64v < 0) {stat = (THROW(NC_ENCZARR)); goto done;}
+	    shapes[i] = (size64_t)zcvt.int64v;
+	    break;
+	case NC_UINT64:
+	    shapes[i] = zcvt.uint64v;
+	    break;
+	default: {stat = (THROW(NC_ENCZARR)); goto done;}
+	}
+    }
+
+done:
+    return THROW(stat);
+}
+
+/* Convert a list of integer strings to size_t integer */
+int
+NCZ_decodesizetvec(const NCjson* jshape, size_t* shapes)
+{
+    int stat = NC_NOERR;
+    size_t i;
+
+    for(i=0;i<NCJarraylength(jshape);i++) {
+	struct ZCVT zcvt;
+	nc_type typeid = NC_NAT;
+	NCjson* jv = NCJith(jshape,i);
+	if((stat = NCZ_json2cvt(jv,&zcvt,&typeid))) goto done;
+	switch (typeid) {
+	case NC_INT64:
+	    if(zcvt.int64v < 0) {stat = (THROW(NC_ENCZARR)); goto done;}
+	    shapes[i] = (size_t)zcvt.int64v;
+	    break;
+	case NC_UINT64:
+	    shapes[i] = (size_t)zcvt.uint64v;
+	    break;
+	default: {stat = (THROW(NC_ENCZARR)); goto done;}
+	}
+    }
+
+done:
+    return THROW(stat);
 }

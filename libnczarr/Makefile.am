@@ -31,6 +31,7 @@ noinst_LTLIBRARIES = libnczarr.la
 libnczarr_la_SOURCES = \
 zinfer.c \
 znc4.c \
+zfill.c \
 zformat.c \
 zformat2.c \
 zformat3.c \
@@ -57,6 +58,7 @@ zvar.c \
 zwalk.c \
 zdebug.c \
 zarr.h \
+zfill.h \
 zformat.h \
 zcache.h \
 zchunking.h \

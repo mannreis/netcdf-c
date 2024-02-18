@@ -57,16 +57,11 @@ typedef struct NCZ_Formatter {
     /* write meta-data elements */
     int (*writemeta)  (NC_FILE_INFO_T* file);
 
-    /* Type converters */
-    int (*nctype2dtype)(nc_type nctype, int endianness, int purezarr, size_t len, char** dnamep, const char** tagp);
-    int (*dtype2nctype)(const char* dtype , const char* dalias, nc_type* nctypep, size_t* typelenp, int* endianp);
-
     /* Codec converters */
-    int (*codec2hdf) (const NC_FILE_INFO_T* file, const NCjson* jfilter, NCZ_Filter* filter, struct NCZ_Plugin* plugin);
     int (*hdf2codec) (const NC_FILE_INFO_T* file, const NC_VAR_INFO_T* var, NCZ_Filter* filter);
 
     /* Misc. */
-    int (*buildchunkkey)(int rank, const size64_t* chunkindices, char dimsep, char** keyp);
+    int (*buildchunkkey)(size_t rank, const size64_t* chunkindices, char dimsep, char** keyp);
 } NCZ_Formatter;
 
 #if defined(__cplusplus)
@@ -89,10 +84,9 @@ extern int NCZF_writemeta(NC_FILE_INFO_T* file);
 extern int NCZF_nctype2dtype(NC_FILE_INFO_T* file, nc_type nctype, int endianness, int purezarr, size_t len, char** dnamep, const char** tagp);
 extern int NCZF_dtype2nctype(NC_FILE_INFO_T* file, const char* dtype , const char* dalias, nc_type* nctypep, size_t* typelenp, int* endianp);
 
-extern int NCZF_codec2hdf(const NC_FILE_INFO_T* file, const NCjson* jfilter, NCZ_Filter* filter, struct NCZ_Plugin* plugin);
 extern int NCZF_hdf2codec(const NC_FILE_INFO_T* file, const NC_VAR_INFO_T* var, NCZ_Filter* filter);
 
-extern int NCZF_buildchunkkey(const NC_FILE_INFO_T* file, int rank, const size64_t* chunkindices, char dimsep, char** keyp);
+extern int NCZF_buildchunkkey(const NC_FILE_INFO_T* file, size_t rank, const size64_t* chunkindices, char dimsep, char** keyp);
 
 /* Define known dispatch tables and initializers */
 /* Each handles a specific NCZarr format + Pure Zarr */

@@ -31,10 +31,12 @@ and do the command:
 #endif
 
 /* Override for plugins */
+#ifndef OPTEXPORT
 #ifdef NETCDF_PROPLIST_H
 #define OPTEXPORT static
 #else
 #define OPTEXPORT DLLEXPORT
+#endif
 #endif
 
 /**************************************************/

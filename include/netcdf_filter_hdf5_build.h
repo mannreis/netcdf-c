@@ -61,8 +61,9 @@
 /* H5Z_FILTER_RESERVED => H5Z_FILTER_RESERVED */
 #define H5Z_FILTER_RESERVED 256 /*filter ids below this value are reserved for library use */
 
-/* H5Z_FILTER_MAX => H5Z_FILTER_MAX */
+#ifndef H5Z_FILTER_MAX
 #define H5Z_FILTER_MAX 65535 /*maximum filter id */
+#endif
 
 /* Only a limited set of definition and invocation flags are allowed */
 #define H5Z_FLAG_MANDATORY      0x0000  /*filter is mandatory		*/

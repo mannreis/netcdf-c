@@ -15,21 +15,25 @@ and do the command:
     make makepluginjson
 */
 
-/* Inside libnetcdf and for plugins, export the json symbols */
-#ifndef DLLEXPORT
-#ifdef _WIN32
-#define DLLEXPORT __declspec(dllexport)
+#if defined(DLL_NETCDF) /* define when library is a DLL */
+#  if defined(DLL_EXPORT) /* define when building the library */
+#   define MSC_EXTRA __declspec(dllexport)
+#  else
+#   define MSC_EXTRA __declspec(dllimport)
+#  endif
 #else
-#define DLLEXPORT
-#endif
+#  define MSC_EXTRA
+#endif	/* defined(DLL_NETCDF) */
+#ifndef EXTERNL
+# define EXTERNL MSC_EXTRA extern
 #endif
 
 /* Override for plugins */
 #ifdef NETCDF_JSON_H
 #define OPTEXPORT static
 #else
-#define OPTEXPORT DLLEXPORT
-#endif
+#define OPTEXPORT MSC_EXTRA
+#endif /*NETCDF_JSON_H*/
 
 /**************************************************/
 /* Json object sorts (note use of term sort rather than e.g. type or discriminant) */
@@ -47,7 +51,6 @@ and do the command:
 /* Dump/text/unparse flags */
 #define NCJFLAG_NONE	    0
 #define NCJFLAG_INDENTED    1
-
 
 /* Define a struct to store primitive values as unquoted
    strings. The sort will provide more info.  Do not bother with
