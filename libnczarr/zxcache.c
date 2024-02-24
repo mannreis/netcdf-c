@@ -541,7 +541,7 @@ NCZ_ensure_fill_chunk(NCZChunkCache* cache)
     default: {
         unsigned char* p;
         for(p=cache->fillchunk,i=0;i<cache->chunksize;i+=typesize,p+=typesize)
-            memcpy(p,var->fill_value,typesize);
+            memcpy(p,var->fill_value,typesize); /* Warning: only works for non-pointer values */
         } break;
     }
 done:

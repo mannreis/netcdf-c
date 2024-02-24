@@ -349,9 +349,10 @@ close_vars(NC_GRP_INFO_T *grp)
                 if (var->type_info)
                 {
 		    int stat = NC_NOERR;
-		    if((stat = NC_reclaim_data(grp->nc4_info,var->type_info->hdr.id,var->fill_value,1)))
-		        return stat;
-		    nullfree(var->fill_value);
+		    if((stat = NCZ_free_fillvalue(var))) return stat;
+//		    if((stat = NC_reclaim_data(grp->nc4_info,var->type_info->hdr.id,var->fill_value,1))) return stat;
+//		    nullfree(var->fill_value);
+		    var->fill_value = NULL;
                 }
             }
         }
@@ -532,7 +533,7 @@ ncz_rec_grp_NCZ_del(NC_GRP_INFO_T *grp)
  * @author Dennis Heimbigner, Ed Hartnett
  */
 int
-ncz_find_grp_file_var(int ncid, int varid, NC_FILE_INFO_T **h5,
+ncz_find_file_grp_var(int ncid, int varid, NC_FILE_INFO_T **h5,
                          NC_GRP_INFO_T **grp, NC_VAR_INFO_T **var)
 {
     NC_FILE_INFO_T *my_h5;
@@ -663,7 +664,9 @@ NCZ_ensure_fill_value(NC_VAR_INFO_T *var)
         return NC_NOERR;
 
     /* If the user has set a fill_value for this var, use, otherwise find the default fill value. */
-    if((stat = NCZ_set_fill_value(var->container->nc4_info,var,var->no_fill,var->fill_value))) goto done;
+    if(var->fill_value == NULL) {
+        if((stat = NCZ_set_fill_value(var->container->nc4_info,var,var->no_fill,var->fill_value))) goto done;
+    }
     assert(var->fill_value != NULL);
 
     LOG((4, "Found a fill value for var %s", var->hdr.name));

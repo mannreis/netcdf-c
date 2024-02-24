@@ -91,6 +91,7 @@ static int build_atts(NC_FILE_INFO_T* file, NC_OBJ* container, NCindex* attlist,
 static int build_superblock(NC_FILE_INFO_T* file, NCjson** jsuperp);
 
 static int read_grp(NC_FILE_INFO_T* file, NC_GRP_INFO_T* parent, const char* name, NC_GRP_INFO_T** grpp);
+static int read_grp_contents(NC_FILE_INFO_T* file, NC_GRP_INFO_T* grp);
 static int read_vars(NC_FILE_INFO_T* file, NC_GRP_INFO_T* grp, NClist* varnames);
 static int read_subgrps(NC_FILE_INFO_T* file, NC_GRP_INFO_T* grp, NClist* subgrpnames);
 static int verify_superblock(NC_FILE_INFO_T* file, const NCjson* jsuper);
@@ -891,9 +892,8 @@ ZF3_readmeta(NC_FILE_INFO_T* file)
     }
 
     /* Now load the groups contents starting with root */
-    assert(file->root_grp == NULL);
-    if((stat = read_grp(file,NULL,"/",&file->root_grp)))
-	goto done;
+    assert(file->root_grp != NULL);
+    if((stat = read_grp_contents(file,file->root_grp))) goto done;
 
 done:
     NCJreclaim(jrootgrp);
@@ -983,7 +983,8 @@ read_attrs(NC_FILE_INFO_T* file, NC_OBJ* container, const NCjson* jatts, const N
 		if(var != NULL && NCJarraylength(jvalues)==1 && atypes[i] == NC_INT)
 		    sscanf(NCJstring(jkey),"%zu",&zvar->maxstrlen);
 		continue; /* _FillValue: ignore */
-	    } 
+    	    } else if(memcmp(NCJstring(jkey),NCZ_V3_PREFIX,strlen(NCZ_V3_PREFIX))==0)
+		    continue; /* do not materialize any "_nczarr..." attributes */
 	    /* Convert jvalues to void* data */
 	    typeid = atypes[i];
 	    if((stat = NCZ_computeattrdata(&typeid, jvalues, NULL, &len, &data))) goto done;
@@ -1094,7 +1095,9 @@ verify_superblock(NC_FILE_INFO_T* file, const NCjson* jsuper)
  * @internal Read group data from map to memory
  *
  * @param file Pointer to file struct
- * @param grp Pointer to grp struct
+ * @param parent Pointer to parent group
+ * @param name of the group to create
+ * @param grpp created group
  *
  * @return ::NC_NOERR No error.
  * @author Dennis Heimbigner
@@ -1103,61 +1106,82 @@ static int
 read_grp(NC_FILE_INFO_T* file, NC_GRP_INFO_T* parent, const char* name, NC_GRP_INFO_T** grpp)
 {
     int stat = NC_NOERR;
+    NC_GRP_INFO_T* grp = NULL;
+
+    ZTRACE(3,"file=%s grp=%s",file->controller->path,grp->hdr.name);
+    
+    /* Build group */
+    if((stat = ncz4_create_grp(file,parent,name,&grp))) goto done;
+
+    /* Fill in the group recursively */
+    if((stat = read_grp_contents(file,grp))) goto done;
+
+    if(grpp) {*grpp = grp; grp = NULL;}
+
+done:
+    return ZUNTRACE(THROW(stat));
+}
+
+/**
+ * @internal fill in group content from map to memory
+ *
+ * @param file Pointer to file struct
+ * @param grp Pointer to grp struct
+ *
+ * @return ::NC_NOERR No error.
+ * @author Dennis Heimbigner
+ */
+static int
+read_grp_contents(NC_FILE_INFO_T* file, NC_GRP_INFO_T* grp)
+{
+    int stat = NC_NOERR;
     NCZ_FILE_INFO_T* zfile = (NCZ_FILE_INFO_T*)file->format_file_info;
     NCZMAP* map = zfile->map;
-    char* fullpath = NULL;
+    char* grppath = NULL;
     char* key = NULL;
     int purezarr = 0;
-    NCjson* jgroup = NULL;
     NClist* subvars = nclistnew();
     NClist* subgrps = nclistnew();
+    NCjson* jgroup = NULL;
     const NCjson* jatts = NULL;
-    const NCjson* jtypes = NULL;
     const NCjson* jnczgrp = NULL;
     const NCjson* jdims = NULL;
-    NC_GRP_INFO_T* grp = NULL;
 
     ZTRACE(3,"file=%s grp=%s",file->controller->path,grp->hdr.name);
     
     purezarr = (zfile->flags & FLAG_PUREZARR);
 
-    /* Construct grp path */
-    if((stat = NCZ_grpkey(grp,&fullpath)))
-	goto done;
-
     /* Download the grp meta-data; might not exist for virtual groups */
 
     /* build Z3GROUP path */
-    if((stat = nczm_concat(fullpath,Z3GROUP,&key))) goto done;
+    /* Construct grp path */
+    if((stat = NCZ_grpkey(grp,&grppath))) goto done;
+    /* and the grp's zarr.json */
+    if((stat = nczm_concat(grppath,Z3GROUP,&key))) goto done;
 
-    /* Read */
+    /* Read zarr.json */
     stat=NCZ_downloadjson(map,key,&jgroup);
     nullfree(key); key = NULL;
     if(stat) goto done;
    
-    /* Build group */
-    if((stat = ncz4_create_grp(file,parent,name,&grp))) goto done;
-
     if(purezarr || jgroup == NULL) {
         /* Apparently this is a virtual group; treat like purezarr to find the vars and groups */
 	if((stat = subobjects_pure(zfile,grp,subvars,subgrps))) goto done;
     } else {
+	/* Get attributes */
+	NCJcheck(NCJdictget(jgroup,"attributes",&jatts));
 	/* Get _nczarr_group */
 	NCJcheck(NCJdictget(jatts,NCZ_V3_GROUP,&jnczgrp));
-	if(jnczgrp != NULL) {	
-	    /* Define dimensions */
-	    NCJcheck(NCJdictget(jnczgrp,"dimensions",&jdims));
-            if(jdims != NULL) {
-		if((stat = parse_dims(file,grp,jdims))) goto done;
-	    }
-	    /* Get lists of subvars and subgrps */
-  	    if((stat = subobjects(zfile,grp,jnczgrp,subvars,subgrps))) goto done;
-	   
-        }
-    }
+	if(jnczgrp == NULL) {stat = NC_ENCZARR; goto done;}
 
-    /* Read the attributes */
-    if((stat = read_attrs(file,(NC_OBJ*)grp,jatts,jtypes))) goto done;
+        /* Define dimensions */
+	NCJcheck(NCJdictget(jnczgrp,"dimensions",&jdims));
+        if(jdims != NULL) {
+	    if((stat = parse_dims(file,grp,jdims))) goto done;
+        }
+        /* Get lists of subvars and subgrps */
+  	if((stat = subobjects(zfile,grp,jnczgrp,subvars,subgrps))) goto done;
+    }
 
     /* Fill in the group recursively */
 
@@ -1171,7 +1195,7 @@ done:
     NCJreclaim(jgroup);
     nclistfreeall(subvars);
     nclistfreeall(subgrps);
-    nullfree(fullpath);
+    nullfree(grppath);
     nullfree(key);
     return ZUNTRACE(THROW(stat));
 }
@@ -1329,40 +1353,56 @@ read_var1(NC_FILE_INFO_T* file, NC_GRP_INFO_T* grp, const char* varname)
     const NCjson* jcodecs = NULL;
     const NCjson* jcodec = NULL;
     const NCjson* jhint = NULL;
+    char* grppath = NULL;
     char* varpath = NULL;
     char* key = NULL;
     int suppress = 0; /* Abort processing of this variable */
-    nc_type vtype = NC_NAT;
     size_t vtypelen = 0;
-    size_t rank = 0;
-    size64_t shape[NC_MAX_VAR_DIMS];
-    size64_t chunks[NC_MAX_VAR_DIMS];
     char* dimnames[NC_MAX_VAR_DIMS];
-    char* dimfqns[NC_MAX_VAR_DIMS];
-    int endianness = NC_ENDIAN_NATIVE;
-    size_t maxstrlen = 0;
-    int scalar = 0;
-    int storage = NC_CHUNKED;
-    char dimension_separator = '\0';
     NC_TYPE_INFO_T* type_info = NULL;
-    int no_fill = 0;
-    void* fillvalue = NULL;
-    int order = 'C';
 #ifdef ENABLE_NCZARR_FILTERS
     int varsized = 0;
-    NClist* filterchain = nclistnew(); /*NClist<NCZ_Filter*>*/
     int chainindex = 0;
 #endif
+    /* Capture arguments for ncz4_create_var */
+    struct {
+	const char* varname;
+	nc_type vtype;
+	int endianness;
+	size_t maxstrlen;
+	int storage;
+	char dimension_separator;
+	char order;
+	size_t rank;
+	size64_t shape[NC_MAX_VAR_DIMS];
+	size64_t chunks[NC_MAX_VAR_DIMS];
+	char* dimfqns[NC_MAX_VAR_DIMS];
+	NClist* filterlist;
+	int no_fill;
+	void* fill_value;
+    } cvargs;
+
+    /* initialize cvargs defaults */
+    memset(&cvargs,0,sizeof(cvargs));
+    cvargs.varname = varname;
+    cvargs.endianness = (NC_isLittleEndian()?NC_ENDIAN_LITTLE:NC_ENDIAN_BIG);
+    cvargs.storage = NC_CHUNKED;
+    cvargs.no_fill = 1;
+#ifdef ENABLE_NCZARR_FILTERS
+    cvargs.filterlist = nclistnew();
+#endif
+    memset(dimnames,0,sizeof(dimnames));
 
     if(zfile->flags & FLAG_PUREZARR) purezarr = 1;
  
-    endianness = (NC_isLittleEndian()?NC_ENDIAN_LITTLE:NC_ENDIAN_BIG);
+    cvargs.endianness = (NC_isLittleEndian()?NC_ENDIAN_LITTLE:NC_ENDIAN_BIG);
     
-    /* Construct var path */
-    if((stat = NCZ_varkey(var,&varpath))) goto done;
-
+    /* Construct parent path */
+    if((stat = NCZ_grpkey(grp,&grppath))) goto done;
+    /* Construct the path to the var */
+    if((stat = nczm_concat(grppath,varname,&varpath))) goto done;
     /* Construct the path to the zarray object */
-    if((stat = nczm_concat(varpath,Z2ARRAY,&key))) goto done;
+    if((stat = nczm_concat(varpath,Z3ARRAY,&key))) goto done;
 
     /* Download the zarray object */
     if((stat=NCZ_readdict(zfile->map,key,&jvar))) goto done;
@@ -1386,22 +1426,14 @@ read_var1(NC_FILE_INFO_T* file, NC_GRP_INFO_T* grp, const char* varname)
     {
 	NCJcheck(NCJdictget(jvar,"shape",&jvalue));
 	if(NCJsort(jvalue) != NCJ_ARRAY) {stat = (THROW(NC_ENCZARR)); goto done;}
+        cvargs.rank = NCJarraylength(jvalue);
 	    
-	if(NCJarraylength(jvalue) == 0) {
-	    scalar = 1;
-	    rank = 0;		    
-	} else {
-	    scalar = 0;
-	    rank = NCJarraylength(jvalue);
-	}
-	    
-	if(rank > 0) {
+	if(cvargs.rank > 0) {
 	    /* extract the shape */
-	    if((stat = NCZ_decodesizet64vec(jvalue, shape))) goto done;
+	    if((stat = NCZ_decodesizet64vec(jvalue, cvargs.shape))) goto done;
 	}
 	/* Set storage flag */
-	storage = (scalar?NC_CONTIGUOUS:NC_CHUNKED);
-
+	cvargs.storage = (cvargs.rank==0?NC_CONTIGUOUS:NC_CHUNKED);
     }
     
     /* Get dimension_names */
@@ -1410,8 +1442,7 @@ read_var1(NC_FILE_INFO_T* file, NC_GRP_INFO_T* grp, const char* varname)
 	/* get the "dimension_names" */
 	NCJcheck(NCJdictget(jvar,"dimension_names",&jdimnames));
 	if(jdimnames != NULL) {
-            rank = NCJarraylength(jdimnames);
-	    for(i=0;i<rank;i++) {
+	    for(i=0;i<cvargs.rank;i++) {
 	        const NCjson* dimpath = NCJith(jdimnames,i);
 	        assert(NCJisatomic(dimpath));
 	        dimnames[i] = strdup(NCJstring(dimpath));
@@ -1437,37 +1468,36 @@ read_var1(NC_FILE_INFO_T* file, NC_GRP_INFO_T* grp, const char* varname)
 	if(jdimrefs != NULL) {
 	    /* Extract the dimref names */
 	    assert((NCJsort(jdimrefs) == NCJ_ARRAY));
-	    if(scalar) {
-		assert(NCJarraylength(jdimrefs) == 0);		    
-	    } else {
-		rank = NCJarraylength(jdimrefs);
-		for(j=0;j<rank;j++) {
-		    const NCjson* dimpath = NCJith(jdimrefs,j);
-		    assert(NCJisatomic(dimpath));
-		    dimfqns[i] = strdup(NCJstring(dimpath));
-		}
+            for(j=0;j<cvargs.rank;j++) {
+		const NCjson* dimpath = NCJith(jdimrefs,j);
+		assert(NCJisatomic(dimpath));
+		cvargs.dimfqns[i] = strdup(NCJstring(dimpath));
 	    }
 	}
 	/* Extract the type_alias hint for use instead of the variables' type */
 	NCJcheck(NCJdictget(jncvar,"type_alias",&jhint));
     } else {/* purezarr; fake the dimfqns */
 	/* Construct the equivalent of dimension_references from dimension_names */
-	if((stat = convertdimnames2fqns(file,grp,rank,(const char**)dimnames,dimfqns))) goto done;
+	if((stat = convertdimnames2fqns(file,grp,cvargs.rank,(const char**)dimnames,cvargs.dimfqns))) goto done;
+#if 0
+    /* fill in var dimids corresponding to the dim references; create dimensions as necessary */
+    if((stat = NCZ_computedimrefs(file,grp,rank,shape,dimnames,cvargs.dimfqns))) goto done;
+#endif
     }
 
     /* Get the type of the variable */
     {
 	NCJcheck(NCJdictget(jvar,"data_type",&jvalue));
 	/* Convert dtype to nc_type */
-	if((stat = dtype2nctype(NCJstring(jvalue),&vtype,&vtypelen,NULL))) goto done;
-	if(vtype > NC_NAT && vtype <= NC_MAX_ATOMIC_TYPE) { /* Disallows NC_JSON */
+	if((stat = dtype2nctype(NCJstring(jvalue),&cvargs.vtype,&vtypelen,NULL))) goto done;
+	if(cvargs.vtype > NC_NAT && cvargs.vtype <= NC_MAX_ATOMIC_TYPE) { /* Disallows NC_JSON */
 	    /* Locate the NC_TYPE_INFO_T object */
-	    if((stat = ncz_gettype(file,grp,vtype,&type_info))) goto done;
+	    if((stat = ncz_gettype(file,grp,cvargs.vtype,&type_info))) goto done;
 	} else {stat = NC_EBADTYPE; goto done;}
-	if(vtype == NC_STRING) {
-	    maxstrlen = vtypelen;
+	if(cvargs.vtype == NC_STRING) {
+	    cvargs.maxstrlen = vtypelen;
 	    vtypelen = sizeof(char*); /* in-memory len */
-	    if(maxstrlen <= 0) maxstrlen = NCZ_get_maxstrlen((NC_OBJ*)var);
+	    if(cvargs.maxstrlen <= 0) cvargs.maxstrlen = NCZ_get_maxstrlen((NC_OBJ*)var);
 	}
     }
 
@@ -1475,12 +1505,12 @@ read_var1(NC_FILE_INFO_T* file, NC_GRP_INFO_T* grp, const char* varname)
     {
 	NCglobalstate* ngs = NC_getglobalstate();
 	assert(ngs != NULL);
-	dimension_separator = '\0';
+	cvargs.dimension_separator = '\0';
 	NCJcheck(NCJdictget(jvar,"chunk_key_encoding",&jvalue));
 	if(jvalue == NULL) {
 	    /* If value is invalid, then use global default */
-	    if(!islegaldimsep(dimension_separator))
-	    dimension_separator = ngs->zarr.dimension_separator; /* use global value */
+	    if(!islegaldimsep(cvargs.dimension_separator))
+	    cvargs.dimension_separator = ngs->zarr.dimension_separator; /* use global value */
 	    /* Verify its value */
 	} else {
 	    if(NCJsort(jvalue) != NCJ_DICT) {stat = NC_ENOTZARR; goto done;}
@@ -1491,27 +1521,27 @@ read_var1(NC_FILE_INFO_T* file, NC_GRP_INFO_T* grp, const char* varname)
 		    NCJcheck(NCJdictget(jtmp,"separator",&jsep));
 		    if(jsep != NULL) {
 			if(NCJisatomic(jsep) && NCJstring(jsep) != NULL && strlen(NCJstring(jsep)) == 1)
-			    dimension_separator = NCJstring(jsep)[0];
+			    cvargs.dimension_separator = NCJstring(jsep)[0];
 		    } else
-			dimension_separator = '/';
+			cvargs.dimension_separator = DFALT_DIM_SEPARATOR_V3;
 		} else
-		    dimension_separator = '/';
+		    cvargs.dimension_separator = DFALT_DIM_SEPARATOR_V3;
 	    } else if(strcasecmp("v2",NCJstring(jtmp))==0) {
 		NCJcheck(NCJdictget(jvalue,"separator",&jsep));
 		if(jsep != NULL) {
 		    if(NCJsort(jsep) == NCJ_STRING && NCJstring(jsep) != NULL && strlen(NCJstring(jsep)) == 1)
-			dimension_separator = NCJstring(jsep)[0];
+			cvargs.dimension_separator = NCJstring(jsep)[0];
 		    else {stat = NC_ENOTZARR; goto done;}
 		} else
-		    dimension_separator = '.';
+		    cvargs.dimension_separator = '.';
 	    } else {stat = NC_ENOTZARR; goto done;}
 	 }
-	assert(islegaldimsep(dimension_separator)); /* we are hosed */
+	assert(islegaldimsep(cvargs.dimension_separator)); /* we are hosed */
     }
 
     /* chunks */
     {
-	if(!scalar) {
+	if(cvargs.rank > 0) {
 	    NCJcheck(NCJdictget(jvar,"chunk_grid",&jvalue));
 	    if(jvalue == NULL) {stat = (THROW(NC_ENOTBUILT)); goto done;}
 	    NCJcheck(NCJdictget(jvalue,"name",&jtmp));
@@ -1523,12 +1553,10 @@ read_var1(NC_FILE_INFO_T* file, NC_GRP_INFO_T* grp, const char* varname)
 	    if(jtmp2 == NULL) {stat = (THROW(NC_ENOTZARR)); goto done;}
 	    if(NCJsort(jtmp2) != NCJ_ARRAY) {stat = (THROW(NC_ENOTZARR)); goto done;}
 
-	    /* Verify the rank */
-	    assert(rank != 0);
-	    if(rank != NCJarraylength(jtmp2)) {stat = (THROW(NC_ENCZARR)); goto done;}
+	    if(cvargs.rank != NCJarraylength(jtmp2)) {stat = (THROW(NC_ENCZARR)); goto done;}
     
 	    /* Get the chunks and chunkproduct */
-	    if((stat = NCZ_decodesizet64vec(jtmp2, chunks))) goto done;
+	    if((stat = NCZ_decodesizet64vec(jtmp2, cvargs.chunks))) goto done;
 	}
     }
 	
@@ -1548,9 +1576,9 @@ read_var1(NC_FILE_INFO_T* file, NC_GRP_INFO_T* grp, const char* varname)
 	if(jvalue == NULL || NCJsort(jvalue) != NCJ_DICT) {stat = NC_ENCZARR; goto done;}	     
 	NCJcheck(NCJdictget(jvalue,"endian",&jtmp));
 	if(strcasecmp("big",NCJstring(jtmp))==0)
-	    endianness = NC_ENDIAN_BIG;
+	    cvargs.endianness = NC_ENDIAN_BIG;
 	else if(strcasecmp("little",NCJstring(jtmp))==0)
-	    endianness = NC_ENDIAN_LITTLE;
+	    cvargs.endianness = NC_ENDIAN_LITTLE;
 	else {stat = NC_EINVAL; goto done;}
 
 #ifdef ENABLE_NCZARR_FILTERS
@@ -1567,51 +1595,51 @@ read_var1(NC_FILE_INFO_T* file, NC_GRP_INFO_T* grp, const char* varname)
 	    jcodec = NCJith(jcodecs,k);
 	    if(jcodec == NULL) break; /* done */
 	    if(NCJsort(jcodec) != NCJ_DICT) {stat = NC_EFILTER; goto done;}
-	    if((stat = json2filter(file,jcodec,chainindex++,filterchain,NULL))) goto done;
+	    if((stat = json2filter(file,jcodec,chainindex++,cvargs.filterlist,NULL))) goto done;
 	}
 	/* Suppress variable if there are filters and var is not fixed-size */
-	if(varsized && nclistlength((NClist*)filterchain) > 0) suppress = 1;
+	if(varsized && nclistlength(cvargs.filterlist) > 0) suppress = 1;
 #endif
     }
-
-#ifdef ENABLE_NCZARR_FILTERS
-    if(!suppress) {
-	/* At this point, we can finalize the filters */
-	if((stat = NCZ_filter_setup(var))) goto done;
-    }
-#endif
-
-    /* fill in var dimids corresponding to the dim references; create dimensions as necessary */
-    if((stat = NCZ_computedimrefs(file,grp,rank,shape,dimnames,dimfqns))) goto done;
 
     /* fill_value; must precede calls to adjust cache */
     {
 	NCJcheck(NCJdictget(jvar,"fill_value",&jvalue));
 	if(jvalue == NULL || NCJsort(jvalue) == NCJ_NULL)
-	    no_fill = 1;
+	    cvargs.no_fill = 1;
 	else {
 	    size_t fvlen;
-	    nc_type atypeid = vtype;
-	    if((stat = NCZ_computeattrdata(&atypeid, jvalue, NULL, &fvlen, &fillvalue))) goto done;
-	    assert(atypeid == vtype);
-	    no_fill = 0;
+	    nc_type atypeid = cvargs.vtype;
+	    if((stat = NCZ_computeattrdata(&atypeid, jvalue, NULL, &fvlen, &cvargs.fill_value))) goto done;
+	    assert(atypeid == cvargs.vtype);
+	    cvargs.no_fill = 0;
 	}
     }
 
     if(!suppress) {
         /* Create the variable */
-        if((stat = ncz4_create_var(file,grp,varname,vtype,
-					endianness,
-					maxstrlen,
-					storage,
-					dimension_separator,
-					order,
-					rank,shape,chunks,dimfqns,
-					filterchain,
-					no_fill,
-					fillvalue,
+        if((stat = ncz4_create_var(file,grp,
+					cvargs.varname,
+					cvargs.vtype,
+					cvargs.endianness,
+					cvargs.maxstrlen,
+					cvargs.storage,
+					cvargs.dimension_separator,
+					cvargs.order,
+					cvargs.rank,
+					cvargs.shape,
+					cvargs.chunks,
+					cvargs.dimfqns,
+					cvargs.filterlist,
+					cvargs.no_fill,
+					cvargs.fill_value,
 					&var)))
 	    goto done;
+#ifdef ENABLE_NCZARR_FILTERS
+	/* At this point, we can finalize the filters */
+	if((stat = NCZ_filter_setup(var))) goto done;
+#endif
+
         if((stat = NCZ_adjust_var_cache(var))) goto done;
 
         /* Now that we have the variable, create its attributes */
@@ -1633,7 +1661,12 @@ read_var1(NC_FILE_INFO_T* file, NC_GRP_INFO_T* grp, const char* varname)
     }
 
 done:
+    /* Clean up cvargs */
+    nclistfree(cvargs.filterlist);
+    nullfree(cvargs.fill_value);
+    NCZ_clearstringvec(cvargs.rank,cvargs.dimfqns);
     /* Clean up	 */
+    nullfree(grppath);
     nullfree(varpath);
     nullfree(key);
     NCJreclaim(jvar);

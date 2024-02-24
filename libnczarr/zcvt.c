@@ -431,7 +431,6 @@ NCZ_stringconvert1(nc_type srctype, char* src, NCjson* jvalue)
     struct ZCVT zcvt;
     nc_type dsttype = NC_NAT;
     char s[1024];
-    char sq[1024+2+1];
     char* p = NULL;
     int isnanorinf = 0;
 
@@ -519,12 +518,15 @@ NCZ_stringconvert1(nc_type srctype, char* src, NCjson* jvalue)
 #endif
 	/* Quote the nan/inf constant */
 	if(isnanorinf) {
+#if 0
+	    char sq[1024+2+1];
 	    size_t l = strlen(s);
 	    memcpy(sq,s,l+1);
 	    s[0] = '"';
 	    memcpy(s+1,sq,l);
 	    s[l+1] = '"';
     	    s[l+2] = '\0';
+#endif /*0*/
 	}
 	} break;
     case NC_STRING: {

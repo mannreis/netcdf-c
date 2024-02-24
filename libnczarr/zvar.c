@@ -728,7 +728,13 @@ ncz_def_var_extra(int ncid, int varid, int *shuffle, int *unused1,
 	LOG((4, "Copying fill value into metadata for variable %s",
 	     var->hdr.name));
 
-	/* (over-) write the NC_VAR_INFO_T.fill_value */	
+	/* Reclaim existing fill value */
+	if(var->fill_value) {
+	    if((stat = NCZ_reclaim_fill_value(var))) goto done;
+	}
+	assert(var->fill_value == NULL);
+
+	/* set the NC_VAR_INFO_T.fill_value */	
 	if((stat = NCZ_set_fill_value(h5,var,*no_fill,fill_value))) goto done;
 
         /* synchronize to Attribute */

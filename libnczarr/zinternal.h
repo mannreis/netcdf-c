@@ -153,12 +153,14 @@ Optionally Inserted into any group zarr.json or array zarr.json is the extra att
 
 */
 
+#define NCZ_V2_PREFIX "_nczarr"
 #define NCZ_V2_SUPERBLOCK "_nczarr_superblock"
 /* Must match values in include/nc4internal.h */
 #define NCZ_V2_GROUP   "_nczarr_group"
 #define NCZ_V2_ARRAY   "_nczarr_array"
 #define NCZ_V2_ATTR    "_nczarr_attrs"
 
+#define NCZ_V3_PREFIX NCZ_V2_PREFIX
 #define NCZ_V3_SUPERBLOCK "_nczarr_superblock"
 /* Must match values in include/nc4internal.h */
 #define NCZ_V3_GROUP   "_nczarr_group"
@@ -365,7 +367,7 @@ int NCZ_write_var_data(NC_FILE_INFO_T* file, NC_VAR_INFO_T* var);
 
 /* Undefined */
 /* Find var, doing lazy var metadata read if needed. */
-int ncz_find_grp_file_var(int ncid, int varid, NC_FILE_INFO_T** file,
+int ncz_find_file_grp_var(int ncid, int varid, NC_FILE_INFO_T** file,
                              NC_GRP_INFO_T** grp, NC_VAR_INFO_T** var);
 
 #endif /* ZINTERNAL_H */

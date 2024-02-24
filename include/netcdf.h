@@ -118,6 +118,7 @@ extern "C" {
         0x0002
    All upper 16 bits are unused except
         0x20000
+        0x40000
 */
 
 /* Lower 16 bits */
@@ -162,7 +163,7 @@ Use this in mode flags for both nc_create() and nc_open(). */
 #define NC_INMEMORY      0x8000  /**< Read from memory. Mode flag for nc_open() or nc_create() */
 
 /* Upper 16 bits */
-#define NC_NOATTCREORD  0x20000 /**< Disable the netcdf-4 (hdf5) attribute creation order tracking */
+#define NC_NOATTCREORD       0x20000 /**< Disable the netcdf-4 (hdf5) attribute creation order tracking */
 #define NC_NODIMSCALE_ATTACH 0x40000 /**< Disable the netcdf-4 (hdf5) attaching of dimscales to variables (#2128) */
 
 #define NC_MAX_MAGIC_NUMBER_LEN 8 /**< Max len of user-defined format magic number. */

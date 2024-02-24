@@ -787,7 +787,7 @@ NCZ_clonestringvec(size_t len, const char** vec)
 }
 
 void
-NCZ_freestringvec(size_t len, char** vec)
+NCZ_clearstringvec(size_t len, char** vec)
 {
     size_t i;
     if(vec == NULL) return;
@@ -798,6 +798,12 @@ NCZ_freestringvec(size_t len, char** vec)
     for(i=0;i<len;i++) {
 	nullfree(vec[i]);
     }
+}
+
+void
+NCZ_freestringvec(size_t len, char** vec)
+{
+    NCZ_clearstringvec(len,vec);
     nullfree(vec);
 }
 
@@ -1035,10 +1041,17 @@ NCZ_makeFQN(NC_GRP_INFO_T* parent, const char* objname, NCbytes* fqn)
     }
     
     /* Create the the fqn */
+    for(i=0;i<nclistlength(segments);i++) {
+	const char* s = (const char*)nclistget(segments,i);
+        ncbytesinsert(fqn,0,strlen(s),s);
+        ncbytesinsert(fqn,0,1,"/");
+    }
+#if 0
     for(i=(nclistlength(segments)-1);i>=0;i--) {
 	ncbytescat(fqn,"/");
 	ncbytescat(fqn,nclistget(segments,i));
     }
+#endif
 
 done:
     nclistfreeall(segments);
@@ -1399,7 +1412,7 @@ NCZ_computedimrefs(NC_FILE_INFO_T* file, NC_GRP_INFO_T* grp,
     if(purezarr) {
         assert(dimfqns != NULL);
         for(i=0;i<ndims;i++) {
-	    assert(dimfqns[0] == NULL);
+	    assert(dimfqns[i] == NULL);
 	    if(dimnames0 == NULL || dimnames0[i] == NULL) {
 	        /* create anonymous dimension names */
 	        snprintf(zdimname,sizeof(zdimname),"%s_%llu",NCDIMANON,shape[i]);
@@ -1415,7 +1428,7 @@ NCZ_computedimrefs(NC_FILE_INFO_T* file, NC_GRP_INFO_T* grp,
     }
 done:
     ncbytesfree(fqn);
-    NCZ_freestringvec(ndims,dimnames);
+    NCZ_clearstringvec(ndims,dimnames);
     return ZUNTRACE(THROW(stat));
 }
 

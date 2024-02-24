@@ -142,7 +142,7 @@ NCZ_misc_codec_to_hdf5(const NCproplist* env, const char* codec_json, int* idp, 
     /* verify the dict size */
     if(isv3) dictpairs = (14); else dictpairs = (14+1);
     if(NCJdictlength(jparams) != dictpairs) {
-	fprintf(stderr,"(1) Incorrect no. of codec parameters: need=%d sent=%d\n",(int)dictpairs,NCJdictlength(jparams));
+	fprintf(stderr,"(1) Incorrect no. of codec parameters: need=%d sent=%zu\n",(int)dictpairs,NCJdictlength(jparams));
 	fprintf(stderr,"jparams=%s\n",NCJtotext(jparams,0));
         stat = NC_EINVAL;
 	goto done;

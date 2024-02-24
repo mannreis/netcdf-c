@@ -33,23 +33,23 @@ static int NCZ_json_convention_read(const NCjson* json, NCjson** jtextp);
  * [Candidate for moving to libsrc4]
  */
 int
-ncz_getattlist(NC_GRP_INFO_T *grp, int varid, NC_VAR_INFO_T **varp, NCindex **attlist)
+ncz_getattlist(NC_GRP_INFO_T *grp, int varid, NC_VAR_INFO_T **varp, NCindex **attlistp)
 {
     int stat = NC_NOERR;
     NC_FILE_INFO_T* file = grp->nc4_info;
     NCZ_FILE_INFO_T* zinfo = file->format_file_info;
 
-    assert(grp && attlist && file && zinfo);
+    assert(grp && file && zinfo);
 
     if (varid == NC_GLOBAL) {
         if (varp) *varp = NULL;
-        *attlist = grp->att;
+        if(attlistp) *attlistp = grp->att;
     } else {
         NC_VAR_INFO_T *var;
         if (!(var = (NC_VAR_INFO_T *)ncindexith(grp->vars, (size_t)varid))) return NC_ENOTVAR;
         assert(var->hdr.id == varid);
         if (varp) *varp = var;
-        *attlist = var->att;
+        if(attlistp) *attlistp = var->att;
     }
     return stat;
 }
@@ -423,7 +423,10 @@ ncz_put_att(int ncid, int containerid, const char *name, nc_type file_type,
     void* copy = NULL;
     NC_OBJ* obj = NULL;
     int isfillvalue = (strcmp(name,_FillValue)==0);
-
+    char norm_name[NC_MAX_NAME + 1];
+    const NC_reservedatt* ra = NULL;
+    NC_ATT_INFO_T* att = NULL;
+    NCindex* attlist = NULL;
     if(containerid == NC_GLOBAL) {
         if((stat= nc4_find_grp_h5(ncid, &grp, &file))) goto done;
 	obj = (NC_OBJ*)grp;
@@ -435,6 +438,12 @@ ncz_put_att(int ncid, int containerid, const char *name, nc_type file_type,
 
     nc = file->controller;
     assert(nc && grp && file);
+
+    if(obj->sort == NCGRP)
+        attlist = ((NC_GRP_INFO_T*)obj)->att;
+    else
+        attlist = ((NC_VAR_INFO_T*)obj)->att;
+    assert(attlist != NULL);
 
     LOG((1, "%s: ncid 0x%x containerid %d name %s file_type %d mem_type %d len %d",
          __func__,ncid, containerid, name, file_type, mem_type, len));
@@ -452,6 +461,30 @@ ncz_put_att(int ncid, int containerid, const char *name, nc_type file_type,
      * created. */
     if (file->cmode & NC_CLASSIC_MODEL && file_type > NC_DOUBLE)
         return NC_ESTRICTNC3;
+
+    /* The length needs to be positive (cast needed for brain-dead systems with signed size_t). */
+    if((unsigned long) len > X_INT_MAX) {stat = NC_EINVAL; goto done;}
+
+    /* If len is not zero, then there must be some data. */
+    if (len > 0 && data == NULL) {stat = NC_EINVAL; goto done;}
+
+    /* If the file is read-only, return an error. */
+    if (file->no_write) {stat = NC_EPERM; goto done;}
+
+    /* Check and normalize the name. */
+    if (!name || strlen(name) > NC_MAX_NAME) {stat = NC_EBADNAME; goto done;}
+    if ((stat = nc4_check_name(name, norm_name))) goto done;
+
+    /* Check that a reserved att name is not being used improperly */
+    ra = NC_findreserved(name);
+    if(ra != NULL) {
+        /* case 1: grp=root, containerid==NC_GLOBAL, flags & READONLYFLAG */
+        if (obj->sort == NCGRP && ((NC_GRP_INFO_T*)obj)->parent == NULL && (ra->flags & READONLYFLAG))
+            {stat = NC_ENAMEINUSE; goto done;}
+        /* case 2: grp=NA, objid!=NC_GLOBAL, flags & HIDDENATTRFLAG */
+        if (obj->sort != NCGRP && (ra->flags & HIDDENATTRFLAG))
+            {stat = NC_ENAMEINUSE; goto done;}
+    }
 
     if(isfillvalue)
         file_type = var->type_info->hdr.id;
@@ -472,7 +505,27 @@ ncz_put_att(int ncid, int containerid, const char *name, nc_type file_type,
     } else { /* no conversion */
 	/* Still need a copy of the input data */
 	copy = NULL;
-	if((stat = NC_copy_data_all(file->controller, mem_type, data, 1, &copy))) goto done;
+	if((stat = NC_copy_data_all(file->controller, mem_type, data, len, &copy))) goto done;
+    }
+
+    /* See if there is already an attribute with this name. */
+    att = (NC_ATT_INFO_T*)ncindexlookup(attlist,norm_name);
+
+    if (!att) {
+        if (!(file->flags & NC_INDEF)) { /* If this is a new att, require define mode. */
+            if (file->cmode & NC_CLASSIC_MODEL) {stat = NC_ENOTINDEFINE; goto done;}
+	    file->flags |= NC_INDEF;/* Set define mode. */
+	    file->redef = NC_TRUE; /* For nc_abort, we need to remember if we're in define mode as a redef. */
+        }
+    } else {
+        /* For an existing att, if we're not in define mode, the len
+           must not be greater than the existing len for classic model. */
+        if(!(file->flags & NC_INDEF) 
+	    && len * (size_t)nc4typelen(att->nc_typeid) > (size_t)att->len * (size_t)nc4typelen(att->nc_typeid)) {
+            if (file->cmode & NC_CLASSIC_MODEL) {stat = NC_ENOTINDEFINE; goto done;}
+	    file->flags |= NC_INDEF;/* Set define mode. */
+	    file->redef = NC_TRUE; /* For nc_abort, we need to remember if we're in define mode as a redef. */
+        }
     }
 
     if((stat = ncz_makeattr(file,obj,name,file_type,len,copy,NULL))) goto done;
@@ -662,21 +715,25 @@ done:
  */
 int
 NCZ_get_att(int ncid, int varid, const char *name, void *value,
-                 nc_type memtype)
+                 nc_type mem_type)
 {
+    int stat = NC_NOERR;
     NC_FILE_INFO_T *file;
     NC_GRP_INFO_T *grp;
     NC_VAR_INFO_T *var = NULL;
+    NC_ATT_INFO_T *att = NULL;
     char norm_name[NC_MAX_NAME + 1];
-    int stat = NC_NOERR;
+    nc_type file_type = NC_NAT;
+    int range_error = 0;
 
     LOG((2, "%s: ncid 0x%x varid %d", __func__, ncid, varid));
 
-    /* Find the file, group, and var info, and do lazy att read if
-     * needed. */
-    if ((stat = ncz_find_grp_var_att(ncid, varid, name, 0, 1, norm_name,
-                                            &file, &grp, &var, NULL)))
-        return stat;
+    /* Find the file, group, and var info */
+    if ((stat = ncz_find_file_grp_var(ncid, varid, &file, &grp, &var))) goto done;
+
+    /* Check and normalize the name. */
+    if (!name || strlen(name) > NC_MAX_NAME) {stat = NC_EBADNAME; goto done;}
+    if ((stat = nc4_check_name(name, norm_name))) goto done;
 
     /* If this is one of the reserved global atts, use nc_get_att_special. */
     {
@@ -687,13 +744,57 @@ NCZ_get_att(int ncid, int varid, const char *name, void *value,
     }
 
     /* See if the attribute exists */
-    stat = nc4_get_att_ptrs(file, grp, var, norm_name, NULL, memtype,
-                            NULL, NULL, value);
+    stat = nc4_find_grp_att(grp,varid,norm_name,0,&att);
 
     /* If asking for _FillValue and it does not exist, build it */
-    if(stat == NC_ENOTATT && varid != NC_GLOBAL && strcmp(norm_name,"_FillValue")==0) {
-	stat = ncz_create_fillvalue(file,var);
+    if(stat == NC_ENOTATT && att != NULL && varid != NC_GLOBAL && strcmp(norm_name,"_FillValue")==0) {
+	if((stat = ncz_create_fillvalue(file,var))) goto done;
+        /* get fill value attribute again */
+        if((stat = nc4_find_grp_att(grp,varid,norm_name,0,&att))) goto done;
     }
+
+    /* stop if error */
+    if(stat) goto done;
+
+    assert(att != NULL);    
+    file_type = att->nc_typeid;
+
+    /* We must have two valid types to continue. */
+    if (file_type == NC_NAT || mem_type == NC_NAT) return NC_EBADTYPE;
+
+    /* No character conversions are allowed. */
+    if (file_type != mem_type &&
+        (file_type == NC_CHAR || mem_type == NC_CHAR ||
+         file_type == NC_STRING || mem_type == NC_STRING))
+        return NC_ECHAR;
+
+    /* For classic mode file, only allow atts with classic types to be
+     * created. */
+    if (file->cmode & NC_CLASSIC_MODEL && file_type > NC_DOUBLE)
+        return NC_ESTRICTNC3;
+
+    /* copy and/or convert memory data to file format data */
+    if(mem_type != file_type && mem_type < NC_STRING && mem_type < NC_STRING) {
+	size_t mem_type_len = 0;
+	size_t file_type_len = 0;
+        if ((stat = nc4_get_typelen_mem(file, mem_type, &mem_type_len))) return stat;
+        if ((stat = nc4_get_typelen_mem(file, file_type, &file_type_len))) return stat;
+	/* Need to convert from file_type data into output buffer */
+        if ((stat = nc4_convert_type(att->data, value, file_type, mem_type,
+                                               att->len, &range_error, NULL,
+                                               (file->cmode & NC_CLASSIC_MODEL),
+					       NC_NOQUANTIZE, 0)))
+	    goto done;
+    } else { /* no conversion */
+	/* Still need a copy of the input data */
+	if((stat = NC_copy_data(file->controller, file_type, att->data, att->len, value))) goto done;
+    }
+
+done:
+    /* If there was an error return it, otherwise return any potential
+       range error value. If none, return NC_NOERR as usual.*/
+    if (range_error) return NC_ERANGE;
+    if (stat) return stat;
     return THROW(stat);
 }
 
@@ -764,42 +865,53 @@ int
 ncz_create_fillvalue(NC_FILE_INFO_T* file, NC_VAR_INFO_T* var)
 {
     int stat = NC_NOERR;
-    size_t i;
-    NC_ATT_INFO_T* fv = NULL;
 
     /* Have the var's attributes been read? */
     if(!var->atts_read) goto done; /* above my pay grade */
 
     /* Is FillValue warranted? */
-    if(!var->no_fill && var->fill_value != NULL && !isdfaltfillvalue(var->type_info->hdr.id,var->fill_value)) {
-        /* Make sure _FillValue does not exist */
+#if 0
+    if(!var->no_fill && var->fill_value != NULL && !isdfaltfillvalue(vartype,var->fill_value)) {
+        /* Make sure _FillValue att does not exist */
 	for(i=0;i<ncindexsize(var->att);i++) {
-	    fv = (NC_ATT_INFO_T*)ncindexith(var->att,i);
-	    if(strcmp(fv->hdr.name,NC_ATT_FILLVALUE)==0) break;
-	    fv = NULL;
+	    fvatt = (NC_ATT_INFO_T*)ncindexith(var->att,i);
+	    if(strcmp(fvatt->hdr.name,NC_ATT_FILLVALUE)==0) break;
+	    fvatt = NULL;
         }
-	if(fv == NULL) {
-	    /* Create it */
-	    if((stat = ncz_makeattr(file, (NC_OBJ*)var,_FillValue,var->type_info->hdr.id,1,var->fill_value,&fv)))
+	if(fvatt == NULL) { /* Create it */
+	    /* Make a copy of the var->fill_value to be stored in the attribute */
+	    if((stat = NC_copy_data_all(file->controller, vartype, var->fill_value, 1, &copy))) goto done;
+	    if((stat = ncz_makeattr(file, (NC_OBJ*)var,_FillValue,vartype,1,copy,&fvatt)))
+	    copy = NULL;
 	    goto done;
 	}
     }
+#else
+    if(!var->no_fill && var->fill_value != NULL) {
+	if((stat = NCZ_copy_var_to_fillatt(file,var))) goto done;
+    }
+#endif
+
 done:
+#if 0
+    if(copy)
+	NC_reclaim_data_all(file->controller,vartype,copy,1);
+#endif
     return THROW(stat);
 }
 
-/* Create an attribute; This is the core of ncz_put_att above */
+/*
+Create an attribute; This is the core of ncz_put_att above
+*/
 int
 ncz_makeattr(NC_FILE_INFO_T* file, NC_OBJ* container, const char* name, nc_type typeid, size_t len, void* values, NC_ATT_INFO_T** attp)
 {
     int stat = NC_NOERR;
     NC_ATT_INFO_T* att = NULL;
     NCZ_ATT_INFO_T* zatt = NULL;
-    NCindex* attlist = NULL;
-    char norm_name[NC_MAX_NAME + 1];
-    const NC_reservedatt* ra = NULL;
     int new_att = 0;
     size_t typesize = 0;
+    NCindex* attlist = NULL;
     
     if(container->sort == NCGRP)
         attlist = ((NC_GRP_INFO_T*)container)->att;
@@ -807,68 +919,28 @@ ncz_makeattr(NC_FILE_INFO_T* file, NC_OBJ* container, const char* name, nc_type 
         attlist = ((NC_VAR_INFO_T*)container)->att;
     assert(attlist != NULL);
 
-    /* The length needs to be positive (cast needed for brain-dead systems with signed size_t). */
-    if((unsigned long) len > X_INT_MAX) {stat = NC_EINVAL; goto done;}
-
-    /* If len is not zero, then there must be some data. */
-    if (len && !values) {stat = NC_EINVAL; goto done;}
-
-    /* If the file is read-only, return an error. */
-    if (file->no_write) {stat = NC_EPERM; goto done;}
-
-    /* Check and normalize the name. */
-    if (!name || strlen(name) > NC_MAX_NAME) {stat = NC_EBADNAME; goto done;}
-    if ((stat = nc4_check_name(name, norm_name))) goto done;
-
-    /* Check that a reserved att name is not being used improperly */
-    ra = NC_findreserved(name);
-    if(ra != NULL) {
-        /* case 1: grp=root, containerid==NC_GLOBAL, flags & READONLYFLAG */
-        if (container->sort == NCGRP && ((NC_GRP_INFO_T*)container)->parent == NULL && (ra->flags & READONLYFLAG))
-            {stat = NC_ENAMEINUSE; goto done;}
-        /* case 2: grp=NA, containerid!=NC_GLOBAL, flags & HIDDENATTRFLAG */
-        if (container->sort != NCGRP && (ra->flags & HIDDENATTRFLAG))
-            {stat = NC_ENAMEINUSE; goto done;}
-    }
-
-    /* See if there is already an attribute with this name. */
-    att = (NC_ATT_INFO_T*)ncindexlookup(attlist,norm_name);
-
-    if (!att) {
-        if (!(file->flags & NC_INDEF)) { /* If this is a new att, require define mode. */
-            if (file->cmode & NC_CLASSIC_MODEL) {stat = NC_ENOTINDEFINE; goto done;}
-	    file->flags |= NC_INDEF;/* Set define mode. */
-	    file->redef = NC_TRUE; /* For nc_abort, we need to remember if we're in define mode as a redef. */
-        }
-        new_att = NC_TRUE;
-    } else {
-        /* For an existing att, if we're not in define mode, the len
-           must not be greater than the existing len for classic model. */
-        if(!(file->flags & NC_INDEF) 
-	    && len * (size_t)nc4typelen(typeid) > (size_t)att->len * (size_t)nc4typelen(att->nc_typeid)) {
-            if (file->cmode & NC_CLASSIC_MODEL) {stat = NC_ENOTINDEFINE; goto done;}
-	    file->flags |= NC_INDEF;/* Set define mode. */
-	    file->redef = NC_TRUE; /* For nc_abort, we need to remember if we're in define mode as a redef. */
-        }
-    }
-
     if ((stat = nc4_get_typelen_mem(file, typeid, &typesize))) goto done;
 
+    /* See if there is already an attribute with this name. */
+    att = (NC_ATT_INFO_T*)ncindexlookup(attlist,name);
+    new_att = (att == NULL);
+    
     if(new_att) {
         if((stat=nc4_att_list_add(attlist,name,&att))) goto done;
         if((zatt = calloc(1,sizeof(NCZ_ATT_INFO_T))) == NULL) {stat = NC_ENOMEM; goto done;}
         zatt->common.file = file;
         att->container = container;
         att->format_att_info = zatt;
-    } else {
+    } else if(att->data) {
+	/* remove old att data */
 	(void)NC_reclaim_data_all(file->controller,att->nc_typeid,att->data,att->len);
 	att->data = NULL;
     }
-    
+
     /* Fill in the attribute's type and value  */
     att->nc_typeid = typeid;
     att->len = (int)len;
-    att->data = values; values = NULL;
+    if((stat = NC_copy_data_all(file->controller,typeid,values,len,&att->data))) goto done;
     att->dirty = NC_TRUE;
     if(attp) {*attp = att; att = NULL;}
 
@@ -876,7 +948,6 @@ ncz_makeattr(NC_FILE_INFO_T* file, NC_OBJ* container, const char* name, nc_type 
         ((NC_VAR_INFO_T*)container)->attr_dirty = NC_TRUE;
 
 done:
-    if(values) (void)NC_reclaim_data_all(file->controller,typeid,values,len);    
     if(stat) {
 	if(new_att && att) {
 	    nc4_att_list_del(attlist,att);
@@ -906,6 +977,10 @@ NCZ_computeattrdata(nc_type* typeidp, const NCjson* values, size_t* typelenp, si
 
     typeid = *typeidp; /* initial assumption */
 
+
+    if((stat = NC4_inq_atomic_type(typeid, NULL, &typelen)))
+	goto done;
+
     /* Handle special types */
     if(typeid == NC_JSON) {
 	/* Apply the JSON attribute convention and convert to JSON string */
@@ -925,9 +1000,6 @@ NCZ_computeattrdata(nc_type* typeidp, const NCjson* values, size_t* typelenp, si
         if((stat = NCZ_attr_convert(values,typeid,typelen,&count,buf))) goto done;
     }
     assert(typeid != NC_NAT && typeid != NC_JSON); 
-
-    if((stat = NC4_inq_atomic_type(typeid, NULL, &typelen)))
-	goto done;
 
     if(typelenp) *typelenp = typelen;
     if(typeidp) *typeidp = typeid; /* return possibly inferred type */
