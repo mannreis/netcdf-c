@@ -1365,13 +1365,14 @@ then create fqns for the dimension names.
 If the dimension does not exist, then use an anonymous name.
 
 We have two sources for the dimension names for this variable.
-1. the "dimension_names" inside the zarr.json (V3) dictionary;
-   this is the simple dimension name.
-2. the xarray "_ARRAY_DIMENSIONS" (V2) attribute as the simple dimension names.
-3. the "dimension_references" key inside the _nczarr_array dictionary;
+1. the "dimension_names":
+   1.1 inside the zarr.json (V3) dictionary; this is the simple dimension name.
+   1.2 the xarray "_ARRAY_DIMENSIONS" (V2) attribute as the simple dimension names.
+2. the "dimension_references" key inside the _nczarr_array dictionary;
    this contains FQNs for the dimensions.
+Note that we may have both 1.1|1.2 and 2.
 
-If purezarr, then we only have #1 or #2. In that case, for each name in "dimension_names",
+If purezarr, then we only have 1.1 or 1.2. In that case, for each name in "dimension_names",
 we need to do the following:
 1. get the i'th size from the "shape" vector.
 2. if the i'th simple dimension name is null, then set the name to "_Anonymous_Dim<n>",
@@ -1393,39 +1394,41 @@ int
 NCZ_computedimrefs(NC_FILE_INFO_T* file, NC_GRP_INFO_T* grp,
                size_t ndims,
 	       size64_t* shape,
-	       char** dimnames0,
-	       char** dimfqns)
+	       NClist* diminfo)
 {
     int stat = NC_NOERR;
     size_t i;
-    int purezarr = 0;
-    NCZ_FILE_INFO_T* zfile = (NCZ_FILE_INFO_T*)file->format_file_info;
     char zdimname[NC_MAX_NAME];
-    char* dimnames[NC_MAX_VAR_DIMS];
     NCbytes* fqn = ncbytesnew();
     
     ZTRACE(3,"file=%s var=%s purezarr=%d ndims=%d shape=%s",
         file->controller->path,var->hdr.name,purezarr,ndims,nczprint_vector(ndims,shape));
 
-    if(zfile->flags & FLAG_PUREZARR) purezarr = 1;
+    assert(diminfo != NULL && nclistlength(diminfo) == ndims);
 
-    if(purezarr) {
-        assert(dimfqns != NULL);
+    {
+	/* Fill in dimnames */
         for(i=0;i<ndims;i++) {
-	    assert(dimfqns[i] == NULL);
-	    if(dimnames0 == NULL || dimnames0[i] == NULL) {
-	        /* create anonymous dimension names */
-	        snprintf(zdimname,sizeof(zdimname),"%s_%llu",NCDIMANON,shape[i]);
-	        dimnames[i] = strdup(zdimname);
-	    } else { /* => dimnames0 != NULL && dimnames0[i] != NULL) */
-		assert(dimnames0 != NULL && dimnames0[i] != NULL);
-                dimnames[i] = nulldup(dimnames0[i]);
+	    NCZ_DimInfo* dimdata = (NCZ_DimInfo*)nclistget(diminfo,i);
+	    if(dimdata->fqn == NULL) {
+	        if(dimdata->name == NULL)
+	            /* create anonymous dimension names */
+	            snprintf(zdimname,sizeof(zdimname),"%s_%llu",NCDIMANON,shape[i]);
+	            dimdata->name = strdup(zdimname);
+		    /* Put the anonymous dim into "/" */
+                    if((stat = NCZ_makeFQN(file->root_grp, dimdata->name, fqn))) goto done;
+		    dimdata->fqn = ncbytesextract(fqn);
+	        } else { /* => dimdata->name != NULL */
+		    assert(dimdata->names != NULL);
+                    /* convert dimension_name to FQN */
+                    if((stat = NCZ_makeFQN(grp, dimdata->name, fqn))) goto done;
+                    dimdata->fqn = ncbytesextract(fqn);
+		}
 	    }
-            /* convert dimension_names to FQNs */
-	    if((stat = NCZ_makeFQN(grp, dimnames[i], fqn))) goto done;
-            dimfqns[i] = ncbytesextract(fqn);
-         }
+	    assert(dimdata->name != NULL && dimdata->fqn != NULL);
+	}
     }
+
 done:
     ncbytesfree(fqn);
     NCZ_clearstringvec(ndims,dimnames);
@@ -1486,4 +1489,16 @@ NCZ_decodesizetvec(const NCjson* jshape, size_t* shapes)
 
 done:
     return THROW(stat);
+}
+
+void
+NCZ_clear_diminfo(NClist* diminfo)
+{
+    size_t i;
+    for(i=0;i<nclistlength(diminfo);i++) {
+	NCZ_DimInfo* ddim = (NCZ_DimInfo*)nclistget(diminfo,i);
+	nullfree(ddim->name);
+	nullfree(ddim->fqn);
+    }
+    nclistclear(diminfo);
 }

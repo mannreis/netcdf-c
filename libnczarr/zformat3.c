@@ -96,7 +96,7 @@ static int read_vars(NC_FILE_INFO_T* file, NC_GRP_INFO_T* grp, NClist* varnames)
 static int read_subgrps(NC_FILE_INFO_T* file, NC_GRP_INFO_T* grp, NClist* subgrpnames);
 static int verify_superblock(NC_FILE_INFO_T* file, const NCjson* jsuper);
 static int parse_dims(NC_FILE_INFO_T* file, NC_GRP_INFO_T* grp, const NCjson* jdims);
-static int read_attrs(NC_FILE_INFO_T* file, NC_OBJ* container, const NCjson* jattrs, const NCjson* jatypes);
+static int parse_attrs(NC_FILE_INFO_T* file, NC_OBJ* container, const NCjson* jatts, const NCjson* jatypes);
 static int NCZ_collect_grps(NC_FILE_INFO_T* file, NC_GRP_INFO_T* parent, NCjson** jgrpsp);
 static int NCZ_collect_arrays(NC_FILE_INFO_T* file, NC_GRP_INFO_T* parent, NCjson** jarraysp);
 static int NCZ_collect_dims(NC_FILE_INFO_T* file, NC_GRP_INFO_T* parent, NCjson** jdimsp);
@@ -912,7 +912,7 @@ done:
 @author Dennis Heimbigner
 */
 static int
-read_attrs(NC_FILE_INFO_T* file, NC_OBJ* container, const NCjson* jatts, const NCjson* jatypes)
+parse_attrs(NC_FILE_INFO_T* file, NC_OBJ* container, const NCjson* jatts, const NCjson* jatypes)
 {
     int stat = NC_NOERR;
     NCZ_FILE_INFO_T* zfile = (NCZ_FILE_INFO_T*)file->format_file_info;
@@ -1643,7 +1643,7 @@ read_var1(NC_FILE_INFO_T* file, NC_GRP_INFO_T* grp, const char* varname)
         if((stat = NCZ_adjust_var_cache(var))) goto done;
 
         /* Now that we have the variable, create its attributes */
-        if((stat = read_attrs(file,(NC_OBJ*)grp,jatts,jtypes))) goto done;
+        if((stat = parse_attrs(file,(NC_OBJ*)grp,jatts,jtypes))) goto done;
     
 	/* Push the fill value attribute */
 	if((stat = NCZ_copy_var_to_fillatt(file,var))) goto done;
@@ -2262,43 +2262,52 @@ static int
 json2filter(NC_FILE_INFO_T* file, const NCjson* jfilter, int chainindex, NClist* filterchain, NCZ_Filter** zfilterp)
 {
     int stat = NC_NOERR;
+    const NCjson* jvalue = NULL;
     NCZ_Filter* filter = NULL;
     NCZ_Plugin* plugin = NULL;
-    const NCjson* jvalue = NULL;
+    NCZ_Codec codec;
+    NCZ_HDF5 hdf5;
+    int flags = 0;
+    int empty = 0;
 
     ZTRACE(6,"file=%s var=%s jfilter=%s",file->hdr.name,var->hdr.name,NCJtrace(jfilter));
 
+    memset(&codec,0,sizeof(NCZ_Codec));
+    memset(&hdf5,0,sizeof(NCZ_HDF5));
+
     /* Get the id of this codec filter */
-    if(NCJdictget(jfilter,"id",&jvalue)<0) {stat = NC_EFILTER; goto done;}
+    if(NCJdictget(jfilter,"name",&jvalue)<0) {stat = NC_EFILTER; goto done;}
     if(!NCJisatomic(jvalue)) {stat = THROW(NC_ENOFILTER); goto done;}
-    filter->codec.id = strdup(NCJstring(jvalue));
+    codec.id = strdup(NCJstring(jvalue));
+    /* Save the codec for this filter */
+    NCJcheck(NCJunparse(jfilter, 0, &codec.codec));
 
     if((stat = NCZ_codec_plugin_lookup(filter->codec.id,&plugin))) goto done;
 
     if(plugin != NULL) {
 	/* Save the hdf5 id */
 	assert(plugin->hdf5.filter != NULL);
-	filter->hdf5.id = plugin->hdf5.filter->id;
+	hdf5.id = plugin->hdf5.filter->id;
         /* Convert the codec to hdf5 form visible parameters */
         if(plugin->codec.codec->NCZ_codec_to_hdf5) {
-            if((stat = plugin->codec.codec->NCZ_codec_to_hdf5(NCplistzarrv2,filter->codec.codec,&filter->hdf5.id,&filter->hdf5.visible.nparams,&filter->hdf5.visible.params))) goto done;
+            if((stat = plugin->codec.codec->NCZ_codec_to_hdf5(NCplistzarrv2,codec.codec,&hdf5.id,&hdf5.visible.nparams,&hdf5.visible.params))) goto done;
 #ifdef DEBUGF
             fprintf(stderr,">>> DEBUGF: json2filter: codec=%s, hdf5=%s\n",printcodec(codec),printhdf5(hdf5));
 #endif
         }
-	filter->flags |= FLAG_VISIBLE;
-	filter->flags |= FLAG_CODEC;
-        filter->plugin = plugin; plugin = NULL;
+	flags |= FLAG_VISIBLE;
+	flags |= FLAG_CODEC;
         if(filter->codec.codec == NULL) {
             /* Unparse jfilter */
             if(NCJunparse(jfilter,0,&filter->codec.codec)<0) goto done;
         }
     } else {
         /* Fake the filter so we do not forget about this codec */
-	NCZ_create_empty_filter(filter);
+	empty = 1;
     }
-    filter->chainindex = chainindex;
-    nclistpush(filterchain,filter);
+
+    /* Create the filter */
+    if((stat = ncz4_create_filter(file,empty,plugin,&codec,&hdf5,flags,chainindex,filterchain,&filter))) goto done;
     
     if(zfilterp) {*zfilterp = filter; filter = NULL;}
 

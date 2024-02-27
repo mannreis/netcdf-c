@@ -52,6 +52,7 @@ and do the command:
 #define NCJFLAG_NONE	    0
 #define NCJFLAG_INDENTED    1
 
+
 /* Define a struct to store primitive values as unquoted
    strings. The sort will provide more info.  Do not bother with
    a union since the amount of saved space is minimal.

@@ -85,6 +85,7 @@ EXTERNL int NCZ_swapatomicdata(size_t datalen, void* data, int typesize);
 EXTERNL char** NCZ_clonestringvec(size_t len, const char** vec);
 EXTERNL void NCZ_freestringvec(size_t len, char** vec);
 EXTERNL void NCZ_clearstringvec(size_t len, char** vec);
+EXTERNL void NCZ_clear_diminfo(NClist* diminfo);
 EXTERNL int NCZ_ischunkname(const char* name,char dimsep);
 EXTERNL char* NCZ_chunkpath(struct ChunkKey key);
 EXTERNL size_t NCZ_get_maxstrlen(NC_OBJ* obj);
@@ -103,8 +104,7 @@ EXTERNL void NCZ_freeAttrInfoVec(struct NCZ_AttrInfo* ainfo);
 EXTERNL void NCZ_setatts_read(NC_OBJ* container);
 EXTERNL int NCZ_computedimrefs(NC_FILE_INFO_T* file, NC_GRP_INFO_T* parent, size_t ndims,
 				size64_t* shapes,
-				char** dimnames,
-				char** dimfqns);
+				NCZ_DimInfo* diminfo);
 EXTERNL int NCZ_decodesizet64vec(const NCjson* jshape, size64_t* shapes);
 EXTERNL int NCZ_decodesizetvec(const NCjson* jshape, size_t* shapes);
 

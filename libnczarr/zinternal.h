@@ -287,8 +287,9 @@ typedef struct NCZ_TYPE_INFO {
 
 /* Parsed dimension info */
 typedef struct NCZ_DimInfo {
-    char* path;
-    size64_t dimlen;
+    char* name;
+    char* fqn;
+    size64_t shape;
     int unlimited;
 } NCZ_DimInfo;
 
