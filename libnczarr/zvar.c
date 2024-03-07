@@ -410,8 +410,11 @@ var->type_info->rc++;
     /* Set variables no_fill to match the database default unless the
      * variable type is variable length (NC_STRING or NC_VLEN) or is
      * user-defined type. */
-    if (var->type_info->nc_type_class <= NC_STRING)
-	var->no_fill = (h5->fill_mode == NC_NOFILL);
+    if (var->type_info->nc_type_class <= NC_STRING) { /* Make fill flags consistent */
+	int no_fill = (h5->fill_mode == NC_NOFILL);
+	if((retval = NCZ_set_fill_value(h5,var,no_fill,NULL))) BAIL(retval);
+        var->fill_val_changed = 0; /* But pretend it has not been changed */
+    }
 
     /* Assign dimensions to the variable. At the same time, check to
      * see if this is a coordinate variable. If so, it will have the
@@ -728,17 +731,11 @@ ncz_def_var_extra(int ncid, int varid, int *shuffle, int *unused1,
 	LOG((4, "Copying fill value into metadata for variable %s",
 	     var->hdr.name));
 
-	/* Reclaim existing fill value */
-	if(var->fill_value) {
-	    if((stat = NCZ_reclaim_fill_value(var))) goto done;
-	}
-	assert(var->fill_value == NULL);
-
-	/* set the NC_VAR_INFO_T.fill_value */	
+	/* (re-)set the NC_VAR_INFO_T.fill_value */	
 	if((stat = NCZ_set_fill_value(h5,var,*no_fill,fill_value))) goto done;
 
         /* synchronize to Attribute */
-	if((stat = NCZ_copy_var_to_fillatt(h5,var))) goto done;
+	if((stat = NCZ_copy_var_to_fillatt(h5,var,NULL))) goto done;
     }
 
     /* Is the user setting the endianness? */

@@ -516,6 +516,7 @@ ncz_rec_grp_NCZ_del(NC_GRP_INFO_T *grp)
 }
 #endif /*0*/
 
+#if 0
 /**
  * @internal Given an ncid and varid, get pointers to the group and var
  * metadata. Lazy var metadata reads are done as needed.
@@ -547,6 +548,7 @@ ncz_find_file_grp_var(int ncid, int varid, NC_FILE_INFO_T **h5,
     if (h5) *h5 = my_h5;
     return NC_NOERR;
 }
+#endif
 
 /**
  * @internal Given an ncid, varid, and attribute name, return

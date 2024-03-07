@@ -438,7 +438,7 @@ NCZ_def_var_filter(int ncid, int varid, unsigned int id, size_t nparams,
     assert(nc);
 
     /* Find info for this file and group and var, and set pointer to each. */
-    if ((stat = ncz_find_file_grp_var(ncid, varid, &h5, &grp, &var)))
+    if ((stat = nc4_find_grp_h5_var(ncid, varid, &h5, &grp, &var)))
 	{stat = THROW(stat); goto done;}
 
     assert(h5 && var && var->hdr.id == varid);
@@ -652,7 +652,7 @@ NCZ_inq_var_filter_ids(int ncid, int varid, size_t* nfiltersp, unsigned int* ids
     assert(nc);
 
     /* Find info for this file and group and var, and set pointer to each. */
-    if ((stat = ncz_find_file_grp_var(ncid, varid, &h5, &grp, &var)))
+    if ((stat = nc4_find_grp_h5_var(ncid, varid, &h5, &grp, &var)))
 	{stat = THROW(stat); goto done;}
 
     assert(h5 && var && var->hdr.id == varid);
@@ -692,7 +692,7 @@ NCZ_inq_var_filter_info(int ncid, int varid, unsigned int id, size_t* nparamsp, 
     assert(nc);
 
     /* Find info for this file and group and var, and set pointer to each. */
-    if ((stat = ncz_find_file_grp_var(ncid, varid, &h5, &grp, &var)))
+    if ((stat = nc4_find_grp_h5_var(ncid, varid, &h5, &grp, &var)))
 	{stat = THROW(stat); goto done;}
 
     assert(h5 && var && var->hdr.id == varid);

@@ -528,11 +528,10 @@ ncz_put_att(int ncid, int containerid, const char *name, nc_type file_type,
         }
     }
 
-    if((stat = ncz_makeattr(file,obj,name,file_type,len,copy,NULL))) goto done;
-    copy = NULL; /* taken by ncz_makeattr */
+    if((stat = ncz_makeattr(file,obj,name,file_type,len,copy,&att))) goto done;
 
     if(isfillvalue) {
-	if((stat = NCZ_copy_fillatt_to_var(file,var))) goto done;
+	if((stat = NCZ_copy_fillatt_to_var(file,att,var))) goto done;
     }
     
 done:
@@ -728,12 +727,17 @@ NCZ_get_att(int ncid, int varid, const char *name, void *value,
 
     LOG((2, "%s: ncid 0x%x varid %d", __func__, ncid, varid));
 
-    /* Find the file, group, and var info */
-    if ((stat = ncz_find_file_grp_var(ncid, varid, &file, &grp, &var))) goto done;
-
     /* Check and normalize the name. */
     if (!name || strlen(name) > NC_MAX_NAME) {stat = NC_EBADNAME; goto done;}
     if ((stat = nc4_check_name(name, norm_name))) goto done;
+
+    /* Find the file and group and (optionally) var info */
+    if(varid != NC_GLOBAL) {
+        if ((stat = nc4_find_grp_h5_var(ncid, varid, &file, &grp, &var))) goto done;
+    } else { /* just find grp and file */
+        if ((stat = nc4_find_grp_h5(ncid, &grp, &file))) goto done;
+	var = NULL;
+    }
 
     /* If this is one of the reserved global atts, use nc_get_att_special. */
     {
@@ -882,13 +886,12 @@ ncz_create_fillvalue(NC_FILE_INFO_T* file, NC_VAR_INFO_T* var)
 	    /* Make a copy of the var->fill_value to be stored in the attribute */
 	    if((stat = NC_copy_data_all(file->controller, vartype, var->fill_value, 1, &copy))) goto done;
 	    if((stat = ncz_makeattr(file, (NC_OBJ*)var,_FillValue,vartype,1,copy,&fvatt)))
-	    copy = NULL;
 	    goto done;
 	}
     }
 #else
     if(!var->no_fill && var->fill_value != NULL) {
-	if((stat = NCZ_copy_var_to_fillatt(file,var))) goto done;
+	if((stat = NCZ_copy_var_to_fillatt(file,var,NULL))) goto done;
     }
 #endif
 
@@ -901,7 +904,8 @@ done:
 }
 
 /*
-Create an attribute; This is the core of ncz_put_att above
+Create an attribute; This is the core of ncz_put_att above.
+Caller must free values.
 */
 int
 ncz_makeattr(NC_FILE_INFO_T* file, NC_OBJ* container, const char* name, nc_type typeid, size_t len, void* values, NC_ATT_INFO_T** attp)
@@ -923,7 +927,7 @@ ncz_makeattr(NC_FILE_INFO_T* file, NC_OBJ* container, const char* name, nc_type 
 
     /* See if there is already an attribute with this name. */
     att = (NC_ATT_INFO_T*)ncindexlookup(attlist,name);
-    new_att = (att == NULL);
+    new_att = (att == NULL?1:0);
     
     if(new_att) {
         if((stat=nc4_att_list_add(attlist,name,&att))) goto done;
@@ -977,9 +981,10 @@ NCZ_computeattrdata(nc_type* typeidp, const NCjson* values, size_t* typelenp, si
 
     typeid = *typeidp; /* initial assumption */
 
-
-    if((stat = NC4_inq_atomic_type(typeid, NULL, &typelen)))
-	goto done;
+    if(typeid == NC_JSON)
+        typelen = 1; /* treat like char */
+    else
+        {if((stat = NC4_inq_atomic_type(typeid, NULL, &typelen))) goto done;}
 
     /* Handle special types */
     if(typeid == NC_JSON) {

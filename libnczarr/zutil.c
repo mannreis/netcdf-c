@@ -241,7 +241,7 @@ ncz_splitkey(const char* key, NClist* segments)
 @param zmap - [in] controlling zarr map
 @param key - [in] .z... object to load
 @param jsonp - [out] root of the loaded json
-@return NC_NOERR
+@return NC_NOERR || NC_EXXX
 @author Dennis Heimbigner
 */
 int
@@ -254,7 +254,7 @@ NCZ_downloadjson(NCZMAP* zmap, const char* key, NCjson** jsonp)
 
     switch (stat = nczmap_len(zmap, key, &len)) {
     case NC_NOERR: break;
-    case NC_ENOOBJECT: /* fall thru */
+    case NC_ENOOBJECT: stat = NC_NOERR; goto ret;
     default: goto done;
     }
 
@@ -267,6 +267,7 @@ NCZ_downloadjson(NCZMAP* zmap, const char* key, NCjson** jsonp)
     if(NCJparse(content,0,&json) < 0)
 	{stat = NC_ENCZARR; goto done;}
 
+ret:
     if(jsonp) {*jsonp = json; json = NULL;}
 
 done:
@@ -327,13 +328,9 @@ NCZ_createdict(NCZMAP* zmap, const char* key, NCjson** jsonp)
     NCjson* json = NULL;
 
     /* See if it already exists */
-    stat = NCZ_downloadjson(zmap,key,&json);
-    if(stat != NC_NOERR) {
-	if(stat == NC_ENOOBJECT) {/* create it */
-	    if((stat = nczmap_def(zmap,key,NCZ_ISMETA)))
-		goto done;	    
-        } else
-	    goto done;
+    if((stat = NCZ_downloadjson(zmap,key,&json))) goto done;
+    if(json == NULL) { /* create it */
+        if((stat = nczmap_def(zmap,key,NCZ_ISMETA))) goto done;	    
     } else {
 	/* Already exists, fail */
 	stat = NC_EINVAL;
@@ -353,7 +350,7 @@ done:
 @param key - [in] key of the object
 @param jsonp - [out] return parsed json
 @return NC_NOERR
-@return NC_EINVAL if object exits
+@return NC_EOBJECT if object exits
 @author Dennis Heimbigner
 */
 int
@@ -362,18 +359,12 @@ NCZ_createarray(NCZMAP* zmap, const char* key, NCjson** jsonp)
     int stat = NC_NOERR;
     NCjson* json = NULL;
 
-    stat = NCZ_downloadjson(zmap,key,&json);
-    if(stat != NC_NOERR) {
-	if(stat == NC_ENOOBJECT) {/* create it */
-	    if((stat = nczmap_def(zmap,key,NCZ_ISMETA)))
-		goto done;	    
-	    /* Create the initial array */
-	    NCJnew(NCJ_ARRAY,&json);
-        } else {
-	    stat = NC_EINVAL;
-	    goto done;
-	}
-    }
+    if((stat = NCZ_downloadjson(zmap,key,&json))) goto done;
+    if(json != NULL) {stat = NC_EOBJECT; goto done;}
+    /* create it */
+    if((stat = nczmap_def(zmap,key,NCZ_ISMETA))) goto done;	    
+    /* Create the initial array */
+    NCJnew(NCJ_ARRAY,&json);
     if(json->sort != NCJ_ARRAY) {stat = NC_ENCZARR; goto done;}
     if(jsonp) {*jsonp = json; json = NULL;}
 done:
@@ -397,8 +388,7 @@ NCZ_readdict(NCZMAP* zmap, const char* key, NCjson** jsonp)
     int stat = NC_NOERR;
     NCjson* json = NULL;
 
-    if((stat = NCZ_downloadjson(zmap,key,&json)))
-	goto done;
+    if((stat = NCZ_downloadjson(zmap,key,&json))) goto done;
     if(NCJsort(json) != NCJ_DICT) {stat = NC_ENCZARR; goto done;}
     if(jsonp) {*jsonp = json; json = NULL;}
 done:
@@ -421,8 +411,7 @@ NCZ_readarray(NCZMAP* zmap, const char* key, NCjson** jsonp)
     int stat = NC_NOERR;
     NCjson* json = NULL;
 
-    if((stat = NCZ_downloadjson(zmap,key,&json)))
-	goto done;
+    if((stat = NCZ_downloadjson(zmap,key,&json))) goto done;
     if(NCJsort(json) != NCJ_ARRAY) {stat = NC_ENCZARR; goto done;}
     if(jsonp) {*jsonp = json; json = NULL;}
 done:
@@ -1385,53 +1374,90 @@ In any case, we now have an FQN for each dimension reference for the var.
 @param file
 @param grp containing var
 @param ndims rank of the variable
-@param shapes the shape of the var
-@param dimnames the simple names of the vars' dimensions (from xarray(v2), dimension_names(v3), or anonymous.
-@param dimfqns the fqns of the dimensions of the var
+@param shape the shape of the var
+@param diminfo info about each dim
 @return NC_NOERR|NC_EXXX
 */
 int
 NCZ_computedimrefs(NC_FILE_INFO_T* file, NC_GRP_INFO_T* grp,
                size_t ndims,
 	       size64_t* shape,
-	       NClist* diminfo)
+	       NCZ_DimInfo* diminfo)
 {
     int stat = NC_NOERR;
     size_t i;
-    char zdimname[NC_MAX_NAME];
+    char digits[NC_MAX_NAME];
     NCbytes* fqn = ncbytesnew();
+    NCbytes* newname = ncbytesnew();
     
     ZTRACE(3,"file=%s var=%s purezarr=%d ndims=%d shape=%s",
         file->controller->path,var->hdr.name,purezarr,ndims,nczprint_vector(ndims,shape));
 
-    assert(diminfo != NULL && nclistlength(diminfo) == ndims);
+    assert(diminfo != NULL);
 
     {
 	/* Fill in dimnames */
         for(i=0;i<ndims;i++) {
-	    NCZ_DimInfo* dimdata = (NCZ_DimInfo*)nclistget(diminfo,i);
-	    if(dimdata->fqn == NULL) {
-	        if(dimdata->name == NULL)
-	            /* create anonymous dimension names */
-	            snprintf(zdimname,sizeof(zdimname),"%s_%llu",NCDIMANON,shape[i]);
-	            dimdata->name = strdup(zdimname);
-		    /* Put the anonymous dim into "/" */
-                    if((stat = NCZ_makeFQN(file->root_grp, dimdata->name, fqn))) goto done;
-		    dimdata->fqn = ncbytesextract(fqn);
-	        } else { /* => dimdata->name != NULL */
-		    assert(dimdata->names != NULL);
-                    /* convert dimension_name to FQN */
-                    if((stat = NCZ_makeFQN(grp, dimdata->name, fqn))) goto done;
-                    dimdata->fqn = ncbytesextract(fqn);
-		}
+	    NC_DIM_INFO_T* dim = NULL;	    
+	    NC_OBJ* obj = NULL;
+	    NCZ_DimInfo* dimdata = &diminfo[i];
+	    size_t loopcounter;
+	    NC_GRP_INFO_T* parent = grp; /* create dim in this group */
+
+            if(dimdata->name == NULL) { /* convert null name to anonymous name */
+                /* create anonymous dimension name WRT root group and using the loopcounter */
+                snprintf(digits,sizeof(digits),"_%llu",shape[i]);
+		ncbytesclear(newname);
+		ncbytescat(newname,NCDIMANON);
+		ncbytescat(newname,digits);
+		dimdata->name = ncbytesextract(newname);
+		parent = file->root_grp; /* anonymous are always created in the root group */
 	    }
-	    assert(dimdata->name != NULL && dimdata->fqn != NULL);
+	    /* Loop repeatedly until we have unique dimension FQN */
+	    for(loopcounter=0;;loopcounter++) {
+		/* cleanup from last loop */
+	        dim = NULL; /* reset loop exit */
+		nullfree(dimdata->fqn); dimdata->fqn = NULL;
+		ncbytesclear(newname);
+		ncbytescat(newname,dimdata->name);
+	   	if(loopcounter > 0) {
+		    /* Make unique name using loopcounter */
+                    snprintf(digits,sizeof(digits),"_%zu",loopcounter);
+		    ncbytescat(newname,digits);
+		}
+   	        /* convert dimension_name to FQN */
+		if((stat = NCZ_makeFQN(parent, ncbytescontents(newname), fqn))) goto done;
+		assert(dimdata->fqn == NULL);
+                dimdata->fqn = ncbytesextract(fqn);
+                /* Check for duplicate */
+                stat = NCZ_locateFQN(file->root_grp,dimdata->fqn,NCDIM,&obj,NULL);
+                if(stat == NC_NOERR) { /* dimension already exists */
+                    NC_DIM_INFO_T* olddim = (NC_DIM_INFO_T*)obj;
+                    /* check if the old dim is consistent with the new dimension*/
+                    if(olddim->len != dimdata->shape || olddim->unlimited) {
+                        /* Inconsistent, so loop again to create an alternate dimension name */   
+			dim = NULL;
+                        continue; /* loop with this new dim name */
+    		    } else {
+			dim = olddim; /* consistent so re-use the old dimension */
+			break;
+		    }
+		} else {
+		    stat = NC_NOERR;
+		    break; /* We have a unique FQN */
+		}
+	    } /* loopcounter */		
+	    stat = NC_NOERR;
+	    if(dim == NULL) {
+                /* Create the dimension */
+	        if((stat = ncz4_create_dim(file,(NC_GRP_INFO_T*)obj,dimdata->name,dimdata->shape,dimdata->unlimited,&dim))) goto done;
+	    }
 	}
     }
 
 done:
     ncbytesfree(fqn);
-    NCZ_clearstringvec(ndims,dimnames);
+    ncbytesfree(newname);
     return ZUNTRACE(THROW(stat));
 }
 
@@ -1492,13 +1518,28 @@ done:
 }
 
 void
-NCZ_clear_diminfo(NClist* diminfo)
+NCZ_clear_diminfo(size_t rank, NCZ_DimInfo* diminfo)
 {
     size_t i;
-    for(i=0;i<nclistlength(diminfo);i++) {
-	NCZ_DimInfo* ddim = (NCZ_DimInfo*)nclistget(diminfo,i);
-	nullfree(ddim->name);
-	nullfree(ddim->fqn);
+    for(i=0;i<rank;i++) {
+	nullfree(diminfo[i].name);
+	nullfree(diminfo[i].fqn);
     }
-    nclistclear(diminfo);
+}
+
+void
+NCZ_reclaim_diminfo_list(NClist* diminfo)
+{
+    if(diminfo != NULL) {
+        size_t i;
+	for(i=0;i<nclistlength(diminfo);i++) {
+	    NCZ_DimInfo* di = (NCZ_DimInfo*)nclistget(diminfo,i);
+	    if(di != NULL) {
+	        nullfree(di->name);
+	        nullfree(di->fqn);
+	        free(di);
+	    }
+	}
+	nclistfree(diminfo);
+    }
 }

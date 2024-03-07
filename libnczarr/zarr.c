@@ -262,10 +262,8 @@ ncz_open_rootgroup(NC_FILE_INFO_T* dataset)
 
     assert(root != NULL);
 
-    if((stat=nczm_concat(NULL,ZGROUP,&rootpath)))
-	goto done;
-    if((stat = NCZ_downloadjson(zfile->map, rootpath, &json)))
-	goto  done;
+    if((stat=nczm_concat(NULL,ZGROUP,&rootpath))) goto done;
+    if((stat = NCZ_downloadjson(zfile->map, rootpath, &json))) goto  done;
     /* Process the json */ 
     for(i=0;i<nclistlength(json->contents);i+=2) {
 	const NCjson* key = nclistget(json->contents,i);

@@ -295,6 +295,10 @@ static int bytesappendc(NCJbuf* bufp, const char c);
 #define OPTSTATIC
 #endif /*NETCDF_JSON_H*/
 
+/* List legal nan and infinity names (lower case) */
+const char* naninf[] = {"-infinity","infinity","-infinityf","infinityf","nan","nanf"};
+const int nnaninf = 6;
+
 /**************************************************/
 
 OPTSTATIC int
@@ -637,19 +641,26 @@ testint(const char* word)
 }
 
 static int
+nancmp(const void* keyp, const void* membpp)
+{
+    int cmp;    
+    const char* key = (const char*)keyp;
+    const char** membp = (const char**)membpp;
+    cmp = strcasecmp(key,*membp);
+    return cmp;
+}
+
+static int
 testdouble(const char* word)
 {
     int ncvt;
     double d;
     int count = 0;
+    void* pos = NULL;
+
     /* Check for Nan and Infinity */
-    if(0==(int)strcasecmp("nan",word)) return 1;
-    if(0==(int)strcasecmp("infinity",word)) return 1;
-    if(0==(int)strcasecmp("-infinity",word)) return 1;
-    /* Allow the XXXf versions as well */
-    if(0==(int)strcasecmp("nanf",word)) return 1;
-    if(0==(int)strcasecmp("infinityf",word)) return 1;
-    if(0==(int)strcasecmp("-infinityf",word)) return 1;
+    pos = bsearch(word, naninf, nnaninf, sizeof(char*), nancmp);
+    if(pos != NULL) return 1;
     /* Try to convert to number */
     ncvt = sscanf(word,"%lg%n",&d,&count); 
     return (ncvt == 1 && strlen(word)==((size_t)count) ? 1 : 0);
@@ -1061,7 +1072,7 @@ done:
     return NCJTHROW(stat);
 }
 
-/* Insert key-value pair into a dict object. key will be strdup'd */
+/* Insert key-value pair into a dict object. key will be strdup'd, jvalue will be claimed */
 OPTSTATIC int
 NCJinsert(NCjson* object, const char* key, NCjson* jvalue)
 {

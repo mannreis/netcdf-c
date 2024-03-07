@@ -526,6 +526,10 @@ NCZ_stringconvert1(nc_type srctype, char* src, NCjson* jvalue)
 	    memcpy(s+1,sq,l);
 	    s[l+1] = '"';
     	    s[l+2] = '\0';
+#else
+            /* Change type to NCJ_STRING */
+	    jvalue->sort = NCJ_STRING;
+		    
 #endif /*0*/
 	}
 	} break;

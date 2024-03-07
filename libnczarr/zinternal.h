@@ -58,6 +58,7 @@
 
 /* V2 Reserved Objects */
 #define Z2METAROOT "/.zgroup"
+#define Z2ATTSROOT "/.zattrs"
 #define Z2GROUP ".zgroup"
 #define Z2ATTRS ".zattrs"
 #define Z2ARRAY ".zarray"
@@ -73,23 +74,36 @@
 
 /* V2 Reserved Attributes */
 /*
-Inserted into /.zgroup
-_nczarr_superblock: {"version": "2.0.0", "format=2"}
-Inserted into any .zgroup
+For nczarr version 2.x.x, the following (key,value)
+pairs are stored in .zgroup and/or .zarray.
+
+For nczarr version 3.0.0, the following (key,value)
+pairs are stored in .zattrs as if they were standard attributes.
+The cost is that lazy attribute reading is no longer possible.
+
+Inserted into /.zgroup || /.zattrs
+_nczarr_superblock: {"version": "3.0.0", "format=2"}
+
+Inserted into any .zgroup || .zattrs (at group level)
 "_nczarr_group": "{
 \"dims\": {\"d1\": \"1\", \"d2\": \"1\",...}
 \"vars\": [\"v1\", \"v2\", ...]
 \"groups\": [\"g1\", \"g2\", ...]
 }"
-Inserted into any .zarray
+
+Inserted into any .zarray || .zattrs (at array level)
 "_nczarr_array": "{
 \"dimensions\": [\"/g1/g2/d1\", \"/d2\",...]
-\"storage\": \"scalar\"|\"contiguous\"|\"compact\"|\"chunked\"
+\"storage\": \"contiguous\" | \"chunked\"
 }"
-Inserted into any .zattrs ? or should it go into the container?
+Note that contiguous <=> scalar for Zarr V2.
+
+Inserted into any .zattrs
 "_nczarr_attrs": "{
 \"types\": {\"attr1\": \"<i4\", \"attr2\": \"json\", \"attr2\": \"char\",...}
 }
+Note: _nczarr_attrs type include non-standard use of a zarr type ">S1" => NC_CHAR
+and "|J0" for json valued attributes.
 */
 
 /* V3 Reserved Attributes */
