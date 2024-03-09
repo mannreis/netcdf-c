@@ -525,8 +525,10 @@ write_var_meta(NC_FILE_INFO_T* file, NCZ_FILE_INFO_T* zfile, NCZMAP* map, NC_VAR
     nullfree(key); key = NULL;
 
     /* Capture dimref names as FQNs */
-    if(var->ndims > 0) {
-	if((dimrefs = nclistnew())==NULL) {stat = NC_ENOMEM; goto done;}
+    if((dimrefs = nclistnew())==NULL) {stat = NC_ENOMEM; goto done;}
+    if(var->ndims == 0) {
+	nclistpush(dimrefs,strdup(DIMSCALAR));
+    } else {/*var->ndims > 0*/
 	for(i=0;i<var->ndims;i++) {
 	    NC_DIM_INFO_T* dim = var->dim[i];
 	    if((stat = NCZ_dimkey(dim,&dimpath))) goto done;
@@ -557,7 +559,7 @@ write_var_meta(NC_FILE_INFO_T* file, NCZ_FILE_INFO_T* zfile, NCZMAP* map, NC_VAR
 
 	/* Set the storage type */
 	if(var->ndims == 0) {
-	    NCJnewstring(NCJ_STRING,"contiguous",&jtmp);
+	    NCJnewstring(NCJ_STRING,"scalar",&jtmp);
 	} else {
 	    NCJnewstring(NCJ_STRING,"chunked",&jtmp);
 	}
@@ -1285,7 +1287,7 @@ read_var1(NC_FILE_INFO_T* file, NC_GRP_INFO_T* grp, const char* varname)
 	NCJcheck(NCJdictget(jzarray,"storage",&jvalue));
 	if(jvalue == NULL)
 	    cvargs.scalar = 0;
-	else if(strcmp(NCJstring(jvalue),"contiguous")==0)
+	else if(strcmp(NCJstring(jvalue),"scalar")==0)
 	    cvargs.scalar = 1;
         cvargs.storage = NC_CHUNKED; /* even for scalars */
     }
@@ -1415,7 +1417,7 @@ read_var1(NC_FILE_INFO_T* file, NC_GRP_INFO_T* grp, const char* varname)
 
     /* Make final scalar adjustments */
     if(cvargs.scalar) {
-        cvargs.rank = 0;
+        cvargs.rank = 1;
 	cvargs.storage = NC_CONTIGUOUS;
     }
 
@@ -1468,14 +1470,19 @@ static int
 collectdimrefs(const NCjson* jdimrefs, struct CVARGS* cvargs)
 {
     int stat = NC_NOERR;
-    NClist* segments = nclistnew();
+    NClist* segments = NULL;
     size_t j;
 
     if(jdimrefs == NULL) goto done;
 
     /* Extract the dimref FQNs */
     if(cvargs->scalar) {
-        assert(NCJarraylength(jdimrefs) == 0);
+        assert(NCJarraylength(jdimrefs) == 1);
+	/* Verify that it is _scalar_ */
+	NCjson* jscalar = NCJith(jdimrefs,0);
+	assert(strcmp(NCJstring(jscalar),DIMSCALAR)==0);
+	cvargs->rank = 1;
+        cvargs->diminfo[0].name = strdup(XARRAYSCALAR);
     } else {
         if(cvargs->rank != NCJarraylength(jdimrefs)) {stat = NC_ENCZARR; goto done;}
         for(j=0;j<cvargs->rank;j++) {
@@ -1484,10 +1491,12 @@ collectdimrefs(const NCjson* jdimrefs, struct CVARGS* cvargs)
 	    char* lastseg = NULL;
             const NCjson* dimpath = NCJith(jdimrefs,j);
             assert(NCJisatomic(dimpath));
+	    assert(cvargs->diminfo[j].fqn == NULL);
 	    cvargs->diminfo[j].fqn = strdup(NCJstring(dimpath));
 	    fqn = cvargs->diminfo[j].fqn;
 	    name = cvargs->diminfo[j].name;
 	    /* Verify WRT simple dim names */
+	    segments = nclistnew();
 	    (void)ncz_splitkey(fqn,segments);
 	    assert(nclistlength(segments) > 0);
 	    lastseg = nclistget(segments,nclistlength(segments)-1);

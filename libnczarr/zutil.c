@@ -1426,6 +1426,7 @@ NCZ_computedimrefs(NC_FILE_INFO_T* file, NC_GRP_INFO_T* grp,
 		    ncbytescat(newname,digits);
 		}
    	        /* convert dimension_name to FQN */
+		assert(ncbyteslength(fqn) == 0);
 		if((stat = NCZ_makeFQN(parent, ncbytescontents(newname), fqn))) goto done;
 		assert(dimdata->fqn == NULL);
                 dimdata->fqn = ncbytesextract(fqn);

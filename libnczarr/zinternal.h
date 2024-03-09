@@ -186,6 +186,7 @@ Optionally Inserted into any group zarr.json or array zarr.json is the extra att
 #define XARRAYCONTROL "xarray"
 #define NOXARRAYCONTROL "noxarray"
 #define XARRAYSCALAR "_scalar_"
+#define DIMSCALAR "/_scalar_"
 #define FORMAT2CONTROL "v2"
 #define FORMAT3CONTROL "v3"
 

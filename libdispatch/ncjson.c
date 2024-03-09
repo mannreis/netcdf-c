@@ -128,8 +128,8 @@ static int bytesappendc(NCJbuf* bufp, const char c);
 #endif /*NETCDF_JSON_H*/
 
 /* List legal nan and infinity names (lower case) */
-const char* naninf[] = {"-infinity","infinity","-infinityf","infinityf","nan","nanf"};
-const int nnaninf = 6;
+static const char* NANINF[] = {"-infinity","infinity","-infinityf","infinityf","nan","nanf"};
+static const int NNANINF = 6;
 
 /**************************************************/
 
@@ -491,7 +491,7 @@ testdouble(const char* word)
     void* pos = NULL;
 
     /* Check for Nan and Infinity */
-    pos = bsearch(word, naninf, nnaninf, sizeof(char*), nancmp);
+    pos = bsearch(word, NANINF, NNANINF, sizeof(char*), nancmp);
     if(pos != NULL) return 1;
     /* Try to convert to number */
     ncvt = sscanf(word,"%lg%n",&d,&count); 
