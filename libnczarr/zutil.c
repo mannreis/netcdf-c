@@ -123,6 +123,7 @@ NCJ_DICT, /*NC_JSON*/
 
 /* Forward */
 static int splitfqn(const char* fqn0, NClist* segments);
+static int uniquedimname(NC_FILE_INFO_T* file, NC_GRP_INFO_T* parent, NCZ_DimInfo* dimdata, NC_DIM_INFO_T** dimp);
 
 /**************************************************/
 
@@ -1382,11 +1383,15 @@ int
 NCZ_computedimrefs(NC_FILE_INFO_T* file, NC_GRP_INFO_T* grp,
                size_t ndims,
 	       size64_t* shape,
-	       NCZ_DimInfo* diminfo)
+	       NCZ_DimInfo* diminfo,
+	       int* isscalarp)
 {
     int stat = NC_NOERR;
     size_t i;
+    int isscalar;
+    int purezarr;
     char digits[NC_MAX_NAME];
+    NCZ_FILE_INFO_T* zfile = (NCZ_FILE_INFO_T*)file->format_file_info;
     NCbytes* fqn = ncbytesnew();
     NCbytes* newname = ncbytesnew();
     
@@ -1395,14 +1400,21 @@ NCZ_computedimrefs(NC_FILE_INFO_T* file, NC_GRP_INFO_T* grp,
 
     assert(diminfo != NULL);
 
+    purezarr = (zfile->flags & FLAG_PUREZARR)?1:0;
+
+    /* Check for scalar */
+    if(!purezarr && ndims == 1 && shape[0] == 1 && diminfo[0].name != NULL && strcmp(diminfo[0].name,XARRAYSCALAR) == 0) {
+	isscalar = 1;
+	goto ret;
+    } else
+        isscalar = 0;
+
     {
 	/* Fill in dimnames */
         for(i=0;i<ndims;i++) {
 	    NC_DIM_INFO_T* dim = NULL;	    
-	    NC_OBJ* obj = NULL;
-	    NCZ_DimInfo* dimdata = &diminfo[i];
-	    size_t loopcounter;
 	    NC_GRP_INFO_T* parent = grp; /* create dim in this group */
+	    NCZ_DimInfo* dimdata = &diminfo[i];
 
             if(dimdata->name == NULL) { /* convert null name to anonymous name */
                 /* create anonymous dimension name WRT root group and using the loopcounter */
@@ -1413,48 +1425,16 @@ NCZ_computedimrefs(NC_FILE_INFO_T* file, NC_GRP_INFO_T* grp,
 		dimdata->name = ncbytesextract(newname);
 		parent = file->root_grp; /* anonymous are always created in the root group */
 	    }
-	    /* Loop repeatedly until we have unique dimension FQN */
-	    for(loopcounter=0;;loopcounter++) {
-		/* cleanup from last loop */
-	        dim = NULL; /* reset loop exit */
-		nullfree(dimdata->fqn); dimdata->fqn = NULL;
-		ncbytesclear(newname);
-		ncbytescat(newname,dimdata->name);
-	   	if(loopcounter > 0) {
-		    /* Make unique name using loopcounter */
-                    snprintf(digits,sizeof(digits),"_%zu",loopcounter);
-		    ncbytescat(newname,digits);
-		}
-   	        /* convert dimension_name to FQN */
-		assert(ncbyteslength(fqn) == 0);
-		if((stat = NCZ_makeFQN(parent, ncbytescontents(newname), fqn))) goto done;
-		assert(dimdata->fqn == NULL);
-                dimdata->fqn = ncbytesextract(fqn);
-                /* Check for duplicate */
-                stat = NCZ_locateFQN(file->root_grp,dimdata->fqn,NCDIM,&obj,NULL);
-                if(stat == NC_NOERR) { /* dimension already exists */
-                    NC_DIM_INFO_T* olddim = (NC_DIM_INFO_T*)obj;
-                    /* check if the old dim is consistent with the new dimension*/
-                    if(olddim->len != dimdata->shape || olddim->unlimited) {
-                        /* Inconsistent, so loop again to create an alternate dimension name */   
-			dim = NULL;
-                        continue; /* loop with this new dim name */
-    		    } else {
-			dim = olddim; /* consistent so re-use the old dimension */
-			break;
-		    }
-		} else {
-		    stat = NC_NOERR;
-		    break; /* We have a unique FQN */
-		}
-	    } /* loopcounter */		
-	    stat = NC_NOERR;
+	    if((stat = uniquedimname(file,parent,dimdata,&dim))) goto done;
 	    if(dim == NULL) {
                 /* Create the dimension */
-	        if((stat = ncz4_create_dim(file,(NC_GRP_INFO_T*)obj,dimdata->name,dimdata->shape,dimdata->unlimited,&dim))) goto done;
+	        if((stat = ncz4_create_dim(file,parent,dimdata->name,dimdata->shape,dimdata->unlimited,&dim))) goto done;
 	    }
 	}
     }
+
+ret:
+    if(isscalarp) *isscalarp = (isscalar?1:0);
 
 done:
     ncbytesfree(fqn);
@@ -1543,4 +1523,59 @@ NCZ_reclaim_diminfo_list(NClist* diminfo)
 	}
 	nclistfree(diminfo);
     }
+}
+
+static int
+uniquedimname(NC_FILE_INFO_T* file, NC_GRP_INFO_T* parent, NCZ_DimInfo* dimdata, NC_DIM_INFO_T** dimp)
+{
+    int stat = NC_NOERR;
+    size_t loopcounter;
+    NC_OBJ* obj = NULL;
+    NC_DIM_INFO_T* dim = NULL;	    
+    NCbytes* newname = ncbytesnew();
+    NCbytes* fqn = ncbytesnew();
+    char digits[NC_MAX_NAME];
+
+    /* Loop repeatedly until we have unique dimension FQN */
+    for(loopcounter=0;;loopcounter++) {
+	/* cleanup from last loop */
+        dim = NULL; /* reset loop exit */
+	nullfree(dimdata->fqn); dimdata->fqn = NULL;
+	ncbytesclear(newname);
+	ncbytescat(newname,dimdata->name);
+   	if(loopcounter > 0) {
+	    /* Make unique name using loopcounter */
+	    snprintf(digits,sizeof(digits),"_%zu",loopcounter);
+	    ncbytescat(newname,digits);
+	}
+	/* convert dimension_name to FQN */
+	assert(ncbyteslength(fqn) == 0);
+	if((stat = NCZ_makeFQN(parent, ncbytescontents(newname), fqn))) goto done;
+	assert(dimdata->fqn == NULL);
+	dimdata->fqn = ncbytesextract(fqn);
+	/* Check for duplicate */
+	stat = NCZ_locateFQN(file->root_grp,dimdata->fqn,NCDIM,&obj,NULL);
+	if(stat == NC_NOERR) { /* dimension already exists */
+	    NC_DIM_INFO_T* olddim = (NC_DIM_INFO_T*)obj;
+	    /* check if the old dim is consistent with the new dimension*/
+	    if(olddim->len != dimdata->shape || olddim->unlimited) {
+		/* Inconsistent, so loop again to create an alternate dimension name */   
+		dim = NULL;
+		continue; /* loop with this new dim name */
+	    } else {
+		dim = olddim; /* consistent so re-use the old dimension */
+		break;
+	    }
+	} else {
+	    stat = NC_NOERR;
+	    break; /* We have a unique FQN */
+	}
+    } /* loopcounter */		
+
+    if(dimp) *dimp = dim;
+
+done:
+    ncbytesfree(newname);
+    ncbytesfree(fqn);
+    return THROW(stat);
 }

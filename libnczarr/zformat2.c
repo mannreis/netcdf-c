@@ -1321,7 +1321,7 @@ read_var1(NC_FILE_INFO_T* file, NC_GRP_INFO_T* grp, const char* varname)
     }
 
     /* Complete the diminfo construction */
-    if((stat = NCZ_computedimrefs(file, grp, cvargs.rank, cvargs.shapes, cvargs.diminfo))) goto done;
+    if((stat = NCZ_computedimrefs(file, grp, cvargs.rank, cvargs.shapes, cvargs.diminfo, &cvargs.scalar))) goto done;
 
     /* Capture dimension_separator (must precede chunk cache creation) */
     {
@@ -1416,8 +1416,8 @@ read_var1(NC_FILE_INFO_T* file, NC_GRP_INFO_T* grp, const char* varname)
     }
 
     /* Make final scalar adjustments */
-    if(cvargs.scalar) {
-        cvargs.rank = 1;
+    if(!purezarr && cvargs.scalar) {
+        cvargs.rank = 0;
 	cvargs.storage = NC_CONTIGUOUS;
     }
 
