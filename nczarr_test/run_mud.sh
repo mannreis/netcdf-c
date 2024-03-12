@@ -40,14 +40,14 @@ rm -f $file
 fi
 
 echo "*** creating netcdf file $file from ref_tst_mud4.cdl ..."
-${NCGEN} -4 -b -o $file $refdir/ref_tst_mud4.cdl
+${NCGEN} -4 -b -o $file $srcdir/ref_tst_mud4.cdl
 echo "*** creating tmp_mud4.cdl from $file ..."
 ${NCDUMP} -n tst_mud4 $file > tmp_mud4.cdl
 # echo "*** comparing tst_mud4.cdl with ref_tst_mud4.cdl..."
-diff -b tmp_mud4.cdl $refdir/ref_tst_mud4.cdl
+diff -b tmp_mud4.cdl $srcdir/ref_tst_mud4.cdl
 # echo "*** comparing annotation from ncdump -bc $file with expected output..."
 ${NCDUMP} -n tst_mud4 -bc $file > tmp_mud4-bc.cdl
-diff -b tmp_mud4-bc.cdl $refdir/ref_tst_mud4-bc.cdl
+diff -b tmp_mud4-bc.cdl $srcdir/ref_tst_mud4-bc.cdl
 
 # Now test with char arrays instead of ints
 if test "x$TESTNCZARR" = x1 ; then
@@ -59,16 +59,16 @@ file="tmp_mud4_chars${zext}.nc"
 rm -f $file
 fi
 echo "*** creating netcdf file $file from ref_tst_mud4_chars.cdl ..."
-${NCGEN} -4 -b -o $file $refdir/ref_tst_mud4_chars.cdl
+${NCGEN} -4 -b -o $file $srcdir/ref_tst_mud4_chars.cdl
 echo "*** creating ${file}.cdl from $file ..."
 ${NCDUMP} -n tst_mud4_chars $file > tmp_mud4_chars.cdl
 # echo "*** comparing tmp_mud4_chars.cdl with ref_tst_mud4_chars.cdl..."
-diff -b tmp_mud4_chars.cdl $refdir/ref_tst_mud4_chars.cdl
+diff -b tmp_mud4_chars.cdl $srcdir/ref_tst_mud4_chars.cdl
 if test 1 = 0 ; then
   # unused
   echo "*** comparing annotation from ncdump -bc tst_mud4_chars.nc with expected output..."
   ${NCDUMP} -n tst_mud4_chars -bc $file > tmp_mud4_chars-bc.cdl
-  diff -b tmp_mud4_chars-bc.cdl $refdir/ref_tst_mud4_chars-bc.cdl
+  diff -b tmp_mud4_chars-bc.cdl $srcdir/ref_tst_mud4_chars-bc.cdl
   echo "*** All ncdump test output for multiple unlimited dimensions passed!"
 fi
 }
