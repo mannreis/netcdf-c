@@ -1557,9 +1557,11 @@ uniquedimname(NC_FILE_INFO_T* file, NC_GRP_INFO_T* parent, NCZ_DimInfo* dimdata,
 	stat = NCZ_locateFQN(file->root_grp,dimdata->fqn,NCDIM,&obj,NULL);
 	if(stat == NC_NOERR) { /* dimension already exists */
 	    NC_DIM_INFO_T* olddim = (NC_DIM_INFO_T*)obj;
-	    /* check if the old dim is consistent with the new dimension*/
-	    if(olddim->len != dimdata->shape || olddim->unlimited) {
-		/* Inconsistent, so loop again to create an alternate dimension name */   
+	    /* check if the old dim is consistent with the new dimension.
+	       Note that consistent means has same size. The dim reference does
+	       not tell us about unlimited, so we ignore that. */
+	    if(olddim->len != dimdata->shape) {
+		/* Inconsistent size, so loop again to create an alternate dimension name */   
 		dim = NULL;
 		continue; /* loop with this new dim name */
 	    } else {

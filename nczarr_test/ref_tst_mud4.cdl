@@ -10,18 +10,31 @@ dimensions:
 	U3 = UNLIMITED ; // (5 currently)
 variables:
 	int ff(F1, F2) ;
+	    ff:_FillValue = -2147483647 ;
 	int uf(U1, F2) ;
+	    uf:_FillValue = -2147483647 ;
 	int fu(F1, U2) ;
+	    fu:_FillValue = -2147483647 ;
 	int uu(U1, U2) ;
+	    uu:_FillValue = -2147483647 ;
 	int ufff(U0, F1, F2, F3) ;
+	    ufff:_FillValue = -2147483647 ;
 	int uffu(U0, F1, F2, U3) ;
+	    uffu:_FillValue = -2147483647 ;
 	int ufuf(U0, F1, U2, F3) ;
+	    ufuf:_FillValue = -2147483647 ;
 	int ufuu(U0, F1, U2, U3) ;
+	    ufuu:_FillValue = -2147483647 ;
 	int uuff(U0, U1, F2, F3) ;
+	    uuff:_FillValue = -2147483647 ;
 	int uufu(U0, U1, F2, U3) ;
+	    uufu:_FillValue = -2147483647 ;
 	int uuuf(U0, U1, U2, F3) ;
+	    uuuf:_FillValue = -2147483647 ;
 	int uuuu(U0, U1, U2, U3) ;
+	    uuuu:_FillValue = -2147483647 ;
 	int ffff(F0, F1, F2, F3) ;
+	    ffff:_FillValue = -2147483647 ;
 data:
 
  ff =

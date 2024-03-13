@@ -88,6 +88,7 @@ typedef struct NCZ_HDF5 {
     NCZ_Params visible;
     NCZ_Params working;
 } NCZ_HDF5;
+extern NCZ_HDF5 NCZ_hdf5_empty;
 
 /* Codec Info */
 typedef struct NCZ_Codec {
@@ -95,6 +96,7 @@ typedef struct NCZ_Codec {
     char* codec;           /**< The Codec from the file; NULL if creating */
     int pseudo;		   /**< If the codec action is handled by non-codec code in netcdf-c */
 } NCZ_Codec;
+extern NCZ_Codec NCZ_codec_empty;
 
 typedef struct NCZ_Filter {
     int flags;             	/**< Flags describing state of this filter. */
@@ -128,5 +130,7 @@ int NCZ_codec_attr(const NC_VAR_INFO_T* var, size_t* lenp, void* data);
 void NCZ_create_empty_filter(NCZ_Filter* filter);
 int NCZ_filter_jsonize(const NC_FILE_INFO_T* file, const NC_VAR_INFO_T* var, NCZ_Filter* filter, NCjson** jfilterp);
 int NCZ_filter_free(NCZ_Filter* spec);
+int NCZ_filter_hdf5_clear(NCZ_HDF5* spec);
+int NCZ_filter_codec_clear(NCZ_Codec* spec);
 
 #endif /*ZFILTER_H*/

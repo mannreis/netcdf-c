@@ -36,7 +36,9 @@
 */
 
 /** @internal List of reserved attributes.
-    WARNING: This list will be sorted in (strcmp) sorted order for binary search. */
+    WARNING: This list will be sorted in (strcmp) sorted order for binary search.
+    So order here does not matter; the table will be modified by sorting.
+*/
 static NC_reservedatt NC_reserved[] = {
     {NC_ATT_CLASS, READONLYFLAG|HIDDENATTRFLAG},			/*CLASS*/
     {NC_ATT_DIMENSION_LIST, READONLYFLAG|HIDDENATTRFLAG},		/*DIMENSION_LIST*/
@@ -45,18 +47,18 @@ static NC_reservedatt NC_reserved[] = {
     {NC_XARRAY_DIMS, READONLYFLAG|HIDDENATTRFLAG},			/*_ARRAY_DIMENSIONS*/
     {NC_ATT_CODECS, VARFLAG|READONLYFLAG|NAMEONLYFLAG},			/*_Codecs*/
     {NC_ATT_FORMAT, READONLYFLAG},					/*_Format*/
-    {ISNETCDF4ATT, READONLYFLAG|NAMEONLYFLAG},				/*_IsNetcdf4*/
+    {ISNETCDF4ATT, READONLYFLAG|NAMEONLYFLAG|VIRTUALFLAG},		/*_IsNetcdf4*/
     {NCPROPS,READONLYFLAG|NAMEONLYFLAG|HIDDENATTRFLAG},			/*_NCProperties*/
     {NC_ATT_COORDINATES, READONLYFLAG|HIDDENATTRFLAG},			/*_Netcdf4Coordinates*/
     {NC_ATT_DIMID_NAME, READONLYFLAG|HIDDENATTRFLAG},			/*_Netcdf4Dimid*/
-    {SUPERBLOCKATT, READONLYFLAG|NAMEONLYFLAG},				/*_SuperblockVersion*/
+    {SUPERBLOCKATT, READONLYFLAG|NAMEONLYFLAG|VIRTUALFLAG},		/*_SuperblockVersion*/
     {NC_ATT_NC3_STRICT_NAME, READONLYFLAG},				/*_nc3_strict*/
     {NC_ATT_NC3_STRICT_NAME, READONLYFLAG},				/*_nc3_strict*/
     {NC_NCZARR_SUPERBLOCK, READONLYFLAG|HIDDENATTRFLAG},		/*_nczarr_superblock */
     {NC_NCZARR_GROUP, READONLYFLAG|HIDDENATTRFLAG},			/*_nczarr_group */
     {NC_NCZARR_ARRAY, READONLYFLAG|HIDDENATTRFLAG},			/*_nczarr_array */
     {NC_NCZARR_ATTR, READONLYFLAG|HIDDENATTRFLAG},			/*_nczarr_attr */
-    {NC_NCZARR_ATTR_UC, READONLYFLAG|HIDDENATTRFLAG},			/*_NCZARR_ATTR */
+    {NC_NCZARR_ATTR_UC, READONLYFLAG|HIDDENATTRFLAG},			/*_NCZARR_ATTR_UC */
 };
 #define NRESERVED (sizeof(NC_reserved) / sizeof(NC_reservedatt))  /*|NC_reserved|*/
 

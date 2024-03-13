@@ -921,12 +921,12 @@ parse_attrs(NC_FILE_INFO_T* file, NC_OBJ* container, NCjson* jatts)
 		/*Special cases:*/
 		if(strcmp(NC_ATT_FILLVALUE,NCJstring(jkey))==0) continue; /* _FillValue: ignore */
 		else if(strcmp(NC_NCZARR_DEFAULT_MAXSTRLEN_ATTR,NCJstring(jkey))==0) {
-		    if(grp != NULL && grp->parent == NULL && NCJarraylength(jvalues)==1 && ainfo[i].type == NC_INT)
-			sscanf(NCJstring(jkey),"%zu",&zfile->default_maxstrlen);
+		    if(grp != NULL && grp->parent == NULL && NCJsort(jvalues)==NCJ_INT && ainfo[i].type == NC_INT)
+			sscanf(NCJstring(jvalues),"%zu",&zfile->default_maxstrlen);
 		    continue; /* _FillValue: ignore */
 		} else if(strcmp(NC_NCZARR_MAXSTRLEN_ATTR,NCJstring(jkey))==0) {
-		    if(var != NULL && NCJarraylength(jvalues)==1 && ainfo[i].type == NC_INT)
-			sscanf(NCJstring(jkey),"%zu",&zvar->maxstrlen);
+		    if(var != NULL && NCJsort(jvalues)==NCJ_INT && ainfo[i].type == NC_INT)
+			sscanf(NCJstring(jvalues),"%zu",&zvar->maxstrlen);
 		    continue; /* _FillValue: ignore */
 		} else if(strcmp(NC_XARRAY_DIMS,NCJstring(jkey))==0) {
 		    continue; /* ignore */
@@ -1194,6 +1194,9 @@ read_var1(NC_FILE_INFO_T* file, NC_GRP_INFO_T* grp, const char* varname)
     char* key = NULL;
     int suppress = 0; /* Abort processing of this variable */
     size_t vtypelen = 0;
+    int zarr_rank = 0; /* == cvargs.rank + 1 if cvargs.scalar is true */
+    nc_type atypeid = NC_NAT;
+    size_t fvlen = 0;
 #ifdef ENABLE_NCZARR_FILTERS
     int varsized = 0;
     int chainindex = 0;
@@ -1248,6 +1251,7 @@ read_var1(NC_FILE_INFO_T* file, NC_GRP_INFO_T* grp, const char* varname)
         NCJcheck(NCJdictget(jvar,"shape",&jvalue));
         if(NCJsort(jvalue) != NCJ_ARRAY) {stat = (THROW(NC_ENCZARR)); goto done;}
         cvargs.rank = NCJarraylength(jvalue);
+	zarr_rank = cvargs.rank;
         /* extract the shapes */
         if((stat = NCZ_decodesizet64vec(jvalue, cvargs.shapes))) goto done;
 	cvargs.storage = NC_CHUNKED;
@@ -1285,10 +1289,11 @@ read_var1(NC_FILE_INFO_T* file, NC_GRP_INFO_T* grp, const char* varname)
 
     if(!purezarr) {/* Extract storage flag and adjust accordingly */
 	NCJcheck(NCJdictget(jzarray,"storage",&jvalue));
-	if(jvalue == NULL)
+	if(jvalue == NULL) {
 	    cvargs.scalar = 0;
-	else if(strcmp(NCJstring(jvalue),"scalar")==0)
+	} else if(strcmp(NCJstring(jvalue),"scalar")==0) {
 	    cvargs.scalar = 1;
+	}
         cvargs.storage = NC_CHUNKED; /* even for scalars */
     }
     
@@ -1407,8 +1412,7 @@ read_var1(NC_FILE_INFO_T* file, NC_GRP_INFO_T* grp, const char* varname)
         if(jvalue == NULL || NCJsort(jvalue) == NCJ_NULL)
             cvargs.no_fill = 1;
         else {
-            size_t fvlen;
-            nc_type atypeid = cvargs.vtype;
+            atypeid = cvargs.vtype;
             if((stat = NCZ_computeattrdata(&atypeid, jvalue, NULL, &fvlen, &cvargs.fill_value))) goto done;
             assert(atypeid == cvargs.vtype && fvlen == 1);
 	    cvargs.no_fill = 0;
@@ -1454,8 +1458,9 @@ read_var1(NC_FILE_INFO_T* file, NC_GRP_INFO_T* grp, const char* varname)
 done:
     /* Clean up cvargs */
     nclistfree(cvargs.filterlist);
-    nullfree(cvargs.fill_value);
-    NCZ_clear_diminfo(cvargs.rank,cvargs.diminfo);
+    if(cvargs.fill_value != NULL)
+	(void)NC_reclaim_data_all(file->controller,atypeid,cvargs.fill_value,fvlen);
+    NCZ_clear_diminfo(zarr_rank,cvargs.diminfo);
     /* Clean up */
     nclistfree(codecs);
     nullfree(grppath);
@@ -2085,6 +2090,7 @@ json2filter(NC_FILE_INFO_T* file, const NCjson* jfilter, int chainindex, NClist*
     if(!NCJisatomic(jvalue)) {stat = THROW(NC_ENOFILTER); goto done;}
     codec.id = strdup(NCJstring(jvalue));
     /* Save the codec for this filter */
+    assert(codec.codec == NULL);
     NCJcheck(NCJunparse(jfilter, 0, &codec.codec));
 
     if((stat = NCZ_codec_plugin_lookup(codec.id,&plugin))) goto done;
@@ -2116,6 +2122,8 @@ json2filter(NC_FILE_INFO_T* file, const NCjson* jfilter, int chainindex, NClist*
     if(zfilterp) {*zfilterp = filter; filter = NULL;}
 
 done:
+    NCZ_filter_free(filter);
+    NCZ_filter_codec_clear(&codec);    
     return THROW(stat);
 }
 

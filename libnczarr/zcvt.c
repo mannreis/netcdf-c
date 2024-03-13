@@ -392,6 +392,7 @@ NCZ_convert1(const NCjson* jsrc, nc_type dsttype, NCbytes* buf)
 	if(srctype != NC_STRING) {stat = NC_EINVAL; goto done;}
 	/* Need to append the pointer and not what it points to */
 	scopy = nulldup(zcvt.strv);
+	/* Note we are appending the pointer not the scopy string */
 	ncbytesappendn(buf,(void*)&scopy,sizeof(scopy));
 	scopy = NULL;
 	} break;

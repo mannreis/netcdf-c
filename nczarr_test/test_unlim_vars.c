@@ -101,11 +101,11 @@ main(int argc, char **argv)
 
         /* Check metadata. */
         if (nc_inq(ncid, &ndims_in, &nvars_in, &natts_in, &unlimdimid_in)) ERR;
-        if (ndims_in != 3 || nvars_in != 1 || natts_in != 0 || unlimdimid_in != 0) ERR;
+        if (ndims_in != 3 || nvars_in != 1 || natts_in != 1 || unlimdimid_in != 0) ERR;
         if (nc_inq_var(ncid, 0, name_in, &xtype_in, &ndims_in, dimids_in,
                        &natts_in)) ERR;
         if (strcmp(name_in, SFC_TEMP_NAME) || xtype_in != NC_FLOAT ||
-            ndims_in != 3 || natts_in != 0) ERR;
+            ndims_in != 3 || natts_in != 1) ERR; /* _FillValue is defined att */
         for (d = 0; d < NDIM3; d++)
             if (dimids_in[d] != dimids[d]) ERR;
         if (nc_inq_dim(ncid, 0, name_in, &len_in)) ERR;
@@ -121,11 +121,11 @@ main(int argc, char **argv)
 
         /* Check metadata. */
         if (nc_inq(ncid, &ndims_in, &nvars_in, &natts_in, &unlimdimid_in)) ERR;
-        if (ndims_in != 3 || nvars_in != 1 || natts_in != 0 || unlimdimid_in != 0) ERR;
+        if (ndims_in != 3 || nvars_in != 1 || natts_in != 1 || unlimdimid_in != 0) ERR; /* _NCProperty */
         if (nc_inq_var(ncid, 0, name_in, &xtype_in, &ndims_in, dimids_in,
                        &natts_in)) ERR;
         if (strcmp(name_in, SFC_TEMP_NAME) || xtype_in != NC_FLOAT ||
-            ndims_in != 3 || natts_in != 0) ERR;
+            ndims_in != 3 || natts_in != 1) ERR;
         for (d = 0; d < NDIM3; d++)
             if (dimids_in[d] != dimids[d]) ERR;
         if (nc_inq_dim(ncid, 0, name_in, &len_in)) ERR;
@@ -147,11 +147,11 @@ main(int argc, char **argv)
 
         /* Check metadata. */
         if (nc_inq(ncid, &ndims_in, &nvars_in, &natts_in, &unlimdimid_in)) ERR;
-        if (ndims_in != 3 || nvars_in != 1 || natts_in != 0 || unlimdimid_in != 0) ERR;
+        if (ndims_in != 3 || nvars_in != 1 || natts_in != 1 || unlimdimid_in != 0) ERR;
         if (nc_inq_var(ncid, 0, name_in, &xtype_in, &ndims_in, dimids_in,
                        &natts_in)) ERR;
         if (strcmp(name_in, SFC_TEMP_NAME) || xtype_in != NC_FLOAT ||
-            ndims_in != 3 || natts_in != 0) ERR;
+            ndims_in != 3 || natts_in != 1) ERR;
         for (d = 0; d < NDIM3; d++)
             if (dimids_in[d] != dimids[d]) ERR;
         if (nc_inq_dim(ncid, 0, name_in, &len_in)) ERR;

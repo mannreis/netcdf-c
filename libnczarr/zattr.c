@@ -59,7 +59,8 @@ ncz_getattlist(NC_GRP_INFO_T *grp, int varid, NC_VAR_INFO_T **varp, NCindex **at
  * See the reserved attribute table in libsrc4/nc4internal.c.
  * The special attributes are the ones marked with NAMEONLYFLAG.
  * For example: NCPROPS, ISNETCDF4ATT, and SUPERBLOCKATT, and CODECS.
- * These atts are not all really in the file, they are constructed on the fly.
+ * Some of these atts are stored in the file, but other are constructed on the fly.
+ * The later are distinguished by the VIRTUALFLAG.
  *
  * @param h5 Pointer to ZARR file info struct.
  * @param var Pointer to var info struct; NULL signals global.

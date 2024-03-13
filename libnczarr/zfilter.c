@@ -66,8 +66,11 @@
 #define H5Z_FILTER_RAW 0
 #define H5Z_CODEC_RAW "hdf5raw"
 
-static NCZ_Codec codec_empty = {NULL, NULL, 0};
-static NCZ_HDF5 hdf5_empty = {0, {0,NULL}, {0, NULL}};
+//static NCZ_Codec codec_empty = {NULL, NULL, 0};
+//static NCZ_HDF5 hdf5_empty = {0, {0,NULL}, {0, NULL}};
+
+NCZ_Codec NCZ_codec_empty = {NULL, NULL, 0};
+NCZ_HDF5 NCZ_hdf5_empty = {0, {0,NULL}, {0, NULL}};
 
 #if 0
 static const char* NCZ_KNOWN_PSEUDO_FILTERS[] = {"bytes",NULL};
@@ -186,8 +189,6 @@ static int NCZ_load_plugin(const char* path, NCZ_Plugin** plugp);
 static int NCZ_unload_plugin(NCZ_Plugin* plugin);
 static int NCZ_plugin_loaded(int filterid, NCZ_Plugin** pp);
 static int NCZ_plugin_save(int filterid, NCZ_Plugin* p);
-static int NCZ_filter_hdf5_clear(NCZ_HDF5* spec);
-static int NCZ_filter_codec_clear(NCZ_Codec* spec);
 static int NCZ_filter_lookup(NC_VAR_INFO_T* var, unsigned int id, struct NCZ_Filter** specp);
 static int NCZ_addfilter(NC_FILE_INFO_T* file, NC_VAR_INFO_T* var, unsigned int id, size_t nparams, const unsigned int* params);
 
@@ -259,7 +260,7 @@ NCZ_filter_free(NCZ_Filter* spec)
     return NC_NOERR;
 }
 
-static int
+int
 NCZ_filter_hdf5_clear(NCZ_HDF5* spec)
 {
     ZTRACE(6,"spec=%d",spec->id);
@@ -270,7 +271,7 @@ done:
     return ZUNTRACE(NC_NOERR);
 }
 
-static int
+int
 NCZ_filter_codec_clear(NCZ_Codec* spec)
 {
     ZTRACE(6,"spec=%d",(spec?spec->id:"null"));
@@ -556,7 +557,7 @@ NCZ_addfilter(NC_FILE_INFO_T* file, NC_VAR_INFO_T* var, unsigned int id, size_t 
 	    nclistpush((NClist*)var->filters, fi);
     }
 
-    assert(fi != NULL && fi->plugin && fi->plugin != plugin);
+    assert(fi != NULL && fi->plugin && fi->plugin == plugin);
 
     /* If this variable is not fixed size, mark filter as suppressed */
     if(var->type_info->varsized) {
@@ -569,7 +570,7 @@ NCZ_addfilter(NC_FILE_INFO_T* file, NC_VAR_INFO_T* var, unsigned int id, size_t 
         nullfree(fi->hdf5.visible.params);
 	nullfree(fi->hdf5.working.params);
         /* Fill in the hdf5 */
-        fi->hdf5 = hdf5_empty; /* struct copy */
+        fi->hdf5 = NCZ_hdf5_empty; /* struct copy */
 	fi->hdf5.id = (int)id;
         /* Capture the visible parameters */
         fi->hdf5.visible.nparams = nparams;
@@ -1829,8 +1830,8 @@ done:
 void
 NCZ_create_empty_filter(NCZ_Filter* filter)
 {
-    filter->hdf5 = hdf5_empty;
-    filter->codec = codec_empty;
+    filter->hdf5 = NCZ_hdf5_empty;
+    filter->codec = NCZ_codec_empty;
     filter->flags |= (FLAG_INCOMPLETE|FLAG_CODEC);
 }
 
