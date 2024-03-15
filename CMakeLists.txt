@@ -6,7 +6,7 @@
 # Set Project Properties
 ##################################
 
-cmake_minimum_required(VERSION 3.12.0)
+cmake_minimum_required(VERSION 3.20.0)
 
 #Project Name
 project(netCDF
@@ -32,6 +32,24 @@ if (NOT DEFINED NETCDF_IS_TOP_LEVEL)
     set(NETCDF_IS_TOP_LEVEL ON)
   endif ()
 endif ()
+
+
+################################
+# The target
+################################
+
+##
+# Default building shared libraries.
+# BUILD_SHARED_LIBS is provided by/used by
+# CMake directly.
+##
+option(BUILD_SHARED_LIBS "Configure netCDF as a shared library." ON)
+if(BUILD_SHARED_LIBS)
+  set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+endif()
+
+add_library(netcdf)
+add_library(netCDF::netcdf ALIAS netcdf)
 
 #####
 # Version Info:
@@ -114,7 +132,7 @@ include(GNUInstallDirs)
 
 if(MSVC)
   set(GLOBAL PROPERTY USE_FOLDERS ON)
-  add_compile_options("/utf-8")
+  target_compile_options(netcdf PUBLIC "/utf-8")
 endif()
 
 # auto-configure style checks, other CMake modules.
@@ -205,16 +223,6 @@ include(GenerateExportHeader)
 # Compiler and Linker Configuration
 ################################
 
-##
-# Default building shared libraries.
-# BUILD_SHARED_LIBS is provided by/used by
-# CMake directly.
-##
-option(BUILD_SHARED_LIBS "Configure netCDF as a shared library." ON)
-if(BUILD_SHARED_LIBS)
-  set(CMAKE_POSITION_INDEPENDENT_CODE ON)
-endif()
-
 option(NC_FIND_SHARED_LIBS "Find dynamically-built versions of dependent libraries" ${BUILD_SHARED_LIBS})
 
 ##
@@ -276,17 +284,15 @@ if(MINGW)
   endif()
 endif()
 
-add_definitions()
-
 # Suppress CRT Warnings.
 # Only necessary for Windows
 if(MSVC)
-  add_definitions(-D_CRT_SECURE_NO_WARNINGS)
+  target_compile_definitions(netcdf PRIVATE _CRT_SECURE_NO_WARNINGS)
 endif()
 
 # Support ANSI format specifiers for *printf on MINGW:
 if(MINGW)
-  add_definitions(-D__USE_MINGW_ANSI_STDIO=1)
+  target_compile_definitions(netcdf PRIVATE __USE_MINGW_ANSI_STDIO=1)
 endif()
 
 #####
@@ -477,8 +483,8 @@ if(WIN32)
   option(ENABLE_DLL "Build a Windows DLL." ${BUILD_SHARED_LIBS})
   if(ENABLE_DLL)
     set(BUILD_DLL ON CACHE BOOL "")
-    add_definitions(-DDLL_NETCDF)
-    add_definitions(-DDLL_EXPORT)
+    target_compile_definitions(netcdf PRIVATE DLL_EXPORT)
+    target_compile_definitions(netcdf PUBLIC DLL_NETCDF)
   endif()
 endif()
 # Did the user specify a default minimum blocksize for posixio?
@@ -501,14 +507,13 @@ if(NOT ENABLE_NETCDF_4)
 set(ENABLE_LOGGING OFF)
 endif()
 if(ENABLE_LOGGING)
-  add_definitions(-DLOGGING)
-  add_definitions(-DENABLE_SET_LOG_LEVEL)
+  target_compile_definitions(netcdf PRIVATE LOGGING ENABLE_SET_LOG_LEVEL)
   set(LOGGING ON)
   set(ENABLE_SET_LOG_LEVEL ON)
 endif()
 option(ENABLE_SET_LOG_LEVEL_FUNC "Enable definition of nc_set_log_level()." ON)
 if(ENABLE_NETCDF_4 AND NOT ENABLE_LOGGING AND ENABLE_SET_LOG_LEVEL_FUNC)
-  add_definitions(-DENABLE_SET_LOG_LEVEL)
+  target_compile_definitions(netcdf PRIVATE -DENABLE_SET_LOG_LEVEL)
   set(ENABLE_SET_LOG_LEVEL ON)
 endif()
 
@@ -638,9 +643,14 @@ endif()
 # Try to enable NCZarr zip support
 option(ENABLE_NCZARR_ZIP "Enable NCZarr ZIP support." OFF)
 
+include(CMakeDependentOption)
+
 # libdl is always available; built-in in Windows and OSX
-option(ENABLE_PLUGINS "Enable dynamically loaded plugins (default on)." ON)
+cmake_dependent_option(ENABLE_PLUGINS "Enable dynamically loaded plugins (default on)."
+  ON "BUILD_SHARED_LIBS" OFF)
+MESSAGE(STATUS "ENABLE_PLUGINS: ${ENABLE_PLUGINS}")
 if(MINGW)
+    message(STATUS "MINGW Detected, disabling plugins.")
     set(ENABLE_PLUGINS OFF CACHE BOOL "Disable plugins" FORCE)
 else()
   if(NOT WIN32)
@@ -649,6 +659,7 @@ else()
     endif()
   endif()
 endif()
+
 if(ENABLE_PLUGINS)
   set(USEPLUGINS yes)
 endif()
@@ -897,47 +908,16 @@ if(ENABLE_PARALLEL4 AND ENABLE_HDF5)
 endif()
 
 # Options to enable parallel IO for classic formats with PnetCDF library.
-set(STATUS_PNETCDF "OFF")
+set(STATUS_PNETCDF ${ENABLE_PNETCDF})
+set(USE_PNETCDF ${ENABLE_PNETCDF})
 if(ENABLE_PNETCDF)
-  # Check for ncmpi_create in libpnetcdf, define USE_PNETCDF
-  # Does the user want to turn on PnetCDF read ability?
-  set(USE_PNETCDF ON CACHE BOOL "")
-  if(NOT PNETCDF)
-    message(STATUS "Cannot find PnetCDF library. Disabling PnetCDF support.")
-    set(USE_PNETCDF OFF CACHE BOOL "")
-  else(NOT PNETCDF)
-    set(USE_PARALLEL ON CACHE BOOL "")
-
-    # Check PnetCDF version. Must be >= 1.6.0
-    set(pnetcdf_h "${PNETCDF_INCLUDE_DIR}/pnetcdf.h" )
-    message(STATUS "PnetCDF include file ${pnetcdf_h} will be searched for version")
-    file(STRINGS "${pnetcdf_h}" pnetcdf_major_string REGEX "^#define PNETCDF_VERSION_MAJOR")
-    string(REGEX REPLACE "[^0-9]" "" pnetcdf_major "${pnetcdf_major_string}")
-    file(STRINGS "${pnetcdf_h}" pnetcdf_minor_string REGEX "^#define PNETCDF_VERSION_MINOR")
-    string(REGEX REPLACE "[^0-9]" "" pnetcdf_minor "${pnetcdf_minor_string}")
-    file(STRINGS "${pnetcdf_h}" pnetcdf_sub_string REGEX "^#define PNETCDF_VERSION_SUB")
-    string(REGEX REPLACE "[^0-9]" "" pnetcdf_sub "${pnetcdf_sub_string}")
-    set(pnetcdf_version "${pnetcdf_major}.${pnetcdf_minor}.${pnetcdf_sub}")
-    message(STATUS "Found PnetCDF version ${pnetcdf_version}")
-
-    if(${pnetcdf_version} VERSION_GREATER "1.6.0")
-      set(STATUS_PNETCDF "ON")
-      include_directories(${PNETCDF_INCLUDE_DIR})
-      set(HAVE_LIBPNETCDF ON)
-      # PnetCDF => parallel
-      set(STATUS_PARALLEL ON)
-      set(USE_PARALLEL ON)
-      message(STATUS "Using PnetCDF Library: ${PNETCDF}")
-    else()
-      message(WARNING "ENABLE_PNETCDF requires version 1.6.1 or later; found version ${pnetcdf_version}. PnetCDF is disabled")
-    endif()
-
+  set(STATUS_PARALLEL ON)
+  set(USE_PARALLEL ON CACHE BOOL "")
   ### 
-  # Generate pnetcdf test.  
+  # Generate pnetcdf test
   ###
   configure_file("${netCDF_SOURCE_DIR}/nc_test/run_pnetcdf_tests.sh.in"
     "${netCDF_BINARY_DIR}/nc_test/run_pnetcdf_tests.sh")
-  endif(NOT PNETCDF)
 endif()
 
 # Options to enable use of fill values for elements causing NC_ERANGE
@@ -960,37 +940,18 @@ endif(ENABLE_ERANGE_FILL)
 set(ENABLE_ZERO_LENGTH_COORD_BOUND ON)
 
 # check and conform with PnetCDF settings on ERANGE_FILL and RELAX_COORD_BOUND
-if(STATUS_PNETCDF)
-  file(STRINGS "${pnetcdf_h}" enable_erange_fill_pnetcdf REGEX "^#define PNETCDF_ERANGE_FILL")
-  string(REGEX REPLACE "[^0-9]" "" erange_fill_pnetcdf "${enable_erange_fill_pnetcdf}")
-  if("x${erange_fill_pnetcdf}" STREQUAL "x1")
-     set(erange_fill_pnetcdf "ON")
-  else()
-     set(erange_fill_pnetcdf "OFF")
-  endif()
+if(USE_PNETCDF)
   if(ENABLE_ERANGE_FILL STREQUAL "AUTO") # not set on command line
-     set(ENABLE_ERANGE_FILL "${erange_fill_pnetcdf}")
+     set(ENABLE_ERANGE_FILL "${PNETCDF_HAS_ERANGE_FILL}")
   else()
      # user explicitly set this option on command line
-     if(NOT ENABLE_ERANGE_FILL STREQUAL "${erange_fill_pnetcdf}")
+     if(NOT ENABLE_ERANGE_FILL STREQUAL "${PNETCDF_HAS_ERANGE_FILL}")
         if(ENABLE_ERANGE_FILL)
            message(FATAL_ERROR "Enabling erange-fill conflicts with PnetCDF setting")
         else()
            message(FATAL_ERROR "Disabling erange-fill conflicts with PnetCDF setting")
         endif()
      endif()
-  endif()
-
-  file(STRINGS "${pnetcdf_h}" relax_coord_bound_pnetcdf REGEX "^#define PNETCDF_RELAX_COORD_BOUND")
-  string(REGEX REPLACE "[^0-9]" "" relax_coord_bound "${relax_coord_bound_pnetcdf}")
-  if("x${relax_coord_bound}" STREQUAL "x1")
-     set(relax_coord_bound_pnetcdf "ON")
-  else()
-     set(relax_coord_bound_pnetcdf "OFF")
-  endif()
-  # pnetcdf must have relaxed coord bounds to build with netCDF-4
-  if(NOT ENABLE_ZERO_LENGTH_COORD_BOUND STREQUAL "${relax_coord_bound_pnetcdf}")
-     message(FATAL_ERROR "Pnetcdf must be built with relax-coord-bound enabled")
   endif()
 endif()
 
@@ -1001,7 +962,7 @@ endif()
 
 if(ENABLE_ZERO_LENGTH_COORD_BOUND)
   message(STATUS "Enabling a more relaxed check for NC_EINVALCOORDS")
-  add_definitions(-DRELAX_COORD_BOUND)
+  target_compile_definitions(netcdf PRIVATE RELAX_COORD_BOUND)
 endif()
 
 # Enable Parallel Tests.
@@ -1018,7 +979,7 @@ IF (ENABLE_PARALLEL_TESTS AND NOT USE_PARALLEL)
 endif()
 
 # Enable special filter test; experimental when using cmake.
-option(ENABLE_FILTER_TESTING "Enable filter testing. Ignored if shared libraries or netCDF4 are not enabled" ON)
+option(ENABLE_FILTER_TESTING "Enable filter testing. Ignored if shared libraries or netCDF4 are not enabled" ${ENABLE_PLUGINS})
 
 if(ENABLE_FILTER_TESTING)
   if(NOT ENABLE_HDF5 AND NOT ENABLE_NCZARR)
@@ -1032,12 +993,12 @@ if(NOT BUILD_SHARED_LIBS)
   set(ENABLE_FILTER_TESTING OFF)
 endif()
 
-option(ENABLE_NCZARR_FILTERS "Enable NCZarr filters" ON)
-option(ENABLE_NCZARR_FILTERS_TESTING "Enable NCZarr filter testing." ON)
+option(ENABLE_NCZARR_FILTERS "Enable NCZarr filters" ${ENABLE_PLUGINS})
+option(ENABLE_NCZARR_FILTERS_TESTING "Enable NCZarr filter testing." ${ENABLE_NCZARR_FILTERS})
 
 # Constraints
-IF (NOT ENABLE_PLUGINS)
-  message(WARNING "ENABLE_FILTER_TESTING requires shared libraries. Disabling.")
+if (NOT ENABLE_PLUGINS AND ENABLE_NCZARR_FILTERS)
+  message(WARNING "ENABLE_NCZARR_FILTERS requires ENABLE_PLUGINS. Disabling.")
   set(ENABLE_NCZARR_FILTERS OFF CACHE BOOL "Enable NCZarr Filters." FORCE)
 endif()
 
@@ -1413,14 +1374,11 @@ endif(ENABLE_BASH_SCRIPT_TESTING)
 # Create config.h file.
 configure_file("${netCDF_SOURCE_DIR}/config.h.cmake.in"
   "${netCDF_BINARY_DIR}/config.h")
+
 add_definitions(-DHAVE_CONFIG_H)
+
 include_directories(${netCDF_BINARY_DIR})
 # End autotools-style checks for config.h
-
-#####
-# Set core names of the libraries.
-#####
-set(netCDF_LIB_CORENAME  "netcdf")
 
 #####
 # Set the true names of all the libraries, if customized by external project
@@ -1487,12 +1445,6 @@ add_subdirectory(liblib)
 
 if(ENABLE_PLUGINS)
   add_subdirectory(plugins)
-endif()
-
-# For tests and utilities, we are no longer
-# exporting symbols but rather importing them.
-if(BUILD_DLL)
-  REMOVE_DEFINITIONS(-DDLL_EXPORT)
 endif()
 
 # Enable Utilities.
@@ -1731,14 +1683,14 @@ else()
 endif()
 
 if(WITH_S3_TESTING STREQUAL PUBLIC)
-set(ENABLE_S3_TESTING "public")
+  set(ENABLE_S3_TESTING "public")
 elseif(WITH_S3_TESTING)
-set(ENABLE_S3_TESTING "yes")
-set(ENABLE_S3_TESTALL "yes")
+  set(ENABLE_S3_TESTING "yes")
+  set(ENABLE_S3_TESTALL "yes")
 elseif(NOT WITH_S3_TESTING)
-set(ENABLE_S3_TESTING "no")
+  set(ENABLE_S3_TESTING "no")
 else()
-set(ENABLE_S3_TESTING "no")
+  set(ENABLE_S3_TESTING "no")
 endif()
 
 # The Unidata testing S3 bucket
@@ -1872,7 +1824,6 @@ configure_package_config_file(
   INSTALL_DESTINATION "${ConfigPackageLocation}"
 )
 
-add_library(netCDF::netcdf ALIAS netcdf)
 target_include_directories(netcdf
     PUBLIC
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
