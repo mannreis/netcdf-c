@@ -15,6 +15,9 @@
 
 #undef DEBUG
 
+/*mnemonic*/
+#define TESTUNLIM 1
+
 /**************************************************/
 /**
 Type Issues:
@@ -123,7 +126,10 @@ NCJ_DICT, /*NC_JSON*/
 
 /* Forward */
 static int splitfqn(const char* fqn0, NClist* segments);
-static int uniquedimname(NC_FILE_INFO_T* file, NC_GRP_INFO_T* parent, NCZ_DimInfo* dimdata, NC_DIM_INFO_T** dimp);
+static int locatedimbyname(NC_FILE_INFO_T* file, NC_GRP_INFO_T* grp, const char* dimname, NC_DIM_INFO_T** dimp, NC_GRP_INFO_T** grpp);
+static int isconsistentdim(NC_DIM_INFO_T* dim, NCZ_DimInfo* dimdata, int testunlim);
+static int locateconsistentdim(NC_FILE_INFO_T* file, NC_GRP_INFO_T* grp, NCZ_DimInfo* dimdata, int testunlim, NC_DIM_INFO_T** dimp, NC_GRP_INFO_T** grpp);
+static int uniquedimname(NC_FILE_INFO_T* file, NC_GRP_INFO_T* parent, NCZ_DimInfo* dimdata, NC_DIM_INFO_T** dimp, NCbytes* dimname);
 
 /**************************************************/
 
@@ -1392,8 +1398,8 @@ NCZ_computedimrefs(NC_FILE_INFO_T* file, NC_GRP_INFO_T* grp,
     int purezarr;
     char digits[NC_MAX_NAME];
     NCZ_FILE_INFO_T* zfile = (NCZ_FILE_INFO_T*)file->format_file_info;
-    NCbytes* fqn = ncbytesnew();
     NCbytes* newname = ncbytesnew();
+    NCbytes* fqn = ncbytesnew();
     
     ZTRACE(3,"file=%s var=%s purezarr=%d ndims=%d shape=%s",
         file->controller->path,var->hdr.name,purezarr,ndims,nczprint_vector(ndims,shape));
@@ -1425,10 +1431,15 @@ NCZ_computedimrefs(NC_FILE_INFO_T* file, NC_GRP_INFO_T* grp,
 		dimdata->name = ncbytesextract(newname);
 		parent = file->root_grp; /* anonymous are always created in the root group */
 	    }
-	    if((stat = uniquedimname(file,parent,dimdata,&dim))) goto done;
+
+	    /* Find a consistent name, or return a usable FQN for the dim */
+	    if((stat = uniquedimname(file,parent,dimdata,&dim,newname))) goto done;
 	    if(dim == NULL) {
+		/* Create the FQN in parent group */
+		ncbytesclear(fqn);
+		if((stat=NCZ_makeFQN(parent,ncbytescontents(newname),fqn))) goto done;
                 /* Create the dimension */
-	        if((stat = ncz4_create_dim(file,parent,dimdata->name,dimdata->shape,dimdata->unlimited,&dim))) goto done;
+	        if((stat = ncz4_create_dim(file,parent,ncbytescontents(fqn),dimdata->shape,dimdata->unlimited,&dim))) goto done;
 	    }
 	}
     }
@@ -1437,8 +1448,8 @@ ret:
     if(isscalarp) *isscalarp = (isscalar?1:0);
 
 done:
-    ncbytesfree(fqn);
     ncbytesfree(newname);
+    ncbytesfree(fqn);
     return ZUNTRACE(THROW(stat));
 }
 
@@ -1525,59 +1536,131 @@ NCZ_reclaim_diminfo_list(NClist* diminfo)
     }
 }
 
+/** Locate/create a dimension that is either consistent or unique.
+@param dim test this dim for consistency with dimdata
+@param dimdata about the dimension properties 
+@param testunlim 1=>test matching unlimited flags; 0=>test for size only
+*/
 static int
-uniquedimname(NC_FILE_INFO_T* file, NC_GRP_INFO_T* parent, NCZ_DimInfo* dimdata, NC_DIM_INFO_T** dimp)
+isconsistentdim(NC_DIM_INFO_T* dim, NCZ_DimInfo* dimdata, int testunlim)
+{
+    if(dim->len != dimdata->shape) return 0;
+    if(testunlim) {
+	if(dim->unlimited && !dimdata->unlimited) return 0;
+	if(!dim->unlimited && dimdata->unlimited) return 0;
+    }
+    return 1;
+}
+
+/** Locate a dimension by name only moving to higher groups as needed.
+@param file dataset
+@param grp grp to start search
+@param dimname to find
+@param dimp store dim here; null if not found
+@param grpp store grp containing the matched dimension
+Note: *dimp != NULL => *grpp != NULL && *dimp==NULL => *grpp==NULL
+Note: *dimp == NULL => no dim exists with matching name
+*/
+static int
+locatedimbyname(NC_FILE_INFO_T* file, NC_GRP_INFO_T* grp, const char* dimname, NC_DIM_INFO_T** dimp, NC_GRP_INFO_T** grpp)
+{
+    int stat = NC_NOERR;
+    NC_DIM_INFO_T* dim = NULL;
+    NC_GRP_INFO_T* g = NULL;
+    NC_GRP_INFO_T* dimg = NULL;
+        
+    if(dimp) *dimp = NULL;
+    if(grpp) *grpp = NULL;
+
+    /* Search upwards in containing groups */
+    for(g=grp;g != NULL;g=g->parent) {
+	dim = (NC_DIM_INFO_T*)ncindexlookup(g->dim,dimname);
+	if(dim != NULL) {dimg = g; break;}
+	dim = NULL;
+    }
+    if(dimp) *dimp = dim;
+    if(grpp) *grpp = dimg;
+    return THROW(stat);
+}
+
+/** Locate a dimension by dimdata moving to higher groups as needed.
+@param file dataset
+@param grp grp to start search
+@param dimdata for consistency test
+@param testunlim 1 => include unlim in test
+@param dimp store dim here; null if not found
+@param grpp store grp containing dim here;
+Note: *dimp != NULL => *grpp != NULL && *dimp==NULL => *grpp==NULL
+Note that *dimp==NULL && *grpp==NULL => there was no dim with given name.
+*/
+static int
+locateconsistentdim(NC_FILE_INFO_T* file, NC_GRP_INFO_T* grp, NCZ_DimInfo* dimdata, int testunlim, NC_DIM_INFO_T** dimp, NC_GRP_INFO_T** grpp)
+{
+    int stat = NC_NOERR;
+    NC_DIM_INFO_T* dim = NULL;
+    NC_GRP_INFO_T* g = NULL;
+   
+    if(dimp) *dimp = NULL;        
+
+    for(g=grp;g != NULL;g=g->parent,dim=NULL) {
+        if((stat = locatedimbyname(file,g,dimdata->name,&dim,&g))) goto done;
+        if(dim == NULL) break; /* no name match */
+	/* See if consistent */
+	if(isconsistentdim(dim,dimdata,!TESTUNLIM)) break; /* use this dim */
+    }
+
+    if(dimp) *dimp = dim;
+    if(grpp) *grpp = g;
+done:
+    return THROW(stat);
+}
+
+/** Locate/create a dimension that is either consistent or unique.
+@param file dataset
+@param parent default grp for creating group
+@param dimdata about the dimension properties 
+@param dimp store matching dim here
+@param dimname store the unique name
+*/
+static int
+uniquedimname(NC_FILE_INFO_T* file, NC_GRP_INFO_T* parent, NCZ_DimInfo* dimdata, NC_DIM_INFO_T** dimp, NCbytes* dimname)
 {
     int stat = NC_NOERR;
     size_t loopcounter;
-    NC_OBJ* obj = NULL;
-    NC_DIM_INFO_T* dim = NULL;	    
-    NCbytes* newname = ncbytesnew();
-    NCbytes* fqn = ncbytesnew();
+    NC_DIM_INFO_T* dim = NULL;
+    NC_GRP_INFO_T* grp = NULL;	    
     char digits[NC_MAX_NAME];
+    NCbytes* newname = ncbytesnew();
 
-    /* Loop repeatedly until we have unique dimension FQN */
-    for(loopcounter=0;;loopcounter++) {
+    if(*dimp) *dimp = NULL;
+    
+    /* See if there is an accessible consistent dimension with same name */
+    if((stat = locateconsistentdim(file,parent,dimdata,!TESTUNLIM,&dim,&grp))) goto done;
+    if(dim == NULL && grp == NULL) goto done; /* Ok to create the dim in the parent group */
+
+    /* Otherwise, we have to find a unique name that can be created in parent group */
+    for(loopcounter=1;;loopcounter++) {
 	/* cleanup from last loop */
         dim = NULL; /* reset loop exit */
 	nullfree(dimdata->fqn); dimdata->fqn = NULL;
+        /* Make unique name using loopcounter */
 	ncbytesclear(newname);
 	ncbytescat(newname,dimdata->name);
-   	if(loopcounter > 0) {
-	    /* Make unique name using loopcounter */
-	    snprintf(digits,sizeof(digits),"_%zu",loopcounter);
-	    ncbytescat(newname,digits);
-	}
-	/* convert dimension_name to FQN */
-	assert(ncbyteslength(fqn) == 0);
-	if((stat = NCZ_makeFQN(parent, ncbytescontents(newname), fqn))) goto done;
-	assert(dimdata->fqn == NULL);
-	dimdata->fqn = ncbytesextract(fqn);
-	/* Check for duplicate */
-	stat = NCZ_locateFQN(file->root_grp,dimdata->fqn,NCDIM,&obj,NULL);
-	if(stat == NC_NOERR) { /* dimension already exists */
-	    NC_DIM_INFO_T* olddim = (NC_DIM_INFO_T*)obj;
-	    /* check if the old dim is consistent with the new dimension.
-	       Note that consistent means has same size. The dim reference does
-	       not tell us about unlimited, so we ignore that. */
-	    if(olddim->len != dimdata->shape) {
-		/* Inconsistent size, so loop again to create an alternate dimension name */   
-		dim = NULL;
-		continue; /* loop with this new dim name */
-	    } else {
-		dim = olddim; /* consistent so re-use the old dimension */
-		break;
-	    }
-	} else {
-	    stat = NC_NOERR;
-	    break; /* We have a unique FQN */
-	}
+	snprintf(digits,sizeof(digits),"_%zu",loopcounter);
+	ncbytescat(newname,digits);
+	/* See if there is an accessible dimension with same name and in this parent group */
+	dim = (NC_DIM_INFO_T*)ncindexlookup(parent->dim,dimdata->name);
+	if(dim != NULL && isconsistentdim(dim,dimdata,!TESTUNLIM)) {
+	    /* Return this name */
+	    ncbytesclear(dimname);
+	    ncbytescat(dimname,ncbytescontents(newname));
+	    break;
+	} /* else try another name */
     } /* loopcounter */		
 
     if(dimp) *dimp = dim;
 
 done:
     ncbytesfree(newname);
-    ncbytesfree(fqn);
     return THROW(stat);
 }
