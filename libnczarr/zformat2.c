@@ -88,6 +88,7 @@ static int locate_nczarr_grp_info(NC_FILE_INFO_T* file, NC_GRP_INFO_T* grp, NCjs
 static int locate_nczarr_array_info(NC_FILE_INFO_T* file, NC_GRP_INFO_T* grp, NCjson* jarray, NCjson* jatts,
 			const NCjson** jzarrayp, const NCjson** jzattsp, int* nczv21p);
 static int define_dims(NC_FILE_INFO_T* file, NC_GRP_INFO_T* parent, NClist* dimdefs, int** dimidsp);
+static int define_dim1(NC_FILE_INFO_T* file, NC_GRP_INFO_T* grp, NCZ_DimInfo* dinfo, int* dimidp);
 static int collect_dims(NC_FILE_INFO_T* file, NC_GRP_INFO_T* grp, NCjson** jdimsp);
 static int parse_group_content(const NCjson* jcontent, NClist* dimdefs, NClist* varnames, NClist* subgrps);
 static int parse_group_content_pure(NC_FILE_INFO_T*  zinfo, NC_GRP_INFO_T* grp, NClist* varnames, NClist* subgrps);
@@ -1139,25 +1140,41 @@ define_dims(NC_FILE_INFO_T* file, NC_GRP_INFO_T* grp, NClist* diminfo, int** dim
     /* Reify each dim in turn */
     for(i = 0; i < rank; i++) {
 	NCZ_DimInfo* dinfo = NULL;
-        NC_DIM_INFO_T* dim = NULL;
         dinfo = (NCZ_DimInfo*)nclistget(diminfo,i);
-#if 0
-        /* Create the NC_DIM_INFO_T object */
-        sscanf(slen,"%lld",&dinfo->shape); /* Get length */
-        if(sisunlimited != NULL)
-            sscanf(sisunlimited,"%lld",&isunlim); /* Get unlimited flag */
-        else
-            isunlim = 0;
-	if((stat = ncz4_create_dim(file,grp,name,len,isunlim,&dim))) goto done;
-#else
-	if((stat = ncz4_create_dim(file,grp,dinfo->name,dinfo->shape,dinfo->unlimited,&dim))) goto done;
-#endif
-	dimids[i] = dim->hdr.id;
+	if((stat = define_dim1(file,grp,dinfo,&dimids[i]))) goto done;
     }
     if(dimidsp) {*dimidsp = dimids; dimids = NULL;}
 
 done:
     nullfree(dimids);
+    return ZUNTRACE(THROW(stat));
+}
+
+/**
+ * @internal Materialize a specific dimension into memory
+ *
+ * @param file Pointer to file info struct.
+ * @param grp Pointer to grp info struct.
+ * @param dimdata info about dimension to materialize
+ *
+ * @return ::NC_NOERR No error.
+ * @author Dennis Heimbigner
+ */
+static int
+define_dim1(NC_FILE_INFO_T* file, NC_GRP_INFO_T* grp, NCZ_DimInfo* dinfo, int* dimidp)
+{
+    int stat = NC_NOERR;
+    int dimid = 0;
+    NC_DIM_INFO_T* dim = NULL;
+
+    ZTRACE(3,"file=%s grp=%s dimdata=%s",file->controller->path,grp->hdr.name,dinfo->name);
+
+    if((stat = ncz4_create_dim(file,grp,dinfo->name,dinfo->shape,dinfo->unlimited,&dim))) goto done;
+    dimid = dim->hdr.id;
+
+    if(dimidp) *dimidp = dimid;
+
+done:
     return ZUNTRACE(THROW(stat));
 }
 
@@ -1421,8 +1438,16 @@ read_var1(NC_FILE_INFO_T* file, NC_GRP_INFO_T* grp, const char* varname)
 
     /* Make final scalar adjustments */
     if(!purezarr && cvargs.scalar) {
+	NC_OBJ* obj = NULL;
+	char* basename = NULL;
+	/* Find the scalar dimension */
+	if((stat = NCZ_locateFQN(file->root_grp,DIMSCALAR,NCDIM,&obj,&basename))) goto done;
+	/* Verify */
+	assert(obj != NULL && strcmp(basename,XARRAYSCALAR)==0);
+	if((stat=NCZ_reclaim_dim((NC_DIM_INFO_T*)obj))) goto done;
         cvargs.rank = 0;
 	cvargs.storage = NC_CONTIGUOUS;
+	nullfree(basename);
     }
 
     if(!suppress) {
@@ -2119,10 +2144,11 @@ json2filter(NC_FILE_INFO_T* file, const NCjson* jfilter, int chainindex, NClist*
     /* Create the filter */
     if((stat = ncz4_create_filter(file,empty,plugin,&codec,&hdf5,flags,chainindex,filterchain,&filter))) goto done;
 
-    if(zfilterp) {*zfilterp = filter; filter = NULL;}
+    if(zfilterp) *zfilterp = filter;
+    filter = NULL; /* its in filterchain if we get here */
 
 done:
-    NCZ_filter_free(filter);
+    NCZ_filter_free(filter); filter = NULL;
     NCZ_filter_codec_clear(&codec);    
     return THROW(stat);
 }

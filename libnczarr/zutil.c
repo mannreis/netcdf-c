@@ -1411,7 +1411,8 @@ NCZ_computedimrefs(NC_FILE_INFO_T* file, NC_GRP_INFO_T* grp,
     /* Check for scalar */
     if(!purezarr && ndims == 1 && shape[0] == 1 && diminfo[0].name != NULL && strcmp(diminfo[0].name,XARRAYSCALAR) == 0) {
 	isscalar = 1;
-	goto ret;
+	/* Always create in root_grp */
+	grp = file->root_grp;
     } else
         isscalar = 0;
 
@@ -1422,29 +1423,34 @@ NCZ_computedimrefs(NC_FILE_INFO_T* file, NC_GRP_INFO_T* grp,
 	    NC_GRP_INFO_T* parent = grp; /* create dim in this group */
 	    NCZ_DimInfo* dimdata = &diminfo[i];
 
+	    ncbytesclear(newname);
+	    ncbytesclear(fqn);
+
             if(dimdata->name == NULL) { /* convert null name to anonymous name */
                 /* create anonymous dimension name WRT root group and using the loopcounter */
                 snprintf(digits,sizeof(digits),"_%llu",shape[i]);
-		ncbytesclear(newname);
 		ncbytescat(newname,NCDIMANON);
 		ncbytescat(newname,digits);
 		dimdata->name = ncbytesextract(newname);
 		parent = file->root_grp; /* anonymous are always created in the root group */
 	    }
 
-	    /* Find a consistent name, or return a usable FQN for the dim */
+	    /* Find a consistent name and return a usable FQN for the dim */
 	    if((stat = uniquedimname(file,parent,dimdata,&dim,newname))) goto done;
 	    if(dim == NULL) {
-		/* Create the FQN in parent group */
-		ncbytesclear(fqn);
-		if((stat=NCZ_makeFQN(parent,ncbytescontents(newname),fqn))) goto done;
                 /* Create the dimension */
-	        if((stat = ncz4_create_dim(file,parent,ncbytescontents(fqn),dimdata->shape,dimdata->unlimited,&dim))) goto done;
+	        if((stat = ncz4_create_dim(file,parent,ncbytescontents(newname),dimdata->shape,dimdata->unlimited,&dim))) goto done;
+	    }
+            nullfree(dimdata->fqn); dimdata->fqn = NULL;
+  	    assert(dim != NULL);
+	    {
+		/* Get the dim's FQN */
+		if((stat=NCZ_makeFQN(dim->container,ncbytescontents(newname),fqn))) goto done;
+		dimdata->fqn = ncbytesextract(fqn);
 	    }
 	}
     }
 
-ret:
     if(isscalarp) *isscalarp = (isscalar?1:0);
 
 done:
@@ -1634,10 +1640,15 @@ uniquedimname(NC_FILE_INFO_T* file, NC_GRP_INFO_T* parent, NCZ_DimInfo* dimdata,
 
     if(*dimp) *dimp = NULL;
     
+    ncbytescat(dimname,dimdata->name); /* Use this name as candidate */
+
     /* See if there is an accessible consistent dimension with same name */
     if((stat = locateconsistentdim(file,parent,dimdata,!TESTUNLIM,&dim,&grp))) goto done;
-    if(dim == NULL && grp == NULL) goto done; /* Ok to create the dim in the parent group */
 
+    if(dim != NULL) goto ret; /* we found a consistent dim already exists */
+    if(dim == NULL && grp == NULL) goto ret; /* Ok to create the dim in the parent group */
+
+    /* Dim exists, but is inconsistent */
     /* Otherwise, we have to find a unique name that can be created in parent group */
     for(loopcounter=1;;loopcounter++) {
 	/* cleanup from last loop */
@@ -1658,6 +1669,7 @@ uniquedimname(NC_FILE_INFO_T* file, NC_GRP_INFO_T* parent, NCZ_DimInfo* dimdata,
 	} /* else try another name */
     } /* loopcounter */		
 
+ret:
     if(dimp) *dimp = dim;
 
 done:

@@ -381,6 +381,9 @@ int ncz_find_default_chunksizes2(NC_GRP_INFO_T *grp, NC_VAR_INFO_T *var);
 int NCZ_ensure_quantizer(int ncid, NC_VAR_INFO_T* var);
 int NCZ_write_var_data(NC_FILE_INFO_T* file, NC_VAR_INFO_T* var);
 
+/* zvar.c */
+int NCZ_reclaim_dim(NC_DIM_INFO_T* dim);
+
 /* Undefined */
 /* Find var, doing lazy var metadata read if needed. */
 int ncz_find_file_grp_var(int ncid, int varid, NC_FILE_INFO_T** file,

@@ -327,7 +327,7 @@ NCZ_filter_remove(NC_VAR_INFO_T* var, unsigned int id)
 	    /* Remove from variable */
     	    nclistremove(flist,k);
 	    /* Reclaim */
-	    NCZ_filter_free(f);
+	    NCZ_filter_free(f); f = NULL;
 	    goto done;
 	}
     }
