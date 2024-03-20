@@ -110,7 +110,7 @@ static int getnextlevel(NCZ_FILE_INFO_T* zfile, NC_GRP_INFO_T* parent, NClist* v
 static int nctype2dtype(nc_type nctype, int purezarr, size_t len, char** dnamep, const char** tagp);
 static int dtype2nctype(const char* dtype, nc_type* nctypep, size_t* typelenp, int* endianp);
 static int jtypes2atypes(int purezarr, const NCjson* jattrs, const NCjson* jtypes, nc_type** atypesp);
-static int json2filter(NC_FILE_INFO_T* file, const NCjson* jfilter, int chainindex, NClist* filterchain, NCZ_Filter** zfilterp);
+static int json2filter(NC_FILE_INFO_T* file, const NCjson* jfilter, NCZ_Filter** zfilterp);
 
 /**************************************************/
 
@@ -1359,7 +1359,6 @@ read_var1(NC_FILE_INFO_T* file, NC_GRP_INFO_T* grp, const char* varname)
     NC_TYPE_INFO_T* type_info = NULL;
 #ifdef ENABLE_NCZARR_FILTERS
     int varsized = 0;
-    int chainindex = 0;
 #endif
     /* Capture arguments for ncz4_create_var */
     struct {
@@ -1374,11 +1373,12 @@ read_var1(NC_FILE_INFO_T* file, NC_GRP_INFO_T* grp, const char* varname)
 	size_t rank;
 	size64_t shape[NC_MAX_VAR_DIMS];
 	size64_t chunks[NC_MAX_VAR_DIMS];
-	NCZ_DimInfo diminfo[NC_MAX_VAR_DIMS];
+	int dimids[NC_MAX_VAR_DIMS];
 	NClist* filterlist;
 	int no_fill;
 	void* fill_value;
     } cvargs;
+    NCZ_DimInfo diminfo[NC_MAX_VAR_DIMS];
 
     /* initialize cvargs defaults */
     memset(&cvargs,0,sizeof(cvargs));
@@ -1389,7 +1389,7 @@ read_var1(NC_FILE_INFO_T* file, NC_GRP_INFO_T* grp, const char* varname)
 #ifdef ENABLE_NCZARR_FILTERS
     cvargs.filterlist = nclistnew();
 #endif
-    memset(cvargs.diminfo,0,sizeof(cvargs.diminfo));
+    memset(diminfo,0,sizeof(diminfo));
 
     memset(dimnames,0,sizeof(dimnames));
 
@@ -1471,17 +1471,17 @@ read_var1(NC_FILE_INFO_T* file, NC_GRP_INFO_T* grp, const char* varname)
             for(j=0;j<cvargs.rank;j++) {
 		const NCjson* dimpath = NCJith(jdimrefs,j);
 		assert(NCJisatomic(dimpath));
-		cvargs.diminfo[i].fqn = strdup(NCJstring(dimpath));
+		diminfo[i].fqn = strdup(NCJstring(dimpath));
 	    }
 	}
 	/* Extract the type_alias hint for use instead of the variables' type */
 	NCJcheck(NCJdictget(jncvar,"type_alias",&jhint));
     } else {/* purezarr; fake the dimfqns */
 	/* Construct the equivalent of dimension_references from dimension_names */
-	if((stat = convertdimnames2fqns(file,grp,cvargs.rank,(const char**)dimnames,cvargs.diminfo))) goto done;
+	if((stat = convertdimnames2fqns(file,grp,cvargs.rank,(const char**)dimnames,diminfo))) goto done;
 #if 0
     /* fill in var dimids corresponding to the dim references; create dimensions as necessary */
-    if((stat = NCZ_computedimrefs(file,grp,rank,shape,dimnames,cvargs.diminfo))) goto done;
+    if((stat = NCZ_computedimrefs(file,grp,rank,shape,dimnames,diminfo))) goto done;
 #endif
     }
 
@@ -1582,7 +1582,6 @@ read_var1(NC_FILE_INFO_T* file, NC_GRP_INFO_T* grp, const char* varname)
 	else {stat = NC_EINVAL; goto done;}
 
 #ifdef ENABLE_NCZARR_FILTERS
-	chainindex = 0; /* track location of filter in the chain */
 	if((stat = NCZ_filter_initialize())) goto done;
 	NCJcheck(NCJdictget(jvar,"codecs",&jcodecs));
 	if(jcodecs == NULL || NCJsort(jcodecs) == NCJ_NULL)
@@ -1591,11 +1590,13 @@ read_var1(NC_FILE_INFO_T* file, NC_GRP_INFO_T* grp, const char* varname)
 	if(NCJarraylength(jcodecs) == 0) {stat = NC_ENOTZARR; goto done;}
 	 /* Process remaining filters */
 	for(k=1;;k++) {
+	    NCZ_Filter* filter = NULL;
 	    jcodec = NULL;
 	    jcodec = NCJith(jcodecs,k);
 	    if(jcodec == NULL) break; /* done */
 	    if(NCJsort(jcodec) != NCJ_DICT) {stat = NC_EFILTER; goto done;}
-	    if((stat = json2filter(file,jcodec,chainindex++,cvargs.filterlist,NULL))) goto done;
+	    if((stat = json2filter(file,jcodec,&filter))) goto done;
+	    nclistpush(cvargs.filterlist,filter);
 	}
 	/* Suppress variable if there are filters and var is not fixed-size */
 	if(varsized && nclistlength(cvargs.filterlist) > 0) suppress = 1;
@@ -1630,7 +1631,7 @@ read_var1(NC_FILE_INFO_T* file, NC_GRP_INFO_T* grp, const char* varname)
 					cvargs.rank,
 					cvargs.shape,
 					cvargs.chunks,
-					cvargs.diminfo,
+					cvargs.dimids,
 					cvargs.filterlist,
 					cvargs.no_fill,
 					cvargs.fill_value,
@@ -1665,7 +1666,7 @@ done:
     /* Clean up cvargs */
     nclistfree(cvargs.filterlist);
     nullfree(cvargs.fill_value);
-    NCZ_clear_diminfo(cvargs.rank,cvargs.diminfo);
+    NCZ_clear_diminfo(cvargs.rank,diminfo);
     /* Clean up	 */
     nullfree(grppath);
     nullfree(varpath);
@@ -2260,7 +2261,7 @@ done:
 * @return NC_NOERR | NC_EXXX
 */
 static int
-json2filter(NC_FILE_INFO_T* file, const NCjson* jfilter, int chainindex, NClist* filterchain, NCZ_Filter** zfilterp)
+json2filter(NC_FILE_INFO_T* file, const NCjson* jfilter, NCZ_Filter** zfilterp)
 {
     int stat = NC_NOERR;
     const NCjson* jvalue = NULL;
@@ -2269,7 +2270,6 @@ json2filter(NC_FILE_INFO_T* file, const NCjson* jfilter, int chainindex, NClist*
     NCZ_Codec codec;
     NCZ_HDF5 hdf5;
     int flags = 0;
-    int empty = 0;
 
     ZTRACE(6,"file=%s var=%s jfilter=%s",file->hdr.name,var->hdr.name,NCJtrace(jfilter));
 
@@ -2284,8 +2284,7 @@ json2filter(NC_FILE_INFO_T* file, const NCjson* jfilter, int chainindex, NClist*
     NCJcheck(NCJunparse(jfilter, 0, &codec.codec));
 
     if((stat = NCZ_codec_plugin_lookup(filter->codec.id,&plugin))) goto done;
-
-    if(plugin != NULL) {
+    if(plugin != NULL && !plugin->incomplete) {
 	/* Save the hdf5 id */
 	assert(plugin->hdf5.filter != NULL);
 	hdf5.id = plugin->hdf5.filter->id;
@@ -2298,19 +2297,12 @@ json2filter(NC_FILE_INFO_T* file, const NCjson* jfilter, int chainindex, NClist*
         }
 	flags |= FLAG_VISIBLE;
 	flags |= FLAG_CODEC;
-        if(filter->codec.codec == NULL) {
-            /* Unparse jfilter */
-            if(NCJunparse(jfilter,0,&filter->codec.codec)<0) goto done;
-        }
-    } else {
-        /* Fake the filter so we do not forget about this codec */
-	empty = 1;
-    }
+    } /* else plugin == NULL || plugin->incomplete */
 
     /* Create the filter */
-    if((stat = ncz4_create_filter(file,empty,plugin,&codec,&hdf5,flags,chainindex,filterchain,&filter))) goto done;
-    
-    if(zfilterp) {*zfilterp = filter; filter = NULL;}
+    if((stat = ncz4_create_filter(file,plugin,flags,&hdf5,&codec,&filter))) goto done;
+    if(zfilterp) *zfilterp = filter;
+    filter = NULL; /* its in filterchain if we get here */
 
 done:
     NCZ_filter_free(filter);

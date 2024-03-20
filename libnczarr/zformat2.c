@@ -54,7 +54,7 @@ struct CVARGS {
 	size_t rank;
 	size64_t shapes[NC_MAX_VAR_DIMS];
 	size64_t chunks[NC_MAX_VAR_DIMS];
-	NCZ_DimInfo diminfo[NC_MAX_VAR_DIMS];
+	int dimids[NC_MAX_VAR_DIMS];
 	NClist* filterlist;
 	int no_fill;
 	void* fill_value;
@@ -94,12 +94,12 @@ static int parse_group_content(const NCjson* jcontent, NClist* dimdefs, NClist* 
 static int parse_group_content_pure(NC_FILE_INFO_T*  zinfo, NC_GRP_INFO_T* grp, NClist* varnames, NClist* subgrps);
 static int searchvars(NCZ_FILE_INFO_T* zfile, NC_GRP_INFO_T* grp, NClist* varnames);
 static int searchsubgrps(NCZ_FILE_INFO_T* zfile, NC_GRP_INFO_T* grp, NClist* subgrpnames);
-static int json2filter(NC_FILE_INFO_T* file, const NCjson* jfilter, int chainindex, NClist* filterchain, NCZ_Filter** zfilterp);
+static int json2filter(NC_FILE_INFO_T* file, const NCjson* jfilter, NCZ_Filter** zfilterp);
 static int nctype2dtype(nc_type nctype, int endianness, int purezarr, size_t len, char** dnamep, const char** tagp);
 static int dtype2nctype(const char* dtype, nc_type* nctypep, size_t* typelenp, int* endianp);
 static int get_att_types(size_t natts, NCjson* jatts, struct Ainfo* ainfo);
-static int collectdimrefs(const NCjson* jdimrefs, struct CVARGS* cvargs);
-static int collectxarraydims(const NCjson* jxarray, struct CVARGS* cvargs);
+static int collectdimrefs(const NCjson* jdimrefs, struct CVARGS* cvargs, NCZ_DimInfo* diminfo);
+static int collectxarraydims(const NCjson* jxarray, struct CVARGS* cvargs, NCZ_DimInfo* diminfo);
 
 /**************************************************/
 
@@ -498,7 +498,7 @@ write_var_meta(NC_FILE_INFO_T* file, NCZ_FILE_INFO_T* zfile, NCZMAP* map, NC_VAR
 	    struct NCZ_Filter* filter = (struct NCZ_Filter*)nclistget(filterchain,k);
 	    /* encode up the filter as a string */
 	    if((stat = NCZ_filter_jsonize(file,var,filter,&jfilter))) goto done;
-	    NCJappend(jtmp,jfilter);
+	    NCJappend(jtmp,jfilter); jfilter = NULL;
 	}
     } else
 #endif
@@ -1216,12 +1216,13 @@ read_var1(NC_FILE_INFO_T* file, NC_GRP_INFO_T* grp, const char* varname)
     size_t fvlen = 0;
 #ifdef ENABLE_NCZARR_FILTERS
     int varsized = 0;
-    int chainindex = 0;
     NClist* codecs = nclistnew(); /* NClist<const NCjson*> */
     const NCjson* jfilter = NULL;
 #endif
     /* Capture arguments for ncz4_create_var */
     struct CVARGS cvargs;
+    /* Capture dim info to make/find dims */
+    NCZ_DimInfo diminfo[NC_MAX_VAR_DIMS];
 
     /* initialize cvargs defaults */
     memset(&cvargs,0,sizeof(cvargs));
@@ -1232,8 +1233,8 @@ read_var1(NC_FILE_INFO_T* file, NC_GRP_INFO_T* grp, const char* varname)
 #ifdef ENABLE_NCZARR_FILTERS
     cvargs.filterlist = nclistnew();
 #endif
-    memset(cvargs.diminfo,0,sizeof(cvargs.diminfo));
-
+    memset(diminfo,0,sizeof(diminfo));
+    
     purezarr = (zfile->flags & FLAG_PUREZARR)?1:0;
 
     /* Construct var path */
@@ -1320,12 +1321,12 @@ read_var1(NC_FILE_INFO_T* file, NC_GRP_INFO_T* grp, const char* varname)
 	if(jatts != NULL) {
 	    const NCjson* jxarray = NULL;
 	    NCJcheck(NCJdictget(jatts,NC_XARRAY_DIMS,&jxarray));
-	    if((stat = collectxarraydims(jxarray,&cvargs))) goto done;
+	    if((stat = collectxarraydims(jxarray,&cvargs,diminfo))) goto done;
 	}
         /* fill in shape and unlimited */
         for(i=0;i<cvargs.rank;i++) {
-	    cvargs.diminfo[i].unlimited = 0;
-	    cvargs.diminfo[i].shape = cvargs.shapes[i];
+	    diminfo[i].unlimited = 0;
+	    diminfo[i].shape = cvargs.shapes[i];
         }
     }
 
@@ -1338,12 +1339,12 @@ read_var1(NC_FILE_INFO_T* file, NC_GRP_INFO_T* grp, const char* varname)
 	if(jdimrefs != NULL) {
             /* Extract the dimref FQNs and validate names*/
             assert((NCJsort(jdimrefs) == NCJ_ARRAY));
-	    if((stat = collectdimrefs(jdimrefs,&cvargs))) goto done;
+	    if((stat = collectdimrefs(jdimrefs,&cvargs,diminfo))) goto done;
 	}
     }
 
     /* Complete the diminfo construction */
-    if((stat = NCZ_computedimrefs(file, grp, cvargs.rank, cvargs.shapes, cvargs.diminfo, &cvargs.scalar))) goto done;
+    if((stat = NCZ_computedimrefs(file, grp, cvargs.rank, cvargs.shapes, diminfo, &cvargs.scalar))) goto done;
 
     /* Capture dimension_separator (must precede chunk cache creation) */
     {
@@ -1410,11 +1411,12 @@ read_var1(NC_FILE_INFO_T* file, NC_GRP_INFO_T* grp, const char* varname)
     {
 	size_t k;
 	/* Compile all the filters+compressor */
-        chainindex = 0; /* track location of filter in the chain */
         if((stat = NCZ_filter_initialize())) goto done;
         for(k=0;k<nclistlength(codecs);k++) {
+	    NCZ_Filter* filter = NULL;
 	    jfilter = nclistget(codecs,k);
-            if((stat = json2filter(file,jfilter,chainindex++,cvargs.filterlist,NULL))) goto done;
+            if((stat = json2filter(file,jfilter,&filter))) goto done;
+	    nclistpush(cvargs.filterlist,filter);
         }
     }
 
@@ -1450,6 +1452,19 @@ read_var1(NC_FILE_INFO_T* file, NC_GRP_INFO_T* grp, const char* varname)
 	nullfree(basename);
     }
 
+    {
+	size_t i;
+	/* Capture the dimids for the dimensions */
+	for(i=0;i<cvargs.rank;i++) {
+	    NC_OBJ* obj = NULL;
+	    NCZ_DimInfo* dinfo = &diminfo[i];
+	    assert(dinfo->name != NULL && dinfo->fqn != NULL);
+	    if((stat = NCZ_locateFQN(file->root_grp,dinfo->fqn,NCDIM,&obj,NULL))) goto done;
+	    if(obj == NULL) {stat = NC_EBADDIM; goto done;}
+	    cvargs.dimids[i] = obj->id;
+	}
+    }
+
     if(!suppress) {
         /* Create the variable */
         if((stat = ncz4_create_var(file,grp,
@@ -1464,7 +1479,7 @@ read_var1(NC_FILE_INFO_T* file, NC_GRP_INFO_T* grp, const char* varname)
 					cvargs.rank,
 					cvargs.shapes,
 					cvargs.chunks,
-					cvargs.diminfo,
+					cvargs.dimids,
 					cvargs.filterlist,
 					cvargs.no_fill,
 					cvargs.fill_value,
@@ -1485,7 +1500,7 @@ done:
     nclistfree(cvargs.filterlist);
     if(cvargs.fill_value != NULL)
 	(void)NC_reclaim_data_all(file->controller,atypeid,cvargs.fill_value,fvlen);
-    NCZ_clear_diminfo(zarr_rank,cvargs.diminfo);
+    NCZ_clear_diminfo(zarr_rank,diminfo);
     /* Clean up */
     nclistfree(codecs);
     nullfree(grppath);
@@ -1497,7 +1512,7 @@ done:
 }
 
 static int
-collectdimrefs(const NCjson* jdimrefs, struct CVARGS* cvargs)
+collectdimrefs(const NCjson* jdimrefs, struct CVARGS* cvargs, NCZ_DimInfo* diminfo)
 {
     int stat = NC_NOERR;
     NClist* segments = NULL;
@@ -1512,7 +1527,7 @@ collectdimrefs(const NCjson* jdimrefs, struct CVARGS* cvargs)
 	NCjson* jscalar = NCJith(jdimrefs,0);
 	assert(strcmp(NCJstring(jscalar),DIMSCALAR)==0);
 	cvargs->rank = 1;
-        cvargs->diminfo[0].name = strdup(XARRAYSCALAR);
+        diminfo[0].name = strdup(XARRAYSCALAR);
     } else {
         if(cvargs->rank != NCJarraylength(jdimrefs)) {stat = NC_ENCZARR; goto done;}
         for(j=0;j<cvargs->rank;j++) {
@@ -1521,10 +1536,10 @@ collectdimrefs(const NCjson* jdimrefs, struct CVARGS* cvargs)
 	    char* lastseg = NULL;
             const NCjson* dimpath = NCJith(jdimrefs,j);
             assert(NCJisatomic(dimpath));
-	    assert(cvargs->diminfo[j].fqn == NULL);
-	    cvargs->diminfo[j].fqn = strdup(NCJstring(dimpath));
-	    fqn = cvargs->diminfo[j].fqn;
-	    name = cvargs->diminfo[j].name;
+	    assert(diminfo[j].fqn == NULL);
+	    diminfo[j].fqn = strdup(NCJstring(dimpath));
+	    fqn = diminfo[j].fqn;
+	    name = diminfo[j].name;
 	    /* Verify WRT simple dim names */
 	    segments = nclistnew();
 	    (void)ncz_splitkey(fqn,segments);
@@ -1532,7 +1547,7 @@ collectdimrefs(const NCjson* jdimrefs, struct CVARGS* cvargs)
 	    lastseg = nclistget(segments,nclistlength(segments)-1);
 	    if(name == NULL) name = strdup(lastseg); /* make consistent */
 	    if(strcmp(name,lastseg) != 0) {stat = NC_ENCZARR; goto done;}
-	    cvargs->diminfo[j].name = name; /* save */		    
+	    diminfo[j].name = name; /* save */		    
   	    nclistfreeall(segments); segments = NULL;
 	}
     } /* else will simulate it from the shape of the variable */
@@ -1542,7 +1557,7 @@ done:
 }
 
 static int
-collectxarraydims(const NCjson* jxarray, struct CVARGS* cvargs)
+collectxarraydims(const NCjson* jxarray, struct CVARGS* cvargs, NCZ_DimInfo* diminfo)
 {
     int stat = NC_NOERR;
     size_t i;
@@ -1553,10 +1568,10 @@ collectxarraydims(const NCjson* jxarray, struct CVARGS* cvargs)
         if(jxarray != NULL) {
             assert(cvargs->rank == NCJarraylength(jxarray));
             for(i=0;i<cvargs->rank;i++) {
-	        assert(cvargs->diminfo[i].name == NULL);
+	        assert(diminfo[i].name == NULL);
                 jdimname = NCJith(jxarray,i);
 		assert(jdimname != NULL);
-	        cvargs->diminfo[i].name = strdup(NCJstring(jdimname));
+	        diminfo[i].name = strdup(NCJstring(jdimname));
 	    }
 	} /* else must be anonymous, so leave name NULL */
     }
@@ -2094,7 +2109,7 @@ done:
 * @return NC_NOERR | NC_EXXX
 */
 static int
-json2filter(NC_FILE_INFO_T* file, const NCjson* jfilter, int chainindex, NClist* filterchain, NCZ_Filter** zfilterp)
+json2filter(NC_FILE_INFO_T* file, const NCjson* jfilter, NCZ_Filter** zfilterp)
 {
     int stat = NC_NOERR;
     const NCjson* jvalue = NULL;
@@ -2103,7 +2118,6 @@ json2filter(NC_FILE_INFO_T* file, const NCjson* jfilter, int chainindex, NClist*
     NCZ_Codec codec;
     NCZ_HDF5 hdf5;
     int flags = 0;
-    int empty = 0;
 
     ZTRACE(6,"file=%s var=%s jfilter=%s",file->hdr.name,var->hdr.name,NCJtrace(jfilter));
 
@@ -2115,11 +2129,10 @@ json2filter(NC_FILE_INFO_T* file, const NCjson* jfilter, int chainindex, NClist*
     if(!NCJisatomic(jvalue)) {stat = THROW(NC_ENOFILTER); goto done;}
     codec.id = strdup(NCJstring(jvalue));
     /* Save the codec for this filter */
-    assert(codec.codec == NULL);
     NCJcheck(NCJunparse(jfilter, 0, &codec.codec));
 
     if((stat = NCZ_codec_plugin_lookup(codec.id,&plugin))) goto done;
-    if(plugin != NULL) {
+    if(plugin != NULL && !plugin->incomplete) {
 	/* Save the hdf5 id */
 	assert(plugin->hdf5.filter != NULL);
 	hdf5.id = plugin->hdf5.filter->id;
@@ -2132,23 +2145,16 @@ json2filter(NC_FILE_INFO_T* file, const NCjson* jfilter, int chainindex, NClist*
         }
 	flags |= FLAG_VISIBLE;
 	flags |= FLAG_CODEC;
-        if(codec.codec == NULL) {
-            /* Unparse jfilter */
-            if(NCJunparse(jfilter,0,&codec.codec)<0) goto done;
-        }
-    } else {
-        /* Fake the filter so we do not forget about this codec */
-	empty = 1;
-    }
-    
-    /* Create the filter */
-    if((stat = ncz4_create_filter(file,empty,plugin,&codec,&hdf5,flags,chainindex,filterchain,&filter))) goto done;
+    } /* else plugin == NULL || plugin->incomplete */
 
+    /* Create the filter */
+    if((stat = ncz4_create_filter(file,plugin,flags,&hdf5,&codec,&filter))) goto done;
+assert(codec.id == NULL && codec.codec == NULL);
     if(zfilterp) *zfilterp = filter;
     filter = NULL; /* its in filterchain if we get here */
 
 done:
-    NCZ_filter_free(filter); filter = NULL;
+    NCZ_filter_free(filter);
     NCZ_filter_codec_clear(&codec);    
     return THROW(stat);
 }

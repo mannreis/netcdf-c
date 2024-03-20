@@ -178,7 +178,7 @@ NCZ_zclose_var1(NC_VAR_INFO_T* var)
     /* Reclaim misc. fields */
     NCJreclaim(zvar->jarray);
     
-    /* Reclaim the object */
+    /* Reclaim the zvar object */
     nullfree(zvar);
     var->format_var_info = NULL; /* avoid memory errors */
     return stat;

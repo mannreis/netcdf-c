@@ -282,7 +282,6 @@ typedef struct NCZ_VAR_INFO {
     struct NCZChunkCache* cache;
     struct NClist* dimension_names; /* names from _ARRAY_DIMENSIONS or dimension_names key */
     char dimension_separator; /* '.' | '/' */
-    NClist* incompletefilters;
     size_t maxstrlen; /* max length of strings for this variable */
     NCjson* jarray; /* Zarr.json; reclaim */
     const NCjson* jzarray; /* _nczarr_array: contains dimensions, attribute types, and storage type; do not reclaim */
@@ -380,6 +379,7 @@ int ncz_gettype(NC_FILE_INFO_T*, NC_GRP_INFO_T*, int xtype, NC_TYPE_INFO_T** typ
 int ncz_find_default_chunksizes2(NC_GRP_INFO_T *grp, NC_VAR_INFO_T *var);
 int NCZ_ensure_quantizer(int ncid, NC_VAR_INFO_T* var);
 int NCZ_write_var_data(NC_FILE_INFO_T* file, NC_VAR_INFO_T* var);
+int NCZ_fillin_var(NC_FILE_INFO_T* h5, NC_VAR_INFO_T* var, NC_TYPE_INFO_T* type, int ndims, const int* dimids);
 
 /* zvar.c */
 int NCZ_reclaim_dim(NC_DIM_INFO_T* dim);
