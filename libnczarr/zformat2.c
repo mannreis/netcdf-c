@@ -470,7 +470,7 @@ write_var_meta(NC_FILE_INFO_T* file, NCZ_FILE_INFO_T* zfile, NCZMAP* map, NC_VAR
 #ifdef ENABLE_NCZARR_FILTERS
     filterchain = (NClist*)var->filters;
     if(nclistlength(filterchain) > 0) {
-	struct NCZ_Filter* filter = (struct NCZ_Filter*)nclistget(filterchain,nclistlength(filterchain)-1);
+	NCZ_Filter* filter = (struct NCZ_Filter*)nclistget(filterchain,nclistlength(filterchain)-1);
 	/* encode up the compressor */
 	if((stat = NCZ_filter_jsonize(file,var,filter,&jtmp))) goto done;
     } else
@@ -495,7 +495,7 @@ write_var_meta(NC_FILE_INFO_T* file, NCZ_FILE_INFO_T* zfile, NCZMAP* map, NC_VAR
 	/* jtmp holds the array of filters */
 	NCJnew(NCJ_ARRAY,&jtmp);
 	for(k=0;k<nclistlength(filterchain)-1;k++) {
-	    struct NCZ_Filter* filter = (struct NCZ_Filter*)nclistget(filterchain,k);
+	    NCZ_Filter* filter = (struct NCZ_Filter*)nclistget(filterchain,k);
 	    /* encode up the filter as a string */
 	    if((stat = NCZ_filter_jsonize(file,var,filter,&jfilter))) goto done;
 	    NCJappend(jtmp,jfilter); jfilter = NULL;
@@ -1416,6 +1416,7 @@ read_var1(NC_FILE_INFO_T* file, NC_GRP_INFO_T* grp, const char* varname)
 	    NCZ_Filter* filter = NULL;
 	    jfilter = nclistget(codecs,k);
             if((stat = json2filter(file,jfilter,&filter))) goto done;
+fprintf(stderr,"??? (1) %d\n",(int)filter->hdf5.id);
 	    nclistpush(cvargs.filterlist,filter);
         }
     }
@@ -1497,6 +1498,7 @@ read_var1(NC_FILE_INFO_T* file, NC_GRP_INFO_T* grp, const char* varname)
 
 done:
     /* Clean up cvargs */
+assert(nclistlength(cvargs.filterlist) == 0);
     nclistfree(cvargs.filterlist);
     if(cvargs.fill_value != NULL)
 	(void)NC_reclaim_data_all(file->controller,atypeid,cvargs.fill_value,fvlen);
@@ -2149,7 +2151,6 @@ json2filter(NC_FILE_INFO_T* file, const NCjson* jfilter, NCZ_Filter** zfilterp)
 
     /* Create the filter */
     if((stat = ncz4_create_filter(file,plugin,flags,&hdf5,&codec,&filter))) goto done;
-assert(codec.id == NULL && codec.codec == NULL);
     if(zfilterp) *zfilterp = filter;
     filter = NULL; /* its in filterchain if we get here */
 

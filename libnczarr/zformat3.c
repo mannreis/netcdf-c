@@ -499,7 +499,7 @@ write_var_meta(NC_FILE_INFO_T* file, NCZ_FILE_INFO_T* zfile, NCZMAP* map, NC_VAR
     if(nclistlength(filterchain) > 0) {
 	size_t k;
 	for(k=0;k<nclistlength(filterchain);k++) {
-	    struct NCZ_Filter* filter = (struct NCZ_Filter*)nclistget(filterchain,k);
+	    NCZ_Filter* filter = (struct NCZ_Filter*)nclistget(filterchain,k);
 	    /* encode up the filter as a string */
 	    if((stat = NCZ_filter_jsonize(file,var,filter,&jfilter))) goto done;
 	    NCJappend(jcodecs,jfilter);
