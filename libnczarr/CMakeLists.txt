@@ -51,20 +51,16 @@ zfilter.h
 zdebug.h
 )
 
-if (ENABLE_DLL)
-  target_compile_definitions(nczarr PRIVATE DLL_NETCDF DLL_EXPORT)
+if(NETCDF_ENABLE_NCZARR_ZIP)
+    set(libnczarr_SOURCES ${libnczarr_SOURCES} zmap_zip.c)
 endif()
 
-if(ENABLE_NCZARR_ZIP)
-    target_sources(nczarr PRIVATE zmap_zip.c)
-endif()
-
-if(ENABLE_S3) 
-    target_sources(nczarr PRIVATE zmap_s3sdk.c)
+if(NETCDF_ENABLE_S3) 
+    set(libnczarr_SOURCES ${libnczarr_SOURCES} zmap_s3sdk.c)
 endif()
 
 if(ENABLE_NCZARR_FILTERS)
-    target_sources(nczarr PRIVATE zfilter.c)
+    set(libnczarr_SOURCES ${libnczarr_SOURCES} zfilter.c)
 endif()
 
 # Build the Zarr dispatch layer as a library that will be included in
@@ -80,5 +76,12 @@ if(STATUS_PARALLEL)
     target_link_libraries(nczarr PUBLIC MPI::MPI_C)
 endif(STATUS_PARALLEL)
 
+<<<<<<< HEAD
+=======
+if (NETCDF_ENABLE_DLL)
+    target_compile_definitions(nczarr PRIVATE DLL_NETCDF DLL_EXPORT)
+endif()
+
+>>>>>>> master
 # Remember to package this file for CMake builds.
 add_extra_dist(${libnczarr_SOURCES} CMakeLists.txt)

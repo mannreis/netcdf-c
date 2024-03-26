@@ -146,7 +146,7 @@ Similarly ````/g1/g2/d2```` defines a dimension "d2" defined in the
 group g2, which in turn is a subgroup of group g1, which is a subgroup
 of the root group.
 
-The *type-alias* key is used to annotate the type of an array
+The *type_alias* key is used to annotate the type of an array
 to allow discovery of netcdf-4 specific types.
 Specifically, there are three current cases:
 | dtype | type_alias |
@@ -160,7 +160,6 @@ it is actually of unsigned 8-bit integer type. But it may actually be of some
 netcdf-4 type that is encoded as *uint8* in order to be recognized by other -- pure zarr--
 implementations. So, for example, if the netcdf-4 type is *char*, then the array's
 dtype is *uint8*, but its type alias is *char*.
-
 
 Optionally Inserted into any group zarr.json or array zarr.json is the extra attribute.
 "_nczarr_attrs": {\"attribute_types\": [{\"name\": \"attr1\", \"configuration\": {\"type\": \"<dtype>\"}}, ...]}
@@ -379,7 +378,7 @@ int ncz_gettype(NC_FILE_INFO_T*, NC_GRP_INFO_T*, int xtype, NC_TYPE_INFO_T** typ
 int ncz_find_default_chunksizes2(NC_GRP_INFO_T *grp, NC_VAR_INFO_T *var);
 int NCZ_ensure_quantizer(int ncid, NC_VAR_INFO_T* var);
 int NCZ_write_var_data(NC_FILE_INFO_T* file, NC_VAR_INFO_T* var);
-int NCZ_fillin_var(NC_FILE_INFO_T* h5, NC_VAR_INFO_T* var, NC_TYPE_INFO_T* type, int ndims, const int* dimids);
+int NCZ_fillin_var(NC_FILE_INFO_T* h5, NC_VAR_INFO_T* var, NC_TYPE_INFO_T* type, int ndims, const int* dimids, size64_t* shape, size64_t* chunksizes, int endianness);
 
 /* zvar.c */
 int NCZ_reclaim_dim(NC_DIM_INFO_T* dim);

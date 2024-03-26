@@ -33,7 +33,7 @@ Read:
 #include "ncjson.h"
 #include "ncpathmgr.h"
 
-#ifdef ENABLE_NCZARR_ZIP
+#ifdef NETCDF_ENABLE_NCZARR_ZIP
 #include <zip.h>
 #endif
 
@@ -251,7 +251,7 @@ NCZ_infer_storage_type(NC_FILE_INFO_T* file, NCZ_FILE_INFO_T* zfile, NCURI* url,
     if(NC_testmode(url, "file")) impl = NCZM_FILE;
     else if(NC_testmode(url, "s3")) impl = NCZM_S3;
     else if(NC_testmode(url, "gs3")) impl = NCZM_GS3;
-#ifdef ENABLE_NCZARR_ZIP
+#ifdef NETCDF_ENABLE_NCZARR_ZIP
     else if(NC_testmode(url, "zip")) impl = NCZM_ZIP;
 #endif
     if(!create) { /* Reading a file of some kind */
@@ -261,7 +261,7 @@ NCZ_infer_storage_type(NC_FILE_INFO_T* file, NCZ_FILE_INFO_T* zfile, NCURI* url,
 	    if(NCstat(url->path,&buf)<0) {ret = errno; goto done;}
 	    if(S_ISDIR(buf.st_mode))
 		impl = NCZM_FILE; /* only possibility */
-#ifdef ENABLE_NCZARR_ZIP
+#ifdef NETCDF_ENABLE_NCZARR_ZIP
 	    else if(S_ISREG(buf.st_mode)) {
 		/* Should be zip, but verify */
                 zip_flags_t zipflags = ZIP_RDONLY;

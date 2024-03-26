@@ -29,7 +29,7 @@ TESTINPUTS =
 
 include $(top_srcdir)/nczarr_test/Makefile.files
 
-if BUILD_UTILITIES
+if NETCDF_BUILD_UTILITIES
 # Test v2 specific tests
 
 # Test fill issues
@@ -41,7 +41,7 @@ TESTS += run_corrupt.sh
 # Test interoperability of V2 files
 TESTS += run_interop.sh
 
-if ENABLE_EXTERNAL_SERVER_TESTS
+if NETCDF_ENABLE_EXTERNAL_SERVER_TESTS
 TESTS += run_external.sh
 endif
 
@@ -68,7 +68,7 @@ test_unlim_io_SOURCES = test_unlim_io.c ${testcommonsrc}
 TESTS += test_put_vars_two_unlim_dim
 endif
 
-if BUILD_UTILITIES
+if NETCDF_BUILD_UTILITIES
 
 TESTS += run_ut_misc.sh
 TESTS += run_ut_map.sh
@@ -89,6 +89,10 @@ TESTS += run_scalar.sh
 TESTS += run_nulls.sh
 TESTS += run_notzarr.sh
 
+if NETCDF_ENABLE_EXTERNAL_SERVER_TESTS
+TESTS += run_external.sh
+endif
+
 # Unlimited Dimension tests (at least in part)
 TESTS += run_mud.sh
 TESTS += test_unlim_vars
@@ -108,11 +112,11 @@ if LARGE_FILE_TESTS
 	TESTS += run_cachetest.sh
 endif
 
-endif #BUILD_UTILITIES
+endif #NETCDF_BUILD_UTILITIES
 
-if BUILD_UTILITIES 
+if NETCDF_BUILD_UTILITIES 
 
-if ENABLE_NCZARR_ZIP
+if NETCDF_ENABLE_NCZARR_ZIP
 	TESTS += run_newformat.sh
 endif
 
@@ -144,8 +148,8 @@ endif
 
 endif # BUILD_BENCHMARKS
 
-if ENABLE_NCZARR_FILTERS
-if ENABLE_FILTER_TESTING
+if NETCDF_ENABLE_NCZARR_FILTERS
+if NETCDF_ENABLE_FILTER_TESTING
 
 check_PROGRAMS += test_filter_avail test_filter_vlen
 TESTS += run_filter_vlen.sh run_filter_misc.sh
@@ -169,10 +173,13 @@ if ISMINGW
 XFAIL_TESTS = run_filter.sh run_specific_filters.sh run_nczfilter.sh
 endif  # ISMINGW
 
-endif #ENABLE_FILTER_TESTING
-endif #ENABLE_NCZARR_FILTERS
+endif #NETCDF_ENABLE_FILTER_TESTING
+endif #NETCDF_ENABLE_NCZARR_FILTERS
 
-endif #BUILD_UTILITIES
+# Test various corrupted files
+TESTS += run_corrupt.sh
+
+endif #NETCDF_BUILD_UTILITIES
 
 # These programs are used by the test cases
 noinst_PROGRAMS = zhex
@@ -184,11 +191,11 @@ zmapio_SOURCES = zmapio.c
 noinst_PROGRAMS += zs3parse
 zs3parse_SOURCES = zs3parse.c
 
-if ENABLE_S3
+if NETCDF_ENABLE_S3
 noinst_PROGRAMS += s3util 
 s3util_SOURCES = s3util.c
-if ENABLE_S3_TESTALL
-if ENABLE_S3_AWS
+if NETCDF_ENABLE_S3_TESTALL
+if NETCDF_ENABLE_S3_AWS
 check_PROGRAMS += tst_pure_awssdk
 tst_pure_awssdk_SOURCES = tst_pure_awssdk.cpp
 AM_CXXFLAGS += -std=c++11
@@ -196,7 +203,7 @@ endif
 endif
 endif
 
-if ENABLE_NCDUMPCHUNKS
+if NETCDF_ENABLE_NCDUMPCHUNKS
 # Given a netcdf4|NCZarr file, dump the actual chunk contents.
 # Used to validate nczarr chunking code.
 AM_CPPFLAGS += -I$(top_srcdir)/libnczarr
@@ -217,7 +224,14 @@ DISTCLEANFILES += findplugin.sh ${BUILT_SOURCES}
 
 clean-local:
 	rm -fr tmp*.file
-if ENABLE_S3_TESTALL
+if NETCDF_ENABLE_S3_TESTALL
+	rm -fr testdir_* testset_*
+	rm -fr tmp_*.nc tmp_*.zarr tst_quantize*.zarr tmp*.file results.file results.s3 results.zip
+	rm -fr rcmiscdir ref_power_901_constants.file 
+endif
+
+if NETCDF_ENABLE_S3_TESTALL
+check-local:
 	bash ${abs_top_builddir}/s3cleanup.sh
 endif
 

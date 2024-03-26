@@ -96,10 +96,10 @@ NCZ_finalize_internal(void)
 {
     /* Reclaim global resources */
     ncz_initialized = 0;
-#ifdef ENABLE_NCZARR_FILTERS
+#ifdef NETCDF_ENABLE_NCZARR_FILTERS
     NCZ_filter_finalize();
 #endif
-#ifdef ENABLE_S3
+#ifdef NETCDF_ENABLE_S3
     NCZ_s3finalize();
 #endif
 

@@ -103,11 +103,9 @@ EXTERNL int NCZ_sortstringlist(void* vec, size_t count);
 EXTERNL int NCZ_sortpairlist(void* vec, size_t count);
 EXTERNL void NCZ_freeAttrInfoVec(struct NCZ_AttrInfo* ainfo);
 EXTERNL void NCZ_setatts_read(NC_OBJ* container);
-EXTERNL int NCZ_computedimrefs(NC_FILE_INFO_T* file, NC_GRP_INFO_T* parent, size_t ndims,
-				size64_t* shapes,
-				NCZ_DimInfo* diminfo, int* scalarp);
 EXTERNL int NCZ_decodesizet64vec(const NCjson* jshape, size64_t* shapes);
 EXTERNL int NCZ_decodesizetvec(const NCjson* jshape, size_t* shapes);
+EXTERNL int NCZ_uniquedimname(NC_FILE_INFO_T* file, NC_GRP_INFO_T* parent, NCZ_DimInfo* dimdata, NC_DIM_INFO_T** dimp, NCbytes* dimname);
 
 /* zwalk.c */
 EXTERNL int NCZ_read_chunk(int ncid, int varid, size64_t* zindices, void* chunkdata);

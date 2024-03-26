@@ -129,7 +129,6 @@ static int splitfqn(const char* fqn0, NClist* segments);
 static int locatedimbyname(NC_FILE_INFO_T* file, NC_GRP_INFO_T* grp, const char* dimname, NC_DIM_INFO_T** dimp, NC_GRP_INFO_T** grpp);
 static int isconsistentdim(NC_DIM_INFO_T* dim, NCZ_DimInfo* dimdata, int testunlim);
 static int locateconsistentdim(NC_FILE_INFO_T* file, NC_GRP_INFO_T* grp, NCZ_DimInfo* dimdata, int testunlim, NC_DIM_INFO_T** dimp, NC_GRP_INFO_T** grpp);
-static int uniquedimname(NC_FILE_INFO_T* file, NC_GRP_INFO_T* parent, NCZ_DimInfo* dimdata, NC_DIM_INFO_T** dimp, NCbytes* dimname);
 
 /**************************************************/
 
@@ -1351,114 +1350,6 @@ done:
 }
 #endif
 
-/**
-Given the following:
-1. shape of a variable as a vector of integers [in]
-2. rank of the variable [in[
-3. set of dim names as simple names [in]
-4. set of fqns for each dimension [out]
-then create fqns for the dimension names.
-If the dimension does not exist, then use an anonymous name.
-
-We have two sources for the dimension names for this variable.
-1. the "dimension_names":
-   1.1 inside the zarr.json (V3) dictionary; this is the simple dimension name.
-   1.2 the xarray "_ARRAY_DIMENSIONS" (V2) attribute as the simple dimension names.
-2. the "dimension_references" key inside the _nczarr_array dictionary;
-   this contains FQNs for the dimensions.
-Note that we may have both 1.1|1.2 and 2.
-
-If purezarr, then we only have 1.1 or 1.2. In that case, for each name in "dimension_names",
-we need to do the following:
-1. get the i'th size from the "shape" vector.
-2. if the i'th simple dimension name is null, then set the name to "_Anonymous_Dim<n>",
-   where n is the size from the shape vector.
-3. compute an equivalent of "dimension_references" by assuming that each simple dimension
-   name maps to an FQN in the current group containing the given variable.
-
-In any case, we now have an FQN for each dimension reference for the var.
-
-@param file
-@param grp containing var
-@param ndims rank of the variable
-@param shape the shape of the var
-@param diminfo info about each dim
-@return NC_NOERR|NC_EXXX
-*/
-int
-NCZ_computedimrefs(NC_FILE_INFO_T* file, NC_GRP_INFO_T* grp,
-               size_t ndims,
-	       size64_t* shape,
-	       NCZ_DimInfo* diminfo,
-	       int* isscalarp)
-{
-    int stat = NC_NOERR;
-    size_t i;
-    int isscalar;
-    int purezarr;
-    char digits[NC_MAX_NAME];
-    NCZ_FILE_INFO_T* zfile = (NCZ_FILE_INFO_T*)file->format_file_info;
-    NCbytes* newname = ncbytesnew();
-    NCbytes* fqn = ncbytesnew();
-    
-    ZTRACE(3,"file=%s var=%s purezarr=%d ndims=%d shape=%s",
-        file->controller->path,var->hdr.name,purezarr,ndims,nczprint_vector(ndims,shape));
-
-    assert(diminfo != NULL);
-
-    purezarr = (zfile->flags & FLAG_PUREZARR)?1:0;
-
-    /* Check for scalar */
-    if(!purezarr && ndims == 1 && shape[0] == 1 && diminfo[0].name != NULL && strcmp(diminfo[0].name,XARRAYSCALAR) == 0) {
-	isscalar = 1;
-	/* Always create in root_grp */
-	grp = file->root_grp;
-    } else
-        isscalar = 0;
-
-    {
-	/* Fill in dimnames */
-        for(i=0;i<ndims;i++) {
-	    NC_DIM_INFO_T* dim = NULL;	    
-	    NC_GRP_INFO_T* parent = grp; /* create dim in this group */
-	    NCZ_DimInfo* dimdata = &diminfo[i];
-
-	    ncbytesclear(newname);
-	    ncbytesclear(fqn);
-
-            if(dimdata->name == NULL) { /* convert null name to anonymous name */
-                /* create anonymous dimension name WRT root group and using the loopcounter */
-                snprintf(digits,sizeof(digits),"_%llu",shape[i]);
-		ncbytescat(newname,NCDIMANON);
-		ncbytescat(newname,digits);
-		dimdata->name = ncbytesextract(newname);
-		parent = file->root_grp; /* anonymous are always created in the root group */
-	    }
-
-	    /* Find a consistent name and return a usable FQN for the dim */
-	    if((stat = uniquedimname(file,parent,dimdata,&dim,newname))) goto done;
-	    if(dim == NULL) {
-                /* Create the dimension */
-	        if((stat = ncz4_create_dim(file,parent,ncbytescontents(newname),dimdata->shape,dimdata->unlimited,&dim))) goto done;
-	    }
-            nullfree(dimdata->fqn); dimdata->fqn = NULL;
-  	    assert(dim != NULL);
-	    {
-		/* Get the dim's FQN */
-		if((stat=NCZ_makeFQN(dim->container,ncbytescontents(newname),fqn))) goto done;
-		dimdata->fqn = ncbytesextract(fqn);
-	    }
-	}
-    }
-
-    if(isscalarp) *isscalarp = (isscalar?1:0);
-
-done:
-    ncbytesfree(newname);
-    ncbytesfree(fqn);
-    return ZUNTRACE(THROW(stat));
-}
-
 /* Convert a list of integer strings to size64_t integers */
 int
 NCZ_decodesizet64vec(const NCjson* jshape, size64_t* shapes)
@@ -1628,8 +1519,8 @@ done:
 @param dimp store matching dim here
 @param dimname store the unique name
 */
-static int
-uniquedimname(NC_FILE_INFO_T* file, NC_GRP_INFO_T* parent, NCZ_DimInfo* dimdata, NC_DIM_INFO_T** dimp, NCbytes* dimname)
+int
+NCZ_uniquedimname(NC_FILE_INFO_T* file, NC_GRP_INFO_T* parent, NCZ_DimInfo* dimdata, NC_DIM_INFO_T** dimp, NCbytes* dimname)
 {
     int stat = NC_NOERR;
     size_t loopcounter;

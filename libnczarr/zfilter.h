@@ -112,23 +112,21 @@ typedef struct NCZ_Filter {
     int flags;             	/**< Flags describing state of this filter. */
 #	define FLAG_VISIBLE	  1 /* If set, then visible parameters are defined */
 #	define FLAG_WORKING	  2 /* If set, then WORKING parameters are defined */
-#	define FLAG_NEWVISIBLE	  4 /* If set, => visible parameters  were modified */
-#	define FLAG_CODEC	  8 /* If set, then visible parameters come from an existing codec string */
-#	define FLAG_HDF5	 16 /* If set, => visible parameters came from nc_def_var_filter */
 } NCZ_Filter;
 
 int NCZ_filter_initialize(void);
 int NCZ_filter_finalize(void);
 
 int NCZ_codec_plugin_lookup(const char* codecid, NCZ_Plugin** pluginp);
-int NCZ_insert_filter(NC_FILE_INFO_T*, NC_VAR_INFO_T* var, NCZ_Filter* filter);
+int NCZ_insert_filter(NC_FILE_INFO_T* file, NClist* list, NCZ_HDF5* hdf5, NCZ_Codec* codec, NCZ_Filter* fi, int exists);
+int NCZ_filter_verify(NCZ_Filter* filter, int varsized);
 int NCZ_filter_setup(NC_VAR_INFO_T* var);
 int NCZ_filter_freelists(NC_VAR_INFO_T* var);
 int NCZ_filter_freelist1(NClist* filters);
 int NCZ_codec_freelist(NCZ_VAR_INFO_T* zvar);
 int NCZ_applyfilterchain(NC_FILE_INFO_T*, NC_VAR_INFO_T*, NClist* chain, size_t insize, void* indata, size_t* outlen, void** outdata, int encode);
 int NCZ_codec_attr(const NC_VAR_INFO_T* var, size_t* lenp, void* data);
-int NCZ_fillin_filter(NC_FILE_INFO_T* file, NCZ_Filter* filter, int flags, NCZ_HDF5* hdf5, NCZ_Codec* codec);
+int NCZ_fillin_filter(NC_FILE_INFO_T* file, NCZ_Filter* filter, NCZ_HDF5* hdf5, NCZ_Codec* codec);
 int NCZ_filter_jsonize(const NC_FILE_INFO_T* file, const NC_VAR_INFO_T* var, NCZ_Filter* filter, NCjson** jfilterp);
 int NCZ_filter_free(NCZ_Filter* spec);
 int NCZ_filter_hdf5_clear(NCZ_HDF5* spec);

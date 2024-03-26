@@ -374,7 +374,7 @@ NCZ_def_var(int ncid, const char *name, nc_type xtype, int ndims,
     if ((retval = nc4_var_list_add(grp, norm_name, ndims, &var)))
 	BAIL(retval);
 
-    retval = NCZ_fillin_var(h5, var, type, ndims, dimids);
+    retval = NCZ_fillin_var(h5, var, type, ndims, dimids, NULL, NULL, NC_ENDIAN_NATIVE);
 
     if(retval == NC_NOERR) {
         /* Return the varid. */
@@ -389,8 +389,16 @@ exit:
     return ZUNTRACE(retval);
 }
 
+/**
+Since variables are created in two places, encapsulate
+the fillin of the variable data. Not all data is filled in,
+but important &/or complex data is filled in.
+*/
 int
-NCZ_fillin_var(NC_FILE_INFO_T* file, NC_VAR_INFO_T* var, NC_TYPE_INFO_T* type, int ndims, const int* dimids)
+NCZ_fillin_var(NC_FILE_INFO_T* file, NC_VAR_INFO_T* var, NC_TYPE_INFO_T* type,
+		int ndims, const int* dimids,
+		size64_t* shape, size64_t* chunksizes,
+		int endianness)
 {
     int stat = NC_NOERR;
     size_t d;
@@ -415,7 +423,7 @@ NCZ_fillin_var(NC_FILE_INFO_T* file, NC_VAR_INFO_T* var, NC_TYPE_INFO_T* type, i
     var->meta_read = NC_TRUE;
     NCZ_setatts_read((NC_OBJ*)var);
 
-#ifdef ENABLE_NCZARR_FILTERS
+#ifdef NETCDF_ENABLE_NCZARR_FILTERS
     /* Set the filter list */
     assert(var->filters == NULL);
     var->filters = (void*)nclistnew();
@@ -428,16 +436,19 @@ var->type_info->rc++;
 #endif
 
     /* Propagate the endianness */
-    var->endianness = var->type_info->endianness;
+    if(endianness == NC_ENDIAN_NATIVE)
+        var->endianness = var->type_info->endianness;
+    else
+	var->endianness = endianness;
+    var->type_info->endianness = var->endianness; /* back prop */
+
     /* Indicate we do not have quantizer yet */
     var->quantize_mode = -1;
 
-    /* Assign dimensions to the variable. At the same time, check to
-     * see if this is a coordinate variable. If so, it will have the
-     * same name as one of its dimensions. If it is a coordinate var,
-     * is it a coordinate var in the same group as the dim? Also, check
-     * whether we should use contiguous or chunked storage. */
+    /* should we use contiguous or chunked storage. */
     var->storage = (zvar->scalar?NC_CONTIGUOUS:NC_CHUNKED);
+
+    /* Assign dimensions to the variable. */
 
     /* Save the rank of the variable */
     if((stat = nc4_var_set_ndims(var, (int)ndims))) goto done;
@@ -454,16 +465,22 @@ var->type_info->rc++;
 	/* Track dimensions for variable */
 	var->dimids[d] = dimids[d];
 	var->dim[d] = dim;
+	if(shape != NULL) assert(shape[d] == (size64_t)var->dim[d]->len);
     }
 
-    /* Determine default chunksizes for this variable. (Even for
-     * variables which may be contiguous.) */
+    /* Determine  chunksizes for this variable. (Even for
+     * variables which may be scalar) */
     LOG((4, "allocating array of %d size_t to hold chunksizes for var %s",
 	 var->ndims, var->hdr.name));
     if(!var->chunksizes) {
 	if(var->ndims) {
             if (!(var->chunksizes = calloc(var->ndims, sizeof(size_t)))) {stat = NC_ENOMEM; goto done;}
-	    if ((stat = ncz_find_default_chunksizes2(grp, var))) goto done;
+	    if(chunksizes != NULL) {
+		size_t j;
+		for(j=0;j<var->ndims;j++) var->chunksizes[j] = (size_t)chunksizes[j];
+	    } else {
+	        if ((stat = ncz_find_default_chunksizes2(grp, var))) goto done;
+	    }
         } else {
 	    /* Pretend that scalars are like var[1] */
 	    if (!(var->chunksizes = calloc(1, sizeof(size_t)))) {stat = NC_ENOMEM; goto done;}
@@ -582,7 +599,7 @@ ncz_def_var_extra(int ncid, int varid, int *shuffle, int *unused1,
     
     /* Can't turn on parallel and deflate/fletcher32/szip/shuffle
      * before HDF5 1.10.3. */
-#ifdef ENABLE_NCZARR_FILTERS
+#ifdef NETCDF_ENABLE_NCZARR_FILTERS
 #ifndef HDF5_SUPPORTS_PAR_FILTERS
     if (h5->parallel == NC_TRUE)
 	if (nclistlength(((NClist*)var->filters)) > 0  || fletcher32 || shuffle)

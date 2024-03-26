@@ -20,19 +20,45 @@ if(USE_X_GETOPT)
 set(XGETOPTSRC "${CMAKE_CURRENT_SOURCE_DIR}/../libdispatch/XGetopt.c")
 endif()
 
-if(ENABLE_TESTS)
+NCZARR_C_TEST(tst_quantize test_quantize nc_test4)
+NCZARR_C_TEST(tst_filter_vlen test_filter_vlen nc_test4)
+NCZARR_C_TEST(tst_unlim_vars test_unlim_vars nc_test4)
+NCZARR_C_TEST(tst_h5_endians test_endians nc_test4)
+NCZARR_C_TEST(tst_put_vars_two_unlim_dim test_put_vars_two_unlim_dim nc_test4)
+NCZARR_C_TEST(tst_chunking test_chunking ncdump)
+
+NCZARR_SH_TEST(specific_filters nc_test4)
+NCZARR_SH_TEST(unknown nc_test4)
+NCZARR_SH_TEST(filter_vlen nc_test4)
+
+# Unlimited tests
+NCZARR_SH_TEST(mud ncdump)
+NCZARR_SH_TEST(nccopy5 ncdump)
+
+FILE(GLOB COPY_FILES ${CMAKE_CURRENT_SOURCE_DIR}/*.sh
+${CMAKE_CURRENT_SOURCE_DIR}/ref*.cdl
+${CMAKE_CURRENT_SOURCE_DIR}/ref*.txt
+${CMAKE_CURRENT_SOURCE_DIR}/ref*.zmap)
+
+FILE(COPY ${COPY_FILES} DESTINATION ${CMAKE_CURRENT_BINARY_DIR}/ FILE_PERMISSIONS OWNER_WRITE OWNER_READ OWNER_EXECUTE)
+
+IF(USE_X_GETOPT)
+SET(XGETOPTSRC "${CMAKE_CURRENT_SOURCE_DIR}/../libdispatch/XGetopt.c")
+ENDIF()
+
+IF(NETCDF_ENABLE_TESTS)
 
   add_library(ut_util STATIC ut_util.c ut_test.c ut_includes.h ut_test.h ${XGETOPTSRC})
-  if(ENABLE_DLL)
+  IF(NETCDF_ENABLE_DLL)
     target_compile_definitions(ut_util PUBLIC -DDLL_EXPORT -DDLL_NETCDF)
-  endif(ENABLE_DLL)
+  ENDIF(NETCDF_ENABLE_DLL)
   target_include_directories(ut_util PUBLIC ../libnczarr ../plugins ${CMAKE_CURRENT_LIST_DIR})
   target_link_libraries(ut_util PUBLIC netcdf ${ALL_TLL_LIBS})
 
   add_library(test_utils STATIC test_utils.c test_utils.h ${XGETOPTSRC})
-  if(ENABLE_DLL)
+  IF(NETCDF_ENABLE_DLL)
     target_compile_definitions(test_utils PUBLIC -DDLL_EXPORT -DDLL_NETCDF)
-  endif(ENABLE_DLL)
+  ENDIF(NETCDF_ENABLE_DLL)
   target_include_directories(test_utils PUBLIC ../libnczarr ../plugins ${CMAKE_CURRENT_LIST_DIR})
   target_link_libraries(test_utils PUBLIC netcdf ${ALL_TLL_LIBS})
 
@@ -41,6 +67,23 @@ if(ENABLE_TESTS)
     RUNTIME_OUTPUT_DIRECTORY_DEBUG ${CMAKE_CURRENT_BINARY_DIR}
     RUNTIME_OUTPUT_DIRECTORY_RELEASE ${CMAKE_CURRENT_BINARY_DIR}
   )
+
+  macro(build_bin_test_with_util_lib F UTIL_LIB)
+    build_bin_test(${F})
+    IF(NETCDF_ENABLE_DLL)
+      target_compile_definitions(${F} PUBLIC -DDLL_NETCDF)
+    ENDIF(NETCDF_ENABLE_DLL)
+    target_link_libraries(${F} ${UTIL_LIB} ${ALL_TLL_LIBS})
+  endmacro()
+
+  macro(add_bin_test_with_util_lib PREFIX F UTIL_LIB)
+    add_bin_test(${PREFIX} ${F})
+    IF(NETCDF_ENABLE_DLL)
+      target_compile_definitions(${PREFIX}_${F} PUBLIC -DDLL_NETCDF)
+    ENDIF(NETCDF_ENABLE_DLL)
+    target_link_libraries(${PREFIX}_${F} ${UTIL_LIB} ${ALL_TLL_LIBS})
+
+  endmacro()
 
   # Base tests
   # The tests are set up as a combination of shell scripts and executables that
@@ -86,20 +129,20 @@ if(ENABLE_TESTS)
   target_include_directories(zs3parse PUBLIC ../libnczarr)
   build_bin_test_with_util_lib(zmapio ut_util)
 
-  if(ENABLE_S3 AND NOT WITH_S3_TESTING STREQUAL "NO")
+  IF(NETCDF_ENABLE_S3 AND NOT WITH_S3_TESTING STREQUAL "NO")
   # Helper programs for testing
     build_bin_test(s3util ${COMMONSRC})
   # Pure AWS Test
-    if(ENABLE_S3_AWS)
-      set(TMP_CMAKE_CXX_STANDARD ${MAKE_CXX_STANDARD})
-      set(CMAKE_CXX_STANDARD 11)
-      add_executable(tst_pure_awssdk tst_pure_awssdk.cpp)
-      target_link_libraries(tst_pure_awssdk ${AWSSDK_CORE_LIB_FILE})
-      add_test(tst_pure_awssdk ${EXECUTABLE_PUTPUT_PATH}/tst_pure_awssdk)
-      set(F tst_pure_awssdk)
-      if(MSVC)
-        set_property(TEST ${F} PROPERTY FOLDER "tests/")
-        set_target_properties(${F} PROPERTIES RUNTIME_OUTPUT_DIRECTORY
+    IF(NETCDF_ENABLE_S3_AWS)
+      SET(TMP_CMAKE_CXX_STANDARD ${MAKE_CXX_STANDARD})
+      SET(CMAKE_CXX_STANDARD 11)
+      ADD_EXECUTABLE(tst_pure_awssdk tst_pure_awssdk.cpp)
+      TARGET_LINK_LIBRARIES(tst_pure_awssdk ${AWSSDK_CORE_LIB_FILE})
+      ADD_TEST(tst_pure_awssdk ${EXECUTABLE_PUTPUT_PATH}/tst_pure_awssdk)
+      SET(F tst_pure_awssdk)
+      IF(MSVC)
+        SET_PROPERTY(TEST ${F} PROPERTY FOLDER "tests/")
+        SET_TARGET_PROPERTIES(${F} PROPERTIES RUNTIME_OUTPUT_DIRECTORY
           ${CMAKE_CURRENT_BINARY_DIR})
         set_target_properties(${F} PROPERTIES RUNTIME_OUTPUT_DIRECTORY_DEBUG
           ${CMAKE_CURRENT_BINARY_DIR})
@@ -107,8 +150,8 @@ if(ENABLE_TESTS)
           ${CMAKE_CURRENT_BINARY_DIR})
       endif(MSVC)      
 
-      SET(CMAKE_CXX_STANDARD ${TMP_CMAKE_CXX_STANDARD})
-    endif(ENABLE_S3_AWS)
+      set(CMAKE_CXX_STANDARD ${TMP_CMAKE_CXX_STANDARD})
+    endif(NETCDF_ENABLE_S3_AWS)
     target_include_directories(s3util PUBLIC ../libnczarr)
   endif()
   
@@ -116,7 +159,7 @@ if(ENABLE_TESTS)
     build_bin_test_with_util_lib(ncdumpchunks ut_util)
   endif()
 
-  if(BUILD_UTILITIES)
+  IF(NETCDF_BUILD_UTILITIES)
     add_sh_test(nczarr_test run_ut_map)
     add_sh_test(nczarr_test run_ut_mapapi)
     add_sh_test(nczarr_test run_ut_misc)
@@ -149,8 +192,8 @@ if(ENABLE_TESTS)
     add_sh_test(nczarr_test run_fillonlyz)
     endif()
 
-  if(ENABLE_NCZARR_FILTERS)
-  if(ENABLE_FILTER_TESTING)
+  if(NETCDF_ENABLE_NCZARR_FILTERS)
+  if(NETCDF_ENABLE_FILTER_TESTING)
 	  build_bin_test(test_nczfilter)
   	  build_bin_test(test_filter_vlen)
 	  build_bin_test(testfilter)
@@ -167,10 +210,10 @@ if(ENABLE_TESTS)
             # It causes race conditions. So suppress and only test by hand.
             add_sh_test(nczarr_test run_unknown)
 	  endif(FALSE)
-  endif(ENABLE_FILTER_TESTING)
-  endif(ENABLE_NCZARR_FILTERS)
+  endif(NETCDF_ENABLE_FILTER_TESTING)
+  endif(NETCDF_ENABLE_NCZARR_FILTERS)
 
-  if(ENABLE_NCZARR_ZIP)
+  if(NETCDF_ENABLE_NCZARR_ZIP)
       add_sh_test(nczarr_test run_newformat)
       # Test various corrupted files
       add_sh_test(nczarr_test run_corrupt.sh)
@@ -180,9 +223,9 @@ if(ENABLE_TESTS)
       add_sh_test(nczarr_test run_ut_chunk)
   endif()
 
-  endif(BUILD_UTILITIES)
+  endif(NETCDF_BUILD_UTILITIES)
 
-endif(ENABLE_TESTS)
+endif(NETCDF_ENABLE_TESTS)
 
 ## Specify files to be distributed by 'make dist'
 FILE(GLOB CUR_EXTRA_DIST RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_SOURCE_DIR}/*.c ${CMAKE_CURRENT_SOURCE_DIR}/*.h ${CMAKE_CURRENT_SOURCE_DIR}/*.sh ${CMAKE_CURRENT_SOURCE_DIR}/*.cdl)
