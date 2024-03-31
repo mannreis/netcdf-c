@@ -89,7 +89,7 @@ typedef struct NCZ_Params {
 
 /* HDF5 Info */
 typedef struct NCZ_HDF5 {
-    int id;           /**< HDF5 id corresponding to filterid. */
+    unsigned id;           /**< HDF5 id corresponding to filterid. */
     NCZ_Params visible;
     NCZ_Params working;
 } NCZ_HDF5;

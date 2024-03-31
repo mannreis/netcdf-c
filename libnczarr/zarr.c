@@ -55,7 +55,7 @@ ncz_create_dataset(NC_FILE_INFO_T* file, NC_GRP_INFO_T* root, NClist* urlcontrol
     zfile->native_endianness = (NCZ_isLittleEndian() ? NC_ENDIAN_LITTLE : NC_ENDIAN_BIG);
     if((zfile->urlcontrols=nclistclone(urlcontrols,1)) == NULL)
 	{stat = NC_ENOMEM; goto done;}
-    zfile->default_maxstrlen = NCZ_MAXSTR_DEFAULT;
+    zdfaltstrlen(&zfile->default_maxstrlen,NCZ_MAXSTR_DEFAULT);
 
     /* Apply client controls */
     if((stat = applycontrols(zfile))) goto done;
@@ -132,8 +132,8 @@ ncz_open_dataset(NC_FILE_INFO_T* file, NClist* urlcontrols)
     zfile->native_endianness = (NCZ_isLittleEndian() ? NC_ENDIAN_LITTLE : NC_ENDIAN_BIG);
     if((zfile->urlcontrols = nclistclone(urlcontrols,1))==NULL) /*0=>envv style*/
 	{stat = NC_ENOMEM; goto done;}
-    zfile->default_maxstrlen = NCZ_MAXSTR_DEFAULT;
-
+    zdfaltstrlen(&zfile->default_maxstrlen,NCZ_MAXSTR_DEFAULT);
+    
     /* Add struct to hold NCZ-specific group info. */
     if (!(root->format_grp_info = calloc(1, sizeof(NCZ_GRP_INFO_T))))
         {stat = NC_ENOMEM; goto done;}

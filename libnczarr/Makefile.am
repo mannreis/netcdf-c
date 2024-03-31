@@ -69,6 +69,7 @@ zmap.h \
 zodom.h \
 zprovenance.h \
 zfilter.h \
+znc4.h \
 zdebug.h
 
 if NETCDF_ENABLE_NCZARR_ZIP

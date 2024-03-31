@@ -145,7 +145,7 @@ static int
 compare(void)
 {
     int errs = 0;
-    int i;
+    size_t i;
     printf("data comparison: |array|=%ld\n",(unsigned long)actualproduct);
     for(i=0;i<actualproduct;i++) {
 	if(expected[i] != array[i]) {
@@ -169,7 +169,7 @@ Create the file, write it, then re-read for comparison.
 static int
 test_bzip2(void)
 {
-    int i;
+    size_t i;
     unsigned int level = BZIP2_LEVEL;
     unsigned int id=0;
     size_t nparams = 0;

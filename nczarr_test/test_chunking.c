@@ -54,7 +54,7 @@ main(int argc, char **argv)
     int fvar_dims[VAR_RANK];
     int ivar_data[NVALS];
     float fvar_data[NVALS];
-    int r, i;
+    size_t r, i;
     char* file_name = FILE_NAME;
     int unlimid;
 

@@ -3,11 +3,11 @@ dimensions:
 	dim = 3 ;
 variables:
 	float fvar(dim) ;
-		fvar:_FillValue = NaNf ;
 		fvar:att = -Infinityf, NaNf, Infinityf ;
+		fvar:_FillValue = NaNf ;
 	double dvar(dim) ;
-		dvar:_FillValue = NaN ;
 		dvar:att = -Infinity, NaN, Infinity ;
+		dvar:_FillValue = NaN ;
 data:
 
  fvar = -Infinityf, _, Infinityf ;

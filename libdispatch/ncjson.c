@@ -129,7 +129,7 @@ static int bytesappendc(NCJbuf* bufp, const char c);
 
 /* List legal nan and infinity names (lower case) */
 static const char* NANINF[] = {"-infinity","infinity","-infinityf","infinityf","nan","nanf"};
-static const int NNANINF = 6;
+static const size_t NNANINF = 6;
 
 /**************************************************/
 

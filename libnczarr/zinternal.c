@@ -771,3 +771,16 @@ NCZ_inq_format_extended(int ncid, int *formatp, int *modep)
 
     return NC_NOERR;
 }
+
+
+void
+zdfaltstrlen(size_t* p, size_t strlen)
+{
+    *p = strlen;
+}
+
+void
+zmaxstrlen(size_t* p, size_t strlen)
+{
+    *p = strlen;
+}

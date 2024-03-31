@@ -486,7 +486,6 @@ write_var_meta(NC_FILE_INFO_T* file, NCZ_FILE_INFO_T* zfile, NCZMAP* map, NC_VAR
     NCJcheck(NCJinsert(jvar,"chunk_key_encoding",jtmp));
     jtmp = NULL;
 
-
     /* build "dimension_names" key */
     if(NCJnew(NCJ_ARRAY,&jdimnames)) {stat = NC_ENOTZARR; goto done;}
      for(i=0;i<var->ndims;i++) {
@@ -977,13 +976,13 @@ assert(natts == 0 || atypes != NULL);
             jvalues = NCJdictvalue(jatts,i);
    	    /*Special cases:*/
 	    if(strcmp(NC_ATT_FILLVALUE,NCJstring(jkey))==0) continue; /* _FillValue: ignore */
-	    else if(strcmp(NC_NCZARR_DEFAULT_MAXSTRLEN_ATTR,NCJstring(jkey))==0) {
-	        if(rootgrp && NCJarraylength(jvalues)==1 && atypes[i] == NC_INT)
-		    sscanf(NCJstring(jkey),"%zu",&zfile->default_maxstrlen);
+	    else if(strcmp(NCZARR_DEFAULT_MAXSTRLEN_ATTR,NCJstring(jkey))==0) {
+	        if(rootgrp && NCJsort(jvalues)==NCJ_INT && atypes[i] == NC_INT)
+		    sscanf(NCJstring(jvalues),"%zu",&zfile->default_maxstrlen);
 		/* leave as attribute */
-	    } else if(strcmp(NC_NCZARR_MAXSTRLEN_ATTR,NCJstring(jkey))==0) {
-	        if(var && NCJarraylength(jvalues)==1 && atypes[i] == NC_INT)
-		    sscanf(NCJstring(jkey),"%zu",&zvar->maxstrlen);
+	    } else if(strcmp(NCZARR_MAXSTRLEN_ATTR,NCJstring(jkey))==0) {
+	        if(var && NCJsort(jvalues)==NCJ_INT && atypes[i] == NC_INT)
+		    sscanf(NCJstring(jvalues),"%zu",&zvar->maxstrlen);
 		/* leave as an attribute */
     	    } else if(strncmp(NCJstring(jkey),NCZ_V3_PREFIX,strlen(NCZ_V3_PREFIX))==0)
 		    continue; /* do not materialize any "_nczarr..." attributes except those preceding this test */
@@ -1083,7 +1082,7 @@ static int
 ZF3_buildchunkkey(size_t rank, const size64_t* chunkindices, char dimsep, char** keyp)
 {
     int stat = NC_NOERR;
-    int r;
+    size_t r;
     NCbytes* key = ncbytesnew();
 
     if(keyp) *keyp = NULL;
@@ -2460,7 +2459,7 @@ json2filter(NC_FILE_INFO_T* file, const NCjson* jfilter, NCZ_Filter** zfilterp, 
     if(plugin != NULL && !plugin->incomplete) {
 	/* Save the hdf5 id */
 	assert(plugin->hdf5.filter != NULL);
-	hdf5.id = plugin->hdf5.filter->id;
+	hdf5.id = (unsigned)plugin->hdf5.filter->id;
         /* Convert the codec to hdf5 form visible parameters */
         if(plugin->codec.codec->NCZ_codec_to_hdf5) {
             if((stat = plugin->codec.codec->NCZ_codec_to_hdf5(NCplistzarrv3,codec.codec,&hdf5.id,&hdf5.visible.nparams,&hdf5.visible.params))) goto done;

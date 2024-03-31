@@ -14,7 +14,8 @@ THISDIR=`pwd`
 cd $ISOPATH
 
 remmaxstrlen() {
-    sed -e '/maxstrlen/d' $1 >$2
+#    sed -e '/maxstrlen/d' $1 >$2
+  cat $1 >$2
 }
 
 testcase() {

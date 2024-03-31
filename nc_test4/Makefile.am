@@ -158,10 +158,10 @@ DISTCLEANFILES = findplugin.sh run_par_test.sh
 
 # The (otherwise unused) program build_fixedstring.c
 # is used to generate the test file ref_fixedstring.h5.
-# That test file is build and included as part of the distribution,
+# That test file is built and included as part of the distribution,
 # so the build_fixedstring.c program generally does not need to
 # be executed unless the test file needs to be modified..
-
-check_PROGRAMS += build_fixedstring
-ref_fixedstring.h5: build_fixedstring.c
-	${srcdir}/buildfixedstring
+noinst_PROGRAMS = build_fixedstring
+build_fixedstring_SOURCES = build_fixedstring.c
+ref_fixedstring.h5:
+	${builddir}/build_fixedstring

@@ -944,7 +944,7 @@ ncz_makeattr(NC_FILE_INFO_T* file, NC_OBJ* container, const char* name, nc_type 
 
     /* Fill in the attribute's type and value  */
     att->nc_typeid = typeid;
-    att->len = (int)len;
+    att->len = len;
     if((stat = NC_copy_data_all(file->controller,typeid,values,len,&att->data))) goto done;
     att->dirty = NC_TRUE;
     if(attp) {*attp = att; att = NULL;}

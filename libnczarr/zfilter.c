@@ -81,7 +81,7 @@ static struct PluginGlobal {
     /* All possible HDF5 filter plugins */
     /* Consider onverting to linked list or hash table or equivalent since very sparse */
     NCZ_Plugin* loaded_plugins[H5Z_FILTER_MAX];
-    int loaded_plugins_max; /* max define plugin id */
+    size_t loaded_plugins_max; /* max define plugin id */
     const struct CodecAPI* hdf5raw;
     NClist* codec_defaults; /* NClist<struct CodecAPI*> */
     NClist* default_libs; /* NClist<NCPSharedLib>; sources of the defaults */
@@ -184,8 +184,8 @@ static int NCZ_load_all_plugins(void);
 static int NCZ_load_plugin_dir(const char* path);
 static int NCZ_load_plugin(const char* path, NCZ_Plugin** plugp);
 static int NCZ_unload_plugin(NCZ_Plugin* plugin);
-static int NCZ_plugin_loaded(int filterid, NCZ_Plugin** pp);
-static int NCZ_plugin_save(int filterid, NCZ_Plugin* p);
+static int NCZ_plugin_loaded(unsigned filterid, NCZ_Plugin** pp);
+static int NCZ_plugin_save(unsigned filterid, NCZ_Plugin* p);
 static int NCZ_filter_lookup(NC_VAR_INFO_T* var, unsigned int id, NCZ_Filter** specp);
 static int NCZ_addfilter(NC_FILE_INFO_T* file, NC_VAR_INFO_T* var, unsigned int id, size_t nparams, const unsigned int* params);
 
@@ -317,7 +317,7 @@ NCZ_filter_remove(NC_VAR_INFO_T* var, unsigned int id)
     /* Walk backwards */
     for(k=nclistlength(flist)-1;k>=0;k--) {
 	NCZ_Filter* f = (NCZ_Filter*)nclistget(flist,k);
-        if(f->hdf5.id == (int)id) {
+        if(f->hdf5.id == id) {
 	    /* Remove from variable */
     	    nclistremove(flist,k);
 	    /* Reclaim */
@@ -347,7 +347,7 @@ NCZ_filter_lookup(NC_VAR_INFO_T* var, unsigned int id, NCZ_Filter** specp)
     for(i=0;i<nclistlength(flist);i++) {
 	NCZ_Filter* spec = nclistget(flist,i);
 	assert(spec != NULL);
-	if((spec->hdf5.id == (int)id) && !spec->incomplete) {
+	if((spec->hdf5.id == id) && !spec->incomplete) {
 	    if(specp) *specp = spec;
 	    break;
 	}
@@ -561,7 +561,7 @@ NCZ_insert_filter(NC_FILE_INFO_T* file, NClist* filterlist, NCZ_HDF5* hdf5, NCZ_
     if((stat=NCZ_filter_codec_clear(&fi->codec))) goto done;
 
     /* Find the matching plugin, if any */
-    if((stat = NCZ_plugin_loaded((int)hdf5->id,&plugin))) goto done;
+    if((stat = NCZ_plugin_loaded(hdf5->id,&plugin))) goto done;
     fi->plugin = plugin;
     if(fi->plugin == NULL || plugin->incomplete) fi->incomplete = 1;
 
@@ -699,7 +699,7 @@ NCZ_inq_filter_avail(int ncid, unsigned id)
     ZTRACE(1,"ncid=%d id=%u",ncid,id);
     if((stat = NCZ_filter_initialize())) goto done;
     /* Check the available filters list */
-    if((stat = NCZ_plugin_loaded((int)id, &plug))) goto done;
+    if((stat = NCZ_plugin_loaded(id, &plug))) goto done;
     if(plug == NULL || plug->incomplete)
         stat = THROW(NC_ENOFILTER);
 done:
@@ -721,7 +721,7 @@ NCZ_filter_initialize(void)
     if(NCZ_filter_initialized) goto done;
 
     memset(plugins.loaded_plugins,0,sizeof(plugins.loaded_plugins));
-    plugins.loaded_plugins_max = -1;
+    plugins.loaded_plugins_max = 0;
     plugins.hdf5raw = NULL;
     plugins.codec_defaults = nclistnew();
     plugins.default_libs = nclistnew();
@@ -746,7 +746,7 @@ int
 NCZ_filter_finalize(void)
 {
     int stat = NC_NOERR;
-    int i;
+    size_t i;
     ZTRACE(6,"");
     if(!NCZ_filter_initialized) goto done;
 #ifdef NETCDF_ENABLE_NCZARR_FILTERS
@@ -790,7 +790,7 @@ done:
 }
 
 static int
-NCZ_plugin_save(int filterid, NCZ_Plugin* p)
+NCZ_plugin_save(unsigned filterid, NCZ_Plugin* p)
 {
     int stat = NC_NOERR;
     ZTRACE(6,"filterid=%d p=%p",filterid,p);
@@ -803,7 +803,7 @@ done:
 }
 
 static int
-NCZ_plugin_loaded(int filterid, NCZ_Plugin** pp)
+NCZ_plugin_loaded(unsigned filterid, NCZ_Plugin** pp)
 {
     int stat = NC_NOERR;
     struct NCZ_Plugin* plug = NULL;
@@ -1126,7 +1126,7 @@ NCZ_load_all_plugins(void)
     }
 
     if(nclistlength(plugins.codec_defaults)) { /* Try to provide default for any HDF5 filters without matching Codec. */
-	int hdf5id;
+	unsigned hdf5id;
 	/* Search all the plugins */
 	for(hdf5id=1;hdf5id<=plugins.loaded_plugins_max;hdf5id++) {
 	    NCZ_Plugin* p = plugins.loaded_plugins[hdf5id];
@@ -1151,7 +1151,7 @@ NCZ_load_all_plugins(void)
 
     /* Make a second pass over plugins to (1) apply hdf5raw codec if possible or (2) mark as incomplete */
     {
-        int hdf5id;
+        unsigned hdf5id;
 	NCZ_Plugin* p;
 	for(hdf5id=1;hdf5id<=plugins.loaded_plugins_max;hdf5id++) {
 	    p = plugins.loaded_plugins[hdf5id];
@@ -1187,7 +1187,7 @@ NCZ_load_all_plugins(void)
 
     /* Initialize all accepted plugins */
     {
-        int i;
+        size_t i;
 	NCZ_Plugin* p;
 	for(i=0;i<plugins.loaded_plugins_max;i++) {
 	    if((p = plugins.loaded_plugins[i]) != NULL) {
@@ -1271,7 +1271,7 @@ NCZ_load_plugin_dir(const char* path)
         const char* name = (const char*)nclistget(contents,i);
 	size_t nmlen = strlen(name);
 	size_t flen = pathlen+1+nmlen+1;
-	int id;
+	unsigned id;
 	NCZ_Plugin* plugin = NULL;
 
 	assert(nmlen > 0);
@@ -1295,7 +1295,7 @@ NCZ_load_plugin_dir(const char* path)
 	default: goto done;
 	}
 	if(plugin != NULL) {
-	    id = plugin->hdf5.filter->id;
+	    id = (unsigned)plugin->hdf5.filter->id;
 	    if(plugins.loaded_plugins[id] == NULL) {
 		if((stat = NCZ_plugin_save(id,plugin))) goto done;
 #ifdef DEBUGL
@@ -1352,7 +1352,7 @@ NCZ_load_plugin(const char* path, struct NCZ_Plugin** plugp)
     const NCZ_codec_t* codec = NULL;
     NCPSharedLib* lib = NULL;
     int flags = NCP_GLOBAL;
-    int h5id = -1;
+    unsigned h5id = 0;
     
     assert(path != NULL && strlen(path) > 0 && plugp != NULL);
 
@@ -1418,7 +1418,7 @@ fprintf(stderr,">>> \n");
 
     if(h5class != NULL && codec != NULL) {
 	/* Verify consistency of the HDF5 and the Codec */
-	if(h5class->id != codec->hdf5id) goto done; /* ignore */
+	if(codec->hdf5id != (unsigned)h5class->id) goto done; /* ignore */
     } 
 
     /* There are several cases to consider:
@@ -1429,11 +1429,11 @@ fprintf(stderr,">>> \n");
 
     /* Get any previous plugin entry for this id; may be NULL */
     if(h5class != NULL) {
-	h5id = h5class->id;
-	if((stat = NCZ_plugin_loaded(h5class->id,&plugin))) goto done;
+	h5id = (unsigned)h5class->id;
+	if((stat = NCZ_plugin_loaded(h5id,&plugin))) goto done;
     } else if(codec != NULL) {
 	h5id = codec->hdf5id;
-	if((stat = NCZ_plugin_loaded(codec->hdf5id,&plugin))) goto done;
+	if((stat = NCZ_plugin_loaded(h5id,&plugin))) goto done;
     }
 
     if(plugin == NULL) {

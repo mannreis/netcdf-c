@@ -306,7 +306,7 @@ NCZ_write_ncproperties(NC_FILE_INFO_T* h5)
         if((stat=nc4_att_list_add(attlist,NCPROPS,&ncprops)))
 	    goto done;
 	ncprops->nc_typeid = NC_CHAR;
-	ncprops->len = (int)strlen(prov->ncproperties);
+	ncprops->len = strlen(prov->ncproperties);
 	if((ncprops->data = strdup(prov->ncproperties)) == NULL)
 	    {stat = NC_ENOMEM; goto done;}
 	ncprops->dirty = 1;

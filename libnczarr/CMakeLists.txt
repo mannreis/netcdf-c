@@ -5,13 +5,13 @@
 #
 # Dennis Heimbigner
 
-add_library(nczarr OBJECT ${libnczarr_SOURCES})
-
+add_library(nczarr OBJECT ${nczarr_SOURCES})
 
 # The source files for the HDF5 dispatch layer.
-target_sources(libnczarr
-PRIVATE
+set(libnczarr_SOURCES
 zinfer.c
+znc4.c
+zfill.c
 zformat.c
 zformat2.c
 zformat3.c
@@ -38,6 +38,7 @@ zvar.c
 zwalk.c
 zdebug.c
 zarr.h
+zfill.h
 zformat.h
 zcache.h
 zchunking.h
@@ -48,6 +49,7 @@ zmap.h
 zodom.h
 zprovenance.h
 zfilter.h
+znc4.h
 zdebug.h
 )
 
@@ -66,6 +68,8 @@ endif()
 # Build the Zarr dispatch layer as a library that will be included in
 # the netCDF library.
 
+target_sources(nczarr PRIVATE ${libnczarr_SOURCES})
+
 target_include_directories(nczarr PUBLIC ../libncpoco)
 
 if (USE_HDF5)
@@ -76,12 +80,24 @@ if(STATUS_PARALLEL)
     target_link_libraries(nczarr PUBLIC MPI::MPI_C)
 endif(STATUS_PARALLEL)
 
-<<<<<<< HEAD
-=======
 if (NETCDF_ENABLE_DLL)
     target_compile_definitions(nczarr PRIVATE DLL_NETCDF DLL_EXPORT)
 endif()
 
->>>>>>> master
+target_link_libraries(dap4 PUBLIC ${CURL_LIBRARIES})
+target_include_directories(dap4 PUBLIC ${CURL_INCLUDE_DIRS})
+target_compile_options(dap4
+  PRIVATE
+    -DCURL_STATICLIB=1
+)
+
+if (NETCDF_ENABLE_DLL)
+  target_compile_definitions(dap4 PRIVATE DLL_NETCDF DLL_EXPORT)
+endif()
+
+if(STATUS_PARALLEL)
+  target_link_libraries(dap4 PUBLIC MPI::MPI_C)
+endif(STATUS_PARALLEL)
+
 # Remember to package this file for CMake builds.
 add_extra_dist(${libnczarr_SOURCES} CMakeLists.txt)

@@ -502,8 +502,6 @@ extern void NC_freeglobalstate(void);
 #define NC_ATT_NC3_STRICT_NAME "_nc3_strict"
 #define NC_XARRAY_DIMS "_ARRAY_DIMENSIONS"
 #define NC_ATT_CODECS "_Codecs"
-#define NC_NCZARR_MAXSTRLEN_ATTR "_nczarr_maxstrlen"
-#define NC_NCZARR_DEFAULT_MAXSTRLEN_ATTR "_nczarr_default_maxstrlen"
 
 /* Must match values in libnczarr/zinternal.h */
 #define NC_NCZARR_SUPERBLOCK "_nczarr_superblock"

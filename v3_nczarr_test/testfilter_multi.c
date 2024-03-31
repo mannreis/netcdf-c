@@ -119,7 +119,7 @@ static int
 compare(void)
 {
     int errs = 0;
-    int i;
+    size_t i;
     printf("data comparison: |array|=%lu\n",(unsigned long)actualproduct);
     for(i=0;i<actualproduct;i++) {
 	if(expected[i] != array[i]) {
@@ -194,7 +194,7 @@ Create the file, write it, then re-read for comparison.
 static int
 test_multi(void)
 {
-    int i;
+    size_t i;
     unsigned int params[2];
 
     printf("\n*** Testing Multi-filter application: filter set = bzip2 deflate noop");

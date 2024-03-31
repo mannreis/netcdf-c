@@ -60,6 +60,10 @@ extern "C" {
 #include "zarr.h"
 #include "zdebug.h"
 
+
+EXTERNL void zdfaltstrlen(size_t* p, size_t strlen);
+EXTERNL void zmaxstrlen(size_t* p, size_t strlen);
+
 #ifdef __cplusplus
 }
 #endif

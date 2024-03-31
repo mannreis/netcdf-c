@@ -186,6 +186,8 @@ Optionally Inserted into any group zarr.json or array zarr.json is the extra att
 #define NOXARRAYCONTROL "noxarray"
 #define XARRAYSCALAR "_scalar_"
 #define DIMSCALAR "/_scalar_"
+#define NCZARR_MAXSTRLEN_ATTR "_nczarr_maxstrlen"
+#define NCZARR_DEFAULT_MAXSTRLEN_ATTR "_nczarr_default_maxstrlen"
 #define FORMAT2CONTROL "v2"
 #define FORMAT3CONTROL "v3"
 
@@ -378,7 +380,7 @@ int ncz_gettype(NC_FILE_INFO_T*, NC_GRP_INFO_T*, int xtype, NC_TYPE_INFO_T** typ
 int ncz_find_default_chunksizes2(NC_GRP_INFO_T *grp, NC_VAR_INFO_T *var);
 int NCZ_ensure_quantizer(int ncid, NC_VAR_INFO_T* var);
 int NCZ_write_var_data(NC_FILE_INFO_T* file, NC_VAR_INFO_T* var);
-int NCZ_fillin_var(NC_FILE_INFO_T* h5, NC_VAR_INFO_T* var, NC_TYPE_INFO_T* type, int ndims, const int* dimids, size64_t* shape, size64_t* chunksizes, int endianness);
+int NCZ_fillin_var(NC_FILE_INFO_T* h5, NC_VAR_INFO_T* var, NC_TYPE_INFO_T* type, size_t ndims, const int* dimids, size64_t* shape, size64_t* chunksizes, int endianness);
 
 /* zvar.c */
 int NCZ_reclaim_dim(NC_DIM_INFO_T* dim);

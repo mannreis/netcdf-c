@@ -1432,10 +1432,10 @@ endif()
 
 if(NETCDF_ENABLE_NCZARR)
   add_subdirectory(libnczarr)
-  file(COPY ${netCDF_SOURCE_DIR}/unit_test/timer_utils.h
-       DESTINATION ${netCDF_BINARY_DIR}/nczarr_test/)
-  file(COPY ${netCDF_SOURCE_DIR}/unit_test/timer_utils.c
-       DESTINATION ${netCDF_BINARY_DIR}/nczarr_test/)
+#  file(COPY ${netCDF_SOURCE_DIR}/unit_test/timer_utils.h
+#       DESTINATION ${netCDF_BINARY_DIR}/nczarr_test/)
+#  file(COPY ${netCDF_SOURCE_DIR}/unit_test/timer_utils.c
+#       DESTINATION ${netCDF_BINARY_DIR}/nczarr_test/)
   file(COPY ${netCDF_SOURCE_DIR}/nc_test4/test_filter.c
        DESTINATION ${netCDF_BINARY_DIR}/nczarr_test/)
   file(COPY ${netCDF_SOURCE_DIR}/nc_test4/test_filter_misc.c
@@ -1776,8 +1776,8 @@ configure_file(${CMAKE_CURRENT_SOURCE_DIR}/s3gc.in ${CMAKE_CURRENT_BINARY_DIR}/s
 #####
 # Build and copy nc_test4/findplugin.sh to various places
 #####
-for(CC nc_test4 nczarr_test v3_nczarr_test plugins examples/C)
-    configure_file(${CMAKE_CURRENT_SOURCE_DIR}/nc_test4/findplugin.in ${CMAKE_CURRENT_BINARY_DIR}/${CC}/findplugin.sh @ONLY NEWLINE_STYLE LF)
+foreach(CC nc_test4 nczarr_test v3_nczarr_test plugins examples/C)
+    configure_file(${CMAKE_CURRENT_SOURCE_DIR}/plugins/findplugin.in ${CMAKE_CURRENT_BINARY_DIR}/${CC}/findplugin.sh @ONLY NEWLINE_STYLE LF)
 endforeach()
 
 if(NETCDF_ENABLE_BENCHMARKS)

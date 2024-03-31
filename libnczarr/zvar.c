@@ -374,7 +374,7 @@ NCZ_def_var(int ncid, const char *name, nc_type xtype, int ndims,
     if ((retval = nc4_var_list_add(grp, norm_name, ndims, &var)))
 	BAIL(retval);
 
-    retval = NCZ_fillin_var(h5, var, type, ndims, dimids, NULL, NULL, NC_ENDIAN_NATIVE);
+    retval = NCZ_fillin_var(h5, var, type, (size_t)ndims, dimids, NULL, NULL, NC_ENDIAN_NATIVE);
 
     if(retval == NC_NOERR) {
         /* Return the varid. */
@@ -396,7 +396,7 @@ but important &/or complex data is filled in.
 */
 int
 NCZ_fillin_var(NC_FILE_INFO_T* file, NC_VAR_INFO_T* var, NC_TYPE_INFO_T* type,
-		int ndims, const int* dimids,
+		size_t ndims, const int* dimids,
 		size64_t* shape, size64_t* chunksizes,
 		int endianness)
 {
@@ -413,7 +413,7 @@ NCZ_fillin_var(NC_FILE_INFO_T* file, NC_VAR_INFO_T* var, NC_TYPE_INFO_T* type,
     var->format_var_info = zvar;
     zvar->common.file = file;
     zvar->scalar = (ndims == 0 ? 1 : 0);
-    zvar->maxstrlen = zfile->default_maxstrlen;
+    zmaxstrlen(&zvar->maxstrlen,zfile->default_maxstrlen);
 
     zvar->dimension_separator = gstate->zarr.dimension_separator;
     assert(zvar->dimension_separator != 0);

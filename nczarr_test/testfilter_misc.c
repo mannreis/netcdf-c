@@ -51,7 +51,7 @@ static size_t dimsize[NDIMS] = {4,4,4,4};
 static size_t chunksize[NDIMS] = {4,4,4,4};
 #endif
 
-static int ndims = NDIMS;
+static size_t ndims = NDIMS;
 
 static size_t totalproduct = 1; /* x-product over max dims */
 static size_t actualproduct = 1; /* x-product over actualdims */
@@ -498,7 +498,7 @@ static int
 odom_next(void)
 {
     ssize_t i; /* do not make unsigned */
-    for(i=ndims-1;i>=0;i--) {
+    for(i=(ssize_t)(ndims-1);i>=0;i--) {
         odom[i] += 1;
         if(odom[i] < dimsize[i]) break;
         if(i == 0) return 0; /* leave the 0th entry if it overflows*/
@@ -511,10 +511,10 @@ static int
 odom_offset(void)
 {
     size_t i;
-    int offset = 0;
+    size_t offset = 0;
     for(i=0;i<ndims;i++) {
-        offset *= (int)dimsize[i];
-        offset += (int)odom[i];
+        offset *= dimsize[i];
+        offset += odom[i];
     }
     return offset;
 }

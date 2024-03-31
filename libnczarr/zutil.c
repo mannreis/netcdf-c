@@ -270,8 +270,7 @@ NCZ_downloadjson(NCZMAP* zmap, const char* key, NCjson** jsonp)
 	goto done;
     content[len] = '\0';
 
-    if(NCJparse(content,0,&json) < 0)
-	{stat = NC_ENCZARR; goto done;}
+    NCJcheck(NCJparse(content,0,&json));
 
 ret:
     if(jsonp) {*jsonp = json; json = NULL;}
@@ -302,7 +301,7 @@ NCZ_uploadjson(NCZMAP* zmap, const char* key, NCjson* json)
 fprintf(stderr,"uploadjson: %s\n",key); fflush(stderr);
 #endif
     /* Unparse the modified json tree */
-    if(NCJunparse(json,0,&content)) goto done;
+    NCJcheck(NCJunparse(json,0,&content));
     ZTRACEMORE(4,"\tjson=%s",content);
     
 if(getenv("NCS3JSON") != NULL)
@@ -395,7 +394,9 @@ NCZ_readdict(NCZMAP* zmap, const char* key, NCjson** jsonp)
     NCjson* json = NULL;
 
     if((stat = NCZ_downloadjson(zmap,key,&json))) goto done;
-    if(NCJsort(json) != NCJ_DICT) {stat = NC_ENCZARR; goto done;}
+    if(json != NULL) {
+        if(NCJsort(json) != NCJ_DICT) {stat = NC_ENCZARR; goto done;}
+    }
     if(jsonp) {*jsonp = json; json = NULL;}
 done:
     NCJreclaim(json);
@@ -844,13 +845,13 @@ NCZ_get_maxstrlen(NC_OBJ* obj)
 	NC_FILE_INFO_T* file = grp->nc4_info;
 	NCZ_FILE_INFO_T* zfile = (NCZ_FILE_INFO_T*)file->format_file_info;
 	if(zfile->default_maxstrlen == 0)
-	    zfile->default_maxstrlen = NCZ_MAXSTR_DEFAULT;
+	    zdfaltstrlen(&zfile->default_maxstrlen,NCZ_MAXSTR_DEFAULT);
 	maxstrlen = zfile->default_maxstrlen;
     } else { /*(obj->sort == NCVAR)*/
         NC_VAR_INFO_T* var = (NC_VAR_INFO_T*)obj;
 	NCZ_VAR_INFO_T* zvar = (NCZ_VAR_INFO_T*)var->format_var_info;
         if(zvar->maxstrlen == 0)
-	    zvar->maxstrlen = NCZ_get_maxstrlen((NC_OBJ*)var->container);
+	    zmaxstrlen(&zvar->maxstrlen,NCZ_get_maxstrlen((NC_OBJ*)var->container));
 	maxstrlen = zvar->maxstrlen;
     }
     return maxstrlen;
@@ -1004,9 +1005,8 @@ NCZ_iscomplexjsontext(size_t textlen, const char* text, NCjson** jsonp)
 loopexit:
     if(!iscomplex) return 0;
     /* Final test: must be parseable */
-    if(NCJparsen(textlen,text,0,&json) < 0) /* not JSON parseable */
-        return 0;
-    if(json == NULL) return 0;
+    if(NCJparsen(textlen,text,0,&json)<0) return 0;
+    if(json == NULL) return 0;/* not JSON parseable */
     if(jsonp) {*jsonp = json; json = NULL;}
     NCJreclaim(json);
     return 1;
