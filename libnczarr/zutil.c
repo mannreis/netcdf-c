@@ -316,68 +316,6 @@ done:
     return ZUNTRACE(stat);
 }
 
-#if 0
-/**
-@internal create object, return empty dict; ok if already exists.
-@param zmap - [in] map
-@param key - [in] key of the object
-@param jsonp - [out] return parsed json
-@return NC_NOERR
-@return NC_EINVAL if object exists
-@author Dennis Heimbigner
-*/
-int
-NCZ_createdict(NCZMAP* zmap, const char* key, NCjson** jsonp)
-{
-    int stat = NC_NOERR;
-    NCjson* json = NULL;
-
-    /* See if it already exists */
-    if((stat = NCZ_downloadjson(zmap,key,&json))) goto done;
-    if(json == NULL) { /* create it */
-        if((stat = nczmap_def(zmap,key,NCZ_ISMETA))) goto done;	    
-    } else {
-	/* Already exists, fail */
-	stat = NC_EINVAL;
-	goto done;
-    }
-    /* Create the empty dictionary */
-    NCJcheck(NCJnew(NCJ_DICT,&json));
-    if(jsonp) {*jsonp = json; json = NULL;}
-done:
-    NCJreclaim(json);
-    return stat;
-}
-
-/**
-@internal create object, return empty array; ok if already exists.
-@param zmap - [in] map
-@param key - [in] key of the object
-@param jsonp - [out] return parsed json
-@return NC_NOERR
-@return NC_EOBJECT if object exits
-@author Dennis Heimbigner
-*/
-int
-NCZ_createarray(NCZMAP* zmap, const char* key, NCjson** jsonp)
-{
-    int stat = NC_NOERR;
-    NCjson* json = NULL;
-
-    if((stat = NCZ_downloadjson(zmap,key,&json))) goto done;
-    if(json != NULL) {stat = NC_EOBJECT; goto done;}
-    /* create it */
-    if((stat = nczmap_def(zmap,key,NCZ_ISMETA))) goto done;	    
-    /* Create the initial array */
-    NCJnew(NCJ_ARRAY,&json);
-    if(json->sort != NCJ_ARRAY) {stat = NC_ENCZARR; goto done;}
-    if(jsonp) {*jsonp = json; json = NULL;}
-done:
-    NCJreclaim(json);
-    return stat;
-}
-#endif /*0*/
-
 /**
 @internal Get contents of a meta object; fail it it does not exist
 @param zmap - [in] map
@@ -425,25 +363,6 @@ done:
     NCJreclaim(json);
     return stat;
 }
-
-#if 0
-/**
-@internal Given an nc_type, produce the corresponding
-default fill value as a string.
-@param nctype - [in] nc_type
-@param defaltp - [out] pointer to hold pointer to the value
-@return NC_NOERR
-@author Dennis Heimbigner
-*/
-
-int
-ncz_default_fill_value(nc_type nctype, const char** dfaltp)
-{
-    if(nctype <= 0 || nctype > N_NCZARR_TYPES) return NC_EINVAL;
-    if(dfaltp) *dfaltp = zfillvalue[nctype];
-    return NC_NOERR;	        
-}
-#endif
 
 /**
 @internal Given an nc_type, produce the corresponding
@@ -919,31 +838,6 @@ NCZ_copy_data(NC_FILE_INFO_T* file, NC_VAR_INFO_T* var, const void* memory, size
     return stat;
 }
 
-#if 0
-/* Recursive helper */
-static int
-checksimplejson(NCjson* json, int depth)
-{
-    int i;
-
-    switch (NCJsort(json)) {
-    case NCJ_ARRAY:
-	if(depth > 0) return 0;  /* e.g. [...,[...],...]  or [...,{...},...] */
-	for(i=0;i < NCJarraylength(json);i++) {
-	    NCjson* j = NCJith(json,i);
-	    if(!checksimplejson(j,depth+1)) return 0;
-        }
-	break;
-    case NCJ_DICT:
-    case NCJ_NULL:
-    case NCJ_UNDEF:
-	return 0;
-    default: break;
-    }
-    return 1;
-}
-#endif
-
 /* Return 1 if the attribute will be stored as a complex JSON valued attribute; return 0 otherwise */
 int
 NCZ_iscomplexjson(const NCjson* json, nc_type typehint)
@@ -1041,13 +935,6 @@ NCZ_makeFQN(NC_GRP_INFO_T* parent, const char* objname, NCbytes* fqn)
         ncbytesinsert(fqn,0,strlen(s),s);
         ncbytesinsert(fqn,0,1,"/");
     }
-#if 0
-    for(i=(nclistlength(segments)-1);i>=0;i--) {
-	ncbytescat(fqn,"/");
-	ncbytescat(fqn,nclistget(segments,i));
-    }
-#endif
-
 done:
     nclistfreeall(segments);
     nullfree(escaped);
@@ -1225,26 +1112,6 @@ NCZ_sortstringlist(void* vec, size_t count)
     return NC_NOERR;
 }
 
-#if 0
-/* Define a static qsort comparator for JSON dict (key,value) pairs */
-static int
-cmp_ncjson(const void* a1, const void* a2)
-{
-    const NCjson** j1 = (const NCjson**)a1;
-    const NCjson** j2 = (const NCjson**)a2;
-    return strcmp(NCJstring(*j1),NCJstring(*j2));
-}
-
-int
-NCZ_sortpairlist(void* vec, size_t count)
-{
-    if(vec != NULL && count > 0) {
-        qsort(vec, count, 2*sizeof(void*), cmp_ncjson);
-    }
-    return NC_NOERR;
-}
-#endif
-
 void
 NCZ_freeAttrInfoVec(struct NCZ_AttrInfo* ainfo)
 {
@@ -1265,90 +1132,6 @@ NCZ_setatts_read(NC_OBJ* container)
     else /* container->sort == NCVAR */
         ((NC_VAR_INFO_T*)container)->atts_read = 1;
 }
-
-#if 0
-/*
-Given a list of segments, find corresponding group.
-*/
-static int
-locategroup(NC_FILE_INFO_T* file, size_t nsegs, NClist* segments, NC_GRP_INFO_T** grpp)
-{
-    int found, stat = NC_NOERR;
-    size_t i, j;
-    NC_GRP_INFO_T* grp = NULL;
-
-    grp = file->root_grp;
-    for(i=0;i<nsegs;i++) {
-        const char* segment = nclistget(segments,i);
-        char norm_name[NC_MAX_NAME];
-        found = 0;
-        if((stat = nc4_check_name(segment,norm_name))) goto done;
-        for(j=0;j<ncindexsize(grp->children);j++) {
-            NC_GRP_INFO_T* subgrp = (NC_GRP_INFO_T*)ncindexith(grp->children,j);
-            if(strcmp(subgrp->hdr.name,norm_name)==0) {
-                grp = subgrp;
-                found = 1;
-                break;
-            }
-        }
-        if(!found) {stat = NC_ENOGRP; goto done;}
-    }
-    /* grp should be group of interest */
-    if(grpp) *grpp = grp;
-
-done:
-    return THROW(stat);
-}
-#endif
-
-#if 0
-static int
-parsedimrefs(NC_FILE_INFO_T* file, size_t rank, char** dimnames, size64_t* shape, NC_DIM_INFO_T** dims, int create)
-{
-    int stat = NC_NOERR;
-    size_t i;
-    NClist* segments = NULL;
-
-    for(i=0;i<rank;i++) {
-        NC_GRP_INFO_T* g = NULL;
-        NC_DIM_INFO_T* d = NULL;
-        size_t j;
-        const char* dimpath = dimnames[i];
-        const char* dimname = NULL;
-
-        /* Locate the corresponding NC_DIM_INFO_T* object */
-        nclistfreeall(segments);
-        segments = nclistnew();
-        if((stat = ncz_splitkey(dimpath,segments)))
-            goto done;
-        if((stat=locategroup(file,nclistlength(segments)-1,segments,&g)))
-            goto done;
-        /* Lookup the dimension */
-        dimname = nclistget(segments,nclistlength(segments)-1);
-        d = NULL;
-        dims[i] = NULL;
-        for(j=0;j<ncindexsize(g->dim);j++) {
-            d = (NC_DIM_INFO_T*)ncindexith(g->dim,j);
-            if(strcmp(d->hdr.name,dimname)==0) {
-                dims[i] = d;
-                break;
-            }
-        }
-        if(dims[i] == NULL && create) {
-            /* If not found and create then create it */
-	    if((stat = ncz4_create_dim(file,file->root_grp,dimname,shape[i],0,&dims[i]))) goto done;
-        } else {
-            /* Verify consistency */
-            if(dims[i]->len != shape[i])
-                {stat = NC_EDIMSIZE; goto done;}
-        }
-        assert(dims[i] != NULL);
-    }
-done:
-    nclistfreeall(segments);
-    return THROW(stat);
-}
-#endif
 
 /* Convert a list of integer strings to size64_t integers */
 int

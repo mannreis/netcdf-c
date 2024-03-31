@@ -69,10 +69,6 @@
 NCZ_Codec NCZ_codec_empty = {NULL, NULL, 0};
 NCZ_HDF5 NCZ_hdf5_empty = {0, {0,NULL}, {0, NULL}};
 
-#if 0
-static const char* NCZ_KNOWN_PSEUDO_FILTERS[] = {"bytes",NULL};
-#endif
-
 /* WARNING: GLOBAL DATA */
 /* TODO: move to common global state */
 
@@ -354,61 +350,6 @@ NCZ_filter_lookup(NC_VAR_INFO_T* var, unsigned int id, NCZ_Filter** specp)
     }
     return ZUNTRACEX(NC_NOERR,"spec=%d",IEXISTS(specp,hdf5.id));
 }
-
-#if 0
-static int
-NCZ_codec_lookup(NClist* codecs, const char* id, NCZ_Codec** codecp)
-{
-    int i;
-    
-    ZTRACE(6,"|codecs|=%u id=%u", (unsigned)nclistlength(codecs), id);
-    if(codecp) *codecp = NULL;
-
-    if(codecs == NULL) return NC_NOERR;
-    for(i=0;i<nclistlength(codecs);i++) {
-	NCZ_Codec* spec = nclistget(codecs,i);
-	assert(spec != NULL);
-	if(strcmp(spec->id,id)==0) {
-	    if(codecp) *codecp = spec;
-	    break;
-	}
-    }
-    return ZUNTRACEX(NC_NOERR,"codec=%s",SEXISTS(codecp,id));
-}
-
-/**
- * @internal Remove a filter from filter list for a variable
- *
- * @param ncid File ID.
- * @param varid Variable ID.
- * @param id filter id to remove
- *
- * @returns ::NC_NOERR No error.
- * @returns ::NC_EBADID Bad ncid.
- * @returns ::NC_ENOTVAR Invalid variable ID.
- * @returns ::NC_ENOTNC4 Attempting netcdf-4 operation on file that is
- * not netCDF-4/NCZARR.
- * @returns ::NC_ELATEDEF Too late to change settings for this variable.
- * @returns ::NC_ENOTINDEFINE Not in define mode.
- * @returns ::NC_EINVAL Invalid input
- * @author Dennis Heimbigner
- */
-int
-nc_var_filter_remove(int ncid, int varid, unsigned int filterid)
-{
-    NC_VAR_INFO_T *var = NULL;
-    int stat;
-
-    /* Get pointer to the var. */
-    if ((stat = ncz_find_file_grp_var(ncid, varid, NULL, NULL, &var)))
-        return stat;
-    assert(var);
-
-    stat = NC4_nczarr_filter_remove(var,filterid);
-
-    return stat;
-}
-#endif
 
 #ifdef NETCDF_ENABLE_NCZARR_FILTERS
 int
@@ -921,9 +862,6 @@ NCZ_filter_jsonize(const NC_FILE_INFO_T* file, const NC_VAR_INFO_T* var, NCZ_Fil
     /* We need to ensure the the current visible parameters are defined and had the opportunity to come
        from the working parameters */
     assert((filter->flags & (FLAG_VISIBLE | FLAG_WORKING)) == (FLAG_VISIBLE | FLAG_WORKING));
-#if 0
-    if((stat = rebuild_visible(var,filter))) goto done;
-#endif
 
     /* Convert the visible parameters back to codec */
     if((stat = NCZF_hdf2codec(file,var,filter))) goto done;

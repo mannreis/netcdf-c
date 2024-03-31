@@ -669,14 +669,6 @@ write_var(NC_FILE_INFO_T* file, NCZ_FILE_INFO_T* zfile, NCZMAP* map, NC_VAR_INFO
 
     if((stat = write_var_meta(file,zfile,map,var))) goto done;
 
-#if 0
-    /* flush only chunks that have been written */
-    if(zvar->cache) {
-	if((stat = NCZ_flush_chunk_cache(zvar->cache)))
-	    goto done;
-    }
-#endif
-
 done:
     return ZUNTRACE(THROW(stat));
 }
@@ -953,15 +945,6 @@ parse_attrs(NC_FILE_INFO_T* file, NC_OBJ* container, const NCjson* jatts, const 
     if((stat = jtypes2atypes(purezarr, jatts, jatypes, &atypes))) goto done;
 assert(natts == 0 || atypes != NULL);
     
-#if 0
-    /* Infer any missing types */
-    for(i=0;i<natts;i++) {
-	if(atypes[i] == NC_NAT && strcmp(ainfo[i].name,NCZ_V3_ATTR)!=0) {
-	    if((stat = NCZ_inferattrtype(ainfo[i].values,NC_NAT,&ainfo[i].nctype))) goto done;
-	}
-    }
-#endif
-
     /* Fill in the attributes */
     {
         for(i=0;i<natts;i++) {
@@ -1259,56 +1242,6 @@ done:
     return ZUNTRACE(THROW(stat));
 }
 
-#if 0
-/**
- * @internal Materialize dimensions into memory
- *
- * @param file Pointer to file info struct.
- * @param grp Pointer to grp info struct.
- * @param diminfo List of (name,length,isunlimited) triples
- *
- * @return ::NC_NOERR No error.
- * @author Dennis Heimbigner
- */
-static int
-define_dims(NC_FILE_INFO_T* file, NC_GRP_INFO_T* grp, NClist* diminfo, int** dimidsp)
-{
-    int stat = NC_NOERR;
-    size_t i, rank;
-    int* dimids = NULL;
-
-    ZTRACE(3,"file=%s grp=%s |diminfo|=%u",file->controller->path,grp->hdr.name,nclistlength(diminfo));
-
-    assert(nclistlength(diminfo)%3 == 0);
-    rank = nclistlength(diminfo)/3;
-    if((dimids = (int*)calloc(rank,sizeof(int)))==NULL) {stat = NC_ENOMEM; goto done;}
-
-    /* Reify each dim in turn */
-    for(i = 0; i < rank; i++) {
-        NC_DIM_INFO_T* dim = NULL;
-        size64_t len = 0;
-        long long isunlim = 0;
-        const char* name = nclistget(diminfo,3*i);
-        const char* slen = nclistget(diminfo,3i+1);
-        const char* sisunlimited = nclistget(diminfo,3i+2);
-
-        /* Create the NC_DIM_INFO_T object */
-        sscanf(slen,"%lld",&len); /* Get length */
-        if(sisunlimited != NULL)
-            sscanf(sisunlimited,"%lld",&isunlim); /* Get unlimited flag */
-        else
-            isunlim = 0;
-	if((stat = ncz4_create_dim(file,grp,name,len,isunlim,&dim))) goto done;
-	dimids[i] = dim->hdr.id;
-    }
-    if(dimidsp) {*dimidsp = dimids; dimids = NULL;}
-
-done:
-    nullfree(dimids);
-    return ZUNTRACE(THROW(stat));
-}
-#endif /*0*/
-
 /**
  * @internal Materialize dimensions into memory
  *
@@ -1536,12 +1469,6 @@ read_var1(NC_FILE_INFO_T* file, NC_GRP_INFO_T* grp, const char* varname)
 	/* Convert dtype to nc_type */
 	if((stat = dtype2nctype(NCJstring(jvalue),dalias,&cvargs.vtype,&vtypelen))) goto done;
 	assert(vtypelen >= 0);
-#if 0
-	if(cvargs.vtype > NC_NAT && cvargs.vtype <= NC_MAX_ATOMIC_TYPE) { /* Disallows NC_JSON */
-	    /* Locate the NC_TYPE_INFO_T object */
-	    if((stat = ncz_gettype(file,grp,cvargs.vtype,&type_info))) goto done;
-	} else {stat = NC_EBADTYPE; goto done;}
-#endif
 	if(cvargs.vtype == NC_STRING) {
 	    cvargs.maxstrlen = (size_t)vtypelen;
 	    if(cvargs.maxstrlen <= 0) cvargs.maxstrlen = NCZ_get_maxstrlen((NC_OBJ*)var);
@@ -2013,140 +1940,6 @@ subobjects(NCZ_FILE_INFO_T* zfile, NC_GRP_INFO_T* parent, const NCjson* jnczgrp,
     return stat;
 }
 
-
-#if 0
-/* Convert an attribute types list to an nc_type list */
-static int
-NCZ_jtypes2atypes(int purezarr, const NCjson* jattrs, const NCjson* jtypes, nc_type** atypesp)
-{
-    int stat = NC_NOERR;
-    size_t i;
-    nc_type* atypes = NULL;
-    
-    if(jtypes != NULL && NCJdictlength(jtypes) != NCJdictlength(jattrs)) {stat = NC_ENCZARR; goto done;} /* length mismatch */
-    if((atypes = (nc_type*)calloc(NCJdictlength(jattrs),sizeof(nc_type)))==NULL) {stat = NC_ENOMEM; goto done;}
-    for(i=0;i<NCJdictlength(jattrs);i++) {
-	const NCjson* akey = NCJdictkey(jattrs,i);
-	if(NCJsort(akey) != NCJ_STRING) {stat = NC_ENOTZARR; goto done;}
-	if(jtypes == NULL) {
-	    const NCjson* avalues = NCJdictvalue(jattrs,i);
-	    /* Infer the type from the values */
-	    if((stat = NCZ_inferattrtype(avalues,NC_NAT,&atypes[i]))) goto done;
-	} else {
-	    /* Find corresponding entry in the types dict */
-	    const NCjson* jtype = NULL;
-	    /* Get the nc_type */
-	    NCJdictget(jtypes,NCJstring(akey),&jtype);
-	    if((stat = dtype2nctype(NULL,NCJstring(jtype),&atypes[i]))) goto done;
-	}
-    }
-    if(atypesp) {*atypesp = atypes; atypes = NULL;}
-done:
-    nullfree(atypes);
-    return stat;
-}
-#endif
-
-#if 0
-/*
-Search up the parent tree looking for a dimension by name.
-*/
-static int
-finddim(NC_FILE_INFO_T* file, NC_GRP_INFO_T* grp, const char* dimname, size64_t size, NC_DIM_INFO_T** dimp)
-{
-    int stat = NC_NOERR;
-    NC_DIM_INFO_T* dim = NULL;
-
-    dim = (NC_DIM_INFO_T*)ncindexlookup(grp->dim,dimname);
-    if(dim == NULL && grp->parent != NULL)
-	{if((stat = finddim(file,grp->parent,dimname,size,&dim))) goto done;}
-    if(dimp) *dimp = dim;    
-done:
-    return THROW(stat);
-}
-#endif
-
-#if 0
-/**
-We need to infer the existence of sub-groups of a parent group that do not have a zarr.json object.
-Basically assumes that any path that has some longer path is itself a group.
-Returns the first level group names
-
-@param grpkey group parent key
-@param paths from which to infer
-@return NC_OK | NC_EXXX
-*/
-
-static void
-infersubgroups(const char* grpkey, NClist* paths, NClist* subgrps)
-{
-   size_t i,j,glen;
-   NCbytes* xpath = ncbytesnew();
-
-   glen = strlen(grpkey);
-   ncbytescat(xpath,grpkey);
-   for(i=0;i<nclistlength(paths);i++) {
-	const char* path = nclistget(paths,i);
-	const char* p;
-	char* q;
-	ptrdiff_t seglen;
-	int dup;
-	assert(memcmp(path,grpkey,glen)==0);
-	path = path+glen; /* point to the first segment past the grpkey */
-	if(*path != '/') continue;
-	p = strchr(path,'/'); /* find end of the first segment */
-	if(p == NULL) p = path+strlen(path); /* treat everything as part of the segment */	
-	seglen = p - path;
-	/* copy a substring not necessarily nul terminated */
-	q = (char*)malloc((size_t)seglen+1);
-	memcpy(q,path,seglen);
-	q[seglen] = '\0';
-	/* look for duplicates */
-	for(dup=0,j=0;j<nclistlength(subgrps);j++) {
-	    if(strcmp(q,(char*)nclistget(subgrps,i))==0) {dup=1; break;}	   
-	}
-	if(dup) {free(q);} else {nclistpush(subgrps,q); q = NULL;}
-   }
-}
-#endif /*0*/
-
-#if 0
-/* Convert simple dimension name to an FQN by assuming that
-   the name is relative to grp
-   */
-static int
-convertdimnames2fqns(NC_FILE_INFO_T* file, NC_GRP_INFO_T* grp, size_t rank, const char** dimnames, NCZ_DimInfo* diminfo)
-{
-    int stat = NC_NOERR;
-    size_t i, fqnlen;
-    NCbytes* fqn = ncbytesnew();
-
-    /* Get the FQN of grp */
-    if(grp->parent == NULL) {
-	ncbytesnull(fqn); /* root group fqn is "" */
-    } else {
-        if((stat = NCZ_makeFQN(grp,grp->hdr.name,fqn))) goto done;
-    }    
-    fqnlen = ncbyteslength(fqn);
-
-    for(i=0;i<rank;i++) {
-	char* dimfqn = NULL;
-	const char* dname = dimnames[i];
-        ncbytessetlength(fqn,fqnlen);
-        if(dname[0] != '/') {
-            /* Compute the fqn of the dim */
-	    ncbytescat(fqn,"/");
-	    ncbytescat(fqn,dname);
-	    diminfo[i].fqn = (char*)ncbytescontents(fqn);
-	}
-	diminfo[i].fqn = dimfqn; dimfqn = NULL;
-    }
-done:
-    ncbytesfree(fqn);
-    return THROW(stat);
-}
-#endif
-
 /**
 Given the following:
 1. shape of a variable as a vector of integers [in]
@@ -2267,49 +2060,6 @@ done:
 #endif /*NETCDF_ENABLE_NCZARR_FILTERS*/
     return THROW(stat);
 }
-
-#if 0
-/* Build filter from parsed Zarr metadata */
-int
-ZF3_codec2hdf(const NC_FILE_INFO_T* file, const NC_VAR_INFO_T* var, const NCjson* jfilter, NCZ_Filter* filter, NCZ_Plugin* plugin)
-{
-    int stat = NC_NOERR;
-#ifdef NETCDF_ENABLE_NCZARR_FILTERS
-    const NCjson* jvalue = NULL;
-    
-    assert(jfilter != NULL);
-    assert(filter != NULL);
-    
-    if(filter->codec.id == NULL) {
-	/* Get the id of this codec filter */
-	if(NCJdictget(jfilter,"name",&jvalue)) {stat = NC_EFILTER; goto done;}
-	if(!NCJisatomic(jvalue)) {stat = THROW(NC_ENOFILTER); goto done;}
-	filter->codec.id = strdup(NCJstring(jvalue));
-    }
-    
-    if(filter->codec.codec == NULL) {
-        /* Unparse jfilter */
-        NCJcheck(NCJunparse(jfilter,0,&filter->codec.codec));
-    }
-
-    if(plugin != NULL) {
-	/* Save the hdf5 id */
-	filter->hdf5.id = plugin->hdf5.filter->id;
-	/* Convert the codec to hdf5 form visible parameters */
-	if(plugin->codec.codec->NCZ_codec_to_hdf5) {
-	    stat = plugin->codec.codec->NCZ_codec_to_hdf5(NCplistzarrv3,filter->codec.codec,&filter->hdf5.id,&filter->hdf5.visible.nparams,&filter->hdf5.visible.params);
-#ifdef DEBUGF
-	    fprintf(stderr,">>> DEBUGF: NCZ_codec_to_hdf5: codec=%s, hdf5=%s\n",printcodec(codec),printhdf5(hdf5));
-#endif
-	    if(stat) goto done;
-	}
-    }
-    
-done:
-#endif /*NETCDF_ENABLE_NCZARR_FILTERS*/
-    return THROW(stat);
-}
-#endif /*0*/
 
 /**************************************************/
 /* Type Converters */
@@ -2555,20 +2305,6 @@ done:
     NCJreclaim(jzarrjson);
     return stat;
 }
-
-#if 0
-static void
-clearDimInfoList(NCZ_DimInfo** diminfo, size_t ndims)
-{
-    size_t i;
-    if(diminfo == NULL) return;
-    for(i=0;i<ndims;i++) {
-	NCZ_DimInfo* di = diminfo[i];
-	nullfree(di->path);
-	nullfree(di);
-    }
-}
-#endif
 
 /**************************************************/
 /* Utilities */

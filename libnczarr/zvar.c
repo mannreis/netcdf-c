@@ -219,39 +219,6 @@ reportchunking("find_default: ",var);
     return NC_NOERR;
 }
 
-#if 0
-/**
- * @internal Give a var a secret ZARR name. This is needed when a var
- * is defined with the same name as a dim, but it is not a coord var
- * of that dim. In that case, the var uses a secret name inside the
- * ZARR file.
- *
- * @param var Pointer to var info.
- * @param name Name to use for base of secret name.
- *
- * @returns ::NC_NOERR No error.
- * @returns ::NC_EMAXNAME Name too long to fit secret prefix.
- * @returns ::NC_ENOMEM Out of memory.
- * @author Dennis Heimbigner, Ed Hartnett
- */
-static int
-give_var_secret_name(NC_VAR_INFO_T *var, const char *name)
-{
-    /* Set a different ncz name for this variable to avoid name
-     * clash. */
-    if (strlen(name) + strlen(NON_COORD_PREPEND) > NC_MAX_NAME)
-	return NC_EMAXNAME;
-	size_t ncz_name_size = (strlen(NON_COORD_PREPEND) + strlen(name) + 1) *
-	                       sizeof(char);
-    if (!(var->ncz_name = malloc(ncz_name_size)))
-	return NC_ENOMEM;
-
-    snprintf(var->ncz_name, ncz_name_size, "%s%s", NON_COORD_PREPEND, name);
-
-    return NC_NOERR;
-}
-#endif /*0*/
-
 /**
  * @internal This is called when a new netCDF-4 variable is defined
  * with nc_def_var().
@@ -611,38 +578,6 @@ ncz_def_var_extra(int ncid, int varid, int *shuffle, int *unused1,
      * late to set all the extra stuff. */
     if (var->created)
         {stat = NC_ELATEDEF; goto done;}
-
-#if 0
-    /* Check compression options. */
-    if (deflate && !deflate_level)
-	{stat = NC_EINVAL; goto done;}
-
-    /* Valid deflate level? */
-    if (deflate)
-    {
-	if (*deflate)
-	    if (*deflate_level < NC_MIN_DEFLATE_LEVEL ||
-		*deflate_level > NC_MAX_DEFLATE_LEVEL)
-		{stat = NC_EINVAL; goto done;}
-
-	/* For scalars, just ignore attempt to deflate. */
-	if (!var->ndims)
-	    goto done;
-
-	/* If szip is in use, return an error. */
-	if ((stat = nc_inq_var_szip(ncid, varid, &option_mask, NULL)))
-	    goto done;
-	if (option_mask)
-	    {stat = NC_EINVAL; goto done;}
-
-	/* Set the deflate settings. */
-	var->storage = NC_CONTIGUOUS;
-	var->deflate = *deflate;
-	if (*deflate)
-	    var->deflate_level = *deflate_level;
-	LOG((3, "%s: *deflate_level %d", __func__, *deflate_level));
-    }
-#endif
 
     /* Shuffle filter? */
     if (shuffle && *shuffle) {
@@ -2360,43 +2295,6 @@ exit:
     nullfree(ztype);
     return THROW(retval);
 }
-
-#if 0
-/**
-Given start+count+stride+dim vectors, determine the largest
-index touched per dimension. If that index is greater-than
-the dimension size, then do one of two things:
-1. If the dimension is fixed size, then return NC_EDIMSIZE.
-2. If the dimension is unlimited, then extend the size of that
-   dimension to cover that maximum point.
-
-@param var
-@param start vector
-@param count vector
-@param stride vector
-@param reading vs writing
-@return NC_EXXX error code
-*/
-int
-NCZ_update_dim_extents(NC_VAR_INFO_T* var, size64_t* start, size64_t* count, size64_t* stride, int reading)
-{
-    int r;
-    int rank = var->ndims;
-
-    NC_UNUSED(reading);
-
-    for(r=0;r<rank;r++) {
-	NC_DIM_INFO_T* dim = var->dim[r];
-        size64_t endpoint; /* compute last point touched */
-	endpoint = start[r] + stride[r]*count[r] - stride[r];
-	if(dim->len < endpoint) {
-	    if(!dim->unlimited) return NC_EDIMSIZE;
-	    /*else*/ dim->len = endpoint+1; 
-	}
-    }
-    return NC_NOERR;
-}
-#endif
 
 /*Flush all chunks to disk. Create any that are missing
 and fill as needed.

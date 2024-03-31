@@ -629,14 +629,6 @@ write_var(NC_FILE_INFO_T* file, NCZ_FILE_INFO_T* zfile, NCZMAP* map, NC_VAR_INFO
 
     if((stat = write_var_meta(file,zfile,map,var))) goto done;
 
-#if 0
-    /* flush only chunks that have been written */
-    if(zvar->cache) {
-	if((stat = NCZ_flush_chunk_cache(zvar->cache)))
-	    goto done;
-    }
-#endif
-
 done:
     return ZUNTRACE(THROW(stat));
 }
@@ -805,23 +797,6 @@ build_atts(NC_FILE_INFO_T* file, NC_OBJ* container, NCindex* attlist, NCjson** j
             }
         }
     }
-
-#if 0
-    if(NCJdictlength(jatts) > 0) {
-        if(!purezarr) {
-            /* Insert the NCZ_V2_ATTR attribute */
-            /* Add a type */
-            NCJcheck(NCJinsertstring(jtypes,NCZ_V2_ATTR,">S1"));
-            NCJcheck(NCJnew(NCJ_DICT,&jdict));
-            if(jtypes != NULL)
-               NCJcheck(NCJinsert(jdict,"types",jtypes));
-            jtypes = NULL;
-            if(jdict != NULL)
-                NCJcheck(NCJinsert(jatts,NCZ_V2_ATTR,jdict));
-            jdict = NULL;
- 	}
-    }
-#endif
 
     if(jattsp) {*jattsp = jatts; jatts = NULL;}
     if(jtypesp) {*jtypesp = jtypes; jtypes = NULL;}
@@ -2169,12 +2144,6 @@ dtype2nctype(const char* dtype, nc_type* nctypep, size_t* typelenp, int* endianp
     default: {stat = NC_ENCZARR; goto done;}
     }
 
-#if 0
-    /* Convert NC_ENDIAN_NATIVE and NC_ENDIAN_NA */
-    if(endianness == NC_ENDIAN_NATIVE)
-        endianness = (NC_isLittleEndian()?NC_ENDIAN_LITTLE:NC_ENDIAN_BIG);
-#endif
-
 exit:
     if(nctypep) *nctypep = nctype;
     if(typelenp) *typelenp = typelen;
@@ -2437,37 +2406,3 @@ get_att_types(int purezarr, NCjson* jatts, struct Ainfo* ainfo)
 done:
     return THROW(stat);
 }
-
-#if 0
-/* Convert an attribute types list to an nc_type list */
-static int
-jtypes2atypes(int purezarr, const NCjson* jattrs, const NCjson* jtypes, nc_type** atypesp)
-{
-    int stat = NC_NOERR;
-    size_t i;
-    nc_type* atypes = NULL;
-    
-    if(jtypes != NULL && NCJdictlength(jtypes) != NCJdictlength(jattrs)) {stat = NC_ENCZARR; goto done;} /* length mismatch */
-    if((atypes = (nc_type*)calloc((size_t)NCJdictlength(jattrs),sizeof(nc_type)))==NULL) {stat = NC_ENOMEM; goto done;}
-    for(i=0;i<NCJdictlength(jattrs);i++) {
-        const NCjson* akey = NCJdictkey(jattrs,i);
-        if(NCJsort(akey) != NCJ_STRING) {stat = NC_ENOTZARR; goto done;}
-        if(jtypes == NULL) {
-            const NCjson* avalues = NCJdictvalue(jattrs,i);
-            /* Infer the type from the values */
-            if((stat = NCZ_inferattrtype(avalues,NC_NAT,&atypes[i]))) goto done;
-        } else {
-	    /* Find corresponding entry in the types dict */
-            const NCjson* jtype = NULL;
-            /* Get the nc_type */
-	    NCJdictget(jtypes,NCJstring(akey),&jtype);
-            if((stat = dtype2nctype(NCJstring(jtype),&atypes[i],NULL,NULL))) goto done;
-        }
-    }
-    if(atypesp) {*atypesp = atypes; atypes = NULL;}
-done:
-    nullfree(atypes);
-    return stat;
-}
-#endif
-

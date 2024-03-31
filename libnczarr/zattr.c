@@ -803,46 +803,6 @@ done:
     return THROW(stat);
 }
 
-#if 0
-static int
-ncz_del_attr(NC_FILE_INFO_T* file, NC_OBJ* container, const char* name)
-{
-    int i,stat = NC_NOERR;
-
-    ZTRACE();
-
-    if(container->sort == NCGRP)
-	stat = ncz_getattlist((NC_GRP_INFO_T*)container,NC_GLOBAL,NULL,&attlist);
-    else
-	stat = ncz_getattlist((NC_VAR_INFO_T*)container,NC_GLOBAL,NULL,&attlist);
-
-	goto done;
-
-    /* Iterate over the attributes to locate the matching attribute */
-    for(i=0;i<nclistlength(jattrs->dict);i+=2) {
-	NCjson* key = nclistget(jattrs->dict,i);
-	assert(key->sort == NCJ_STRING);
-	if(strcmp(key->value,name)==0) {
-	    /* Remove and reclaim */
-	    NCjson* value = nclistget(jattrs->dict,i+1);
-	    nclistremove(jattrs->dict,i);
-	    nclistremove(jattrs->dict,i+1);
-	    NCJreclaim(key);
-	    NCJreclaim(value);
-	    break;
-	}    
-    }
-    /* Write the json back out */
-    if((stat = ncz_unload_jatts(zinfo, container, jattrs, jtypes)))
-	goto done;
-
-done:
-    NCJreclaim(jattrs);
-    NCJreclaim(jtypes);
-    return stat;
-}
-#endif
-
 /* Test if fillvalue is default */
 int
 isdfaltfillvalue(nc_type nctype, void* fillval)
@@ -875,32 +835,11 @@ ncz_create_fillvalue(NC_FILE_INFO_T* file, NC_VAR_INFO_T* var)
     if(!var->atts_read) goto done; /* above my pay grade */
 
     /* Is FillValue warranted? */
-#if 0
-    if(!var->no_fill && var->fill_value != NULL && !isdfaltfillvalue(vartype,var->fill_value)) {
-        /* Make sure _FillValue att does not exist */
-	for(i=0;i<ncindexsize(var->att);i++) {
-	    fvatt = (NC_ATT_INFO_T*)ncindexith(var->att,i);
-	    if(strcmp(fvatt->hdr.name,NC_ATT_FILLVALUE)==0) break;
-	    fvatt = NULL;
-        }
-	if(fvatt == NULL) { /* Create it */
-	    /* Make a copy of the var->fill_value to be stored in the attribute */
-	    if((stat = NC_copy_data_all(file->controller, vartype, var->fill_value, 1, &copy))) goto done;
-	    if((stat = ncz_makeattr(file, (NC_OBJ*)var,_FillValue,vartype,1,copy,&fvatt)))
-	    goto done;
-	}
-    }
-#else
     if(!var->no_fill && var->fill_value != NULL) {
 	if((stat = NCZ_copy_var_to_fillatt(file,var,NULL))) goto done;
     }
-#endif
 
 done:
-#if 0
-    if(copy)
-	NC_reclaim_data_all(file->controller,vartype,copy,1);
-#endif
     return THROW(stat);
 }
 
@@ -1017,72 +956,6 @@ done:
     NCJreclaim(jtext); /* we created it */
     return ZUNTRACEX(THROW(stat),"typelen=%d count=%u",(typelenp?*typelenp:0),(countp?*countp:-1));
 }
-
-#if 0
-/**
-@internal Read attributes from a group or var and collect the necessary info.
-@param file - [in] the containing file (annotation)
-@param container - [in] the containing object (var or grp)
-@return NC_NOERR|NC_EXXX
-
-@author Dennis Heimbigner
-*/
-static int
-NCZ_readattrs(NC_FILE_INFO_T* file, NC_OBJ* container, struct NCZ_AttrInfo** ainfop)
-{
-    int stat = NC_NOERR;
-    size_t i;
-    char* key = NULL;
-    NCZ_FILE_INFO_T* zinfo = NULL;
-    NC_VAR_INFO_T* var = NULL;
-    NCZ_VAR_INFO_T* zvar = NULL;
-    NC_GRP_INFO_T* grp = NULL;
-    NC_ATT_INFO_T* att = NULL;
-    NCindex* attlist = NULL;
-    char* attrpath = NULL;
-    nc_type typeid;
-    size_t len, typelen;
-    NC_ATT_INFO_T* fillvalueatt = NULL;
-    nc_type typehint = NC_NAT;
-    int purezarr;
-    NCZMAP* map = NULL;
-    NClist* atypes = nclistnew();
-    struct NCZ_AttrInfo* ainfo = NULL;
-    size_t acount = 0;
-
-    ZTRACE(3,"file=%s container=%s",file->controller->path,container->name);
-
-    zinfo = file->format_file_info;
-
-    purezarr = (zinfo->flags & FLAG_PUREZARR)?1:0;
-
-    if((stat = NCZF_readattrs(file, container, &ainfo))) goto done;
-
-    if(ainfo != NULL) {
-	struct NCZ_AttrInfo* ap = NULL;
-	for(ap=ainfo,i=0;ap->name;i++,ainfo++) {
-	    size_t j;
-	    const char* atype = NULL;
-	    NCjson* key;
-	    NCjson* value;
-	    key = NCJdictkey(jattrs,i);
-	    ap->name = strdup(NCJstring(key));
-	    ap->nctype = atypes[i];
-	    /* clone and save the json value array */
-	    value = NCJdictvalue(jattrs,i);
-	    assert(ap->values == NULL);
-	    NCJclone(value,&ap->values);
-	}	
-    }
-    if(ainfop) {*ainfop = ainfo; ainfo = NULL;}
-
-done:
-    NCJreclaim(jattrs);
-    nullfree(atypes);
-    NCZ_freeAttrInfo(ainfo);
-    return ZUNTRACE(THROW(stat));
-}
-#endif /*0*/
 
 /* Convert a json value to actual data values of an attribute.
 @param src - [in] src value

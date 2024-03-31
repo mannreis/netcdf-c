@@ -35,70 +35,6 @@ sizeof(char *), /*NC_STRING*/
 static int typeid2jtype(nc_type typeid);
 static int naninftest(const char* s, double* dcase, float* fcase);
 
-#if 0
-/* Convert a JSON value to a struct ZCVT value and also return the type */
-int
-NCZ_string2cvt(char* src, nc_type srctype, struct ZCVT* zcvt, nc_type* typeidp)
-{
-    int stat = NC_NOERR;
-    nc_type dsttype = NC_NAT;
-
-    assert(zcvt);
-    
-    /* Convert to a restricted set of values */
-    switch (srctype) {
-    case NC_BYTE: {
-	zcvt->int64v = (signed long long)(*((signed char*)src));
-	dsttype = NC_INT64;
-	} break;
-    case NC_UBYTE: {
-	zcvt->uint64v = (unsigned long long)(*((unsigned char*)src));
-	dsttype = NC_UINT64;
-	} break;
-    case NC_SHORT: {
-	zcvt->int64v = (signed long long)(*((signed short*)src));
-	dsttype = NC_INT64;
-	} break;
-    case NC_USHORT: {
-	zcvt->uint64v = (unsigned long long)(*((unsigned short*)src));
-	dsttype = NC_UINT64;
-	} break;
-    case NC_INT: {
-	zcvt->int64v = (signed long long)(*((signed int*)src));
-	dsttype = NC_INT64;
-	} break;
-    case NC_UINT: {
-	zcvt->uint64v = (unsigned long long)(*((unsigned int*)src));
-	dsttype = NC_UINT64;
-	} break;
-    case NC_INT64: {
-	zcvt->int64v = (signed long long)(*((signed long long*)src));
-	dsttype = NC_INT64;
-	} break;
-    case NC_UINT64: {
-	zcvt->uint64v = (unsigned long long)(*((unsigned long long*)src));
-	dsttype = NC_UINT64;
-	} break;
-    case NC_FLOAT: {
-	zcvt->float64v = (double)(*((float*)src));
-	dsttype = NC_DOUBLE;
-	} break;
-    case NC_DOUBLE: {
-	dsttype = NC_DOUBLE;
-	zcvt->float64v= (double)(*((double*)src));
-	} break;
-    case NC_STRING: {
-	dsttype = NC_STRING;
-	zcvt->strv= *((char**)src);
-	} break;
-    default: stat = NC_EINTERNAL; goto done;
-    }
-    if(typeidp) *typeidp = dsttype;
-done:
-    return stat;
-}
-#endif
-
 /* Warning: do not free returned zcvt.strv; it may point into a string in jsrc */
 int
 NCZ_json2cvt(const NCjson* jsrc, struct ZCVT* zcvt, nc_type* typeidp)
@@ -519,19 +455,8 @@ NCZ_stringconvert1(nc_type srctype, char* src, NCjson* jvalue)
 #endif
 	/* Quote the nan/inf constant */
 	if(isnanorinf) {
-#if 0
-	    char sq[1024+2+1];
-	    size_t l = strlen(s);
-	    memcpy(sq,s,l+1);
-	    s[0] = '"';
-	    memcpy(s+1,sq,l);
-	    s[l+1] = '"';
-    	    s[l+2] = '\0';
-#else
             /* Change type to NCJ_STRING */
 	    jvalue->sort = NCJ_STRING;
-		    
-#endif /*0*/
 	}
 	} break;
     case NC_STRING: {

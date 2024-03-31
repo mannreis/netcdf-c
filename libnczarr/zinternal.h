@@ -315,21 +315,6 @@ struct NCZ_AttrInfo {
     NCjson* values;
 };
 
-#if 0
-/* Define the contents of the .nczcontent object */
-/* The .nczcontent field stores the following:
-   1. List of (name,length) for dims in the group
-   2. List of (name,type) for user-defined types in the group
-   3. List of var names in the group
-   4. List of subgroups names in the group
-*/
-typedef struct NCZCONTENT{
-    NClist* dims;
-    NClist* types; /* currently not used */
-    NClist* vars;
-    NClist* grps;
-} NCZCONTENT;
-#endif
 
 /**************************************************/
 

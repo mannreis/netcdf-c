@@ -300,15 +300,3 @@ NCZ_clearsliceprojections(size_t count, NCZSliceProjections* slpv)
 	}
     }
 }
-
-#if 0
-static void
-clearallprojections(NCZAllProjections* nap)
-{
-    if(nap != NULL) {
-	int i;
-	for(i=0;i<nap->rank;i++) 
-	    nclistfreeall(&nap->allprojections[i].projections);
-    }
-}
-#endif

@@ -28,22 +28,6 @@ static int wholechunk_indices(struct Common* common, NCZSlice* slices, size64_t*
 static int transfern(const struct Common* common, unsigned char* slpptr, unsigned char* memptr, size_t avail, size_t slpstride, void* chunkdata);
 #endif
 
-#if 0
-static const char*
-astype(int typesize, void* ptr)
-{
-    switch(typesize) {
-    case 4: {
-	static char is[8]; 
-	snprintf(is,sizeof(is),"%u",*((unsigned int*)ptr));
-	return is;
-        } break;
-    default: break;
-    }
-    return "?";
-}
-#endif
-
 /**************************************************/
 int
 ncz_chunking_init(void)
@@ -458,42 +442,6 @@ done:
     return stat;    
 }
 
-#if 0
-#ifdef WDEBUG
-static void
-wdebug1(const struct Common* common, unsigned char* srcptr, unsigned char* dstptr, size_t count, size_t stride, void* chunkdata, const char* tag)
-{
-    unsigned char* dstbase = (common->reading?common->memory:chunkdata);
-    unsigned char* srcbase = (common->reading?chunkdata:common->memory);
-    unsigned dstoff = (unsigned)(dstptr - dstbase);
-    unsigned srcoff = (unsigned)(srcptr - srcbase);
-//    unsigned srcidx = srcoff / sizeof(unsigned);
-
-    fprintf(stderr,"%s: %s: [%u/%d] %u->%u",
-	    tag,
-	    common->reading?"read":"write",
-	    (unsigned)count,
-    	    (unsigned)stride,
-	    (unsigned)(srcoff/common->typesize),
-	    (unsigned)(dstoff/common->typesize)
-	    );
-#if 0
-    fprintf(stderr,"\t%s[%u]=%u\n",(common->reading?"chunkdata":"memdata"),
-//      0,((unsigned*)srcptr)[0]
-        srcidx,((unsigned*)srcbase)[srcidx]
-	);
-#endif
-#if 0
-    { size_t len = common->typesize*count;
-    fprintf(stderr," | [%u] %u->%u\n",(unsigned)len,(unsigned)srcoff,(unsigned)dstoff);
-    }
-#endif
-    fprintf(stderr,"\n");
-}
-#else
-#define wdebug1(common,srcptr,dstptr,count,srcstride,dststride,chunkdata,tag)
-#endif
-#endif /*0*/
 
 #ifdef TRANSFERN
 static int
@@ -541,29 +489,6 @@ done:
     return THROW(stat);
 }
 #endif /*TRANSFERN*/
-
-#if 0
-/* This function may not be necessary if code in zvar does it instead */
-static int
-NCZ_fillchunk(void* chunkdata, struct Common* common)
-{
-    int stat = NC_NOERR;    
-
-    if(common->fillvalue == NULL) {
-        memset(chunkdata,0,common->chunkcount*common->typesize);
-	goto done;
-    }	
-
-    if(common->cache->fillchunk == NULL) {
-        /* Get fill chunk*/
-        if((stat = NCZ_create_fill_chunk(common->cache->chunksize, common->typesize, common->fillvalue, &common->cache->fillchunk)))
-	    goto done;
-    }
-    memcpy(chunkdata,common->cache->fillchunk,common->cache->chunksize);
-done:
-    return stat;
-}
-#endif
 
 /* Break out this piece so we can use it for unit testing */
 /**
@@ -664,22 +589,6 @@ NCZ_computelinearoffset(size_t R, const size64_t* indices, const size64_t* dimle
       } 
       return offset;
 }
-
-#if 0
-/* Goal: Given a linear position
-     compute the corresponding set of R indices
-*/
-void
-NCZ_offset2indices(size_t R, size64_t offset, const size64_t* dimlens, size64_t* indices)
-{
-      int i;
-
-      for(i=0;i<R;i++) {
-          indices[i] = offset % dimlens[i];
-          offset = offset / dimlens[i];
-      } 
-}
-#endif
 
 /**************************************************/
 /* Unit test entry points */
