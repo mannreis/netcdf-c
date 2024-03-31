@@ -19,8 +19,8 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <stdarg.h>
-#include <string.h>
 #include <stddef.h> /* size_t, ptrdiff_t */
+#include <string.h>
 #include <assert.h>
 #ifdef HAVE_UNISTD_H
 #include <unistd.h>
