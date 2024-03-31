@@ -70,7 +70,7 @@ set_property(SOURCE zdispatch.c
 # Build the Zarr dispatch layer as a library that will be included in
 # the netCDF library.
 
-add_library(nczarr OBJECT ${nczarr_SOURCES})
+add_library(nczarr OBJECT ${libnczarr_SOURCES})
 
 target_include_directories(nczarr PUBLIC ../libncpoco)
 
