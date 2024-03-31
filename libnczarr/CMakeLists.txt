@@ -6,7 +6,7 @@
 # Dennis Heimbigner
 
 # The source files for the HDF5 dispatch layer.
-set(libnczarr_SOURCES
+SET(libnczarr_SOURCES
 zinfer.c
 znc4.c
 zfill.c
@@ -52,15 +52,15 @@ zdebug.h
 )
 
 if(NETCDF_ENABLE_NCZARR_ZIP)
-    set(libnczarr_SOURCES ${libnczarr_SOURCES} zmap_zip.c)
+    SET(libnczarr_SOURCES ${libnczarr_SOURCES} zmap_zip.c)
 endif()
 
 if(NETCDF_ENABLE_S3) 
-    set(libnczarr_SOURCES ${libnczarr_SOURCES} zmap_s3sdk.c)
+    SET(libnczarr_SOURCES ${libnczarr_SOURCES} zmap_s3sdk.c)
 endif()
 
 if(ENABLE_NCZARR_FILTERS)
-    set(libnczarr_SOURCES ${libnczarr_SOURCES} zfilter.c)
+    SET(libnczarr_SOURCES ${libnczarr_SOURCES} zfilter.c)
 endif()
 
 set_property(SOURCE zdispatch.c
