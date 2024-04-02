@@ -31,10 +31,8 @@ Notes on terminology in this document.
 
 NCZarr uses a data model that, by design, extends the Zarr Version 2 Specification or Version 3 Specification.
 
-__Note Carefully__: a legal _NCZarr_ dataset is also a legal _Zarr_ dataset under a specific assumption. This assumption is that within Zarr meta-data objects, like ''.zarray'', unrecognized dictionary keys are ignored.
-If this assumption is true of an implementation, then the _NCZarr_ dataset is a legal _Zarr_ dataset and should be readable by that _Zarr_ implementation.
-The inverse is true also. A legal _Zarr_ dataset is also a legal _NCZarr_
-dataset, where "legal" means it conforms to the Zarr version 2 or 3 specification.
+__Note Carefully__: a legal _NCZarr_ dataset is expected to also be a legal _Zarr_ dataset.
+The inverse is true also. A legal _Zarr_ dataset is expected to also be a legal _NCZarr_ dataset, where "legal" means it conforms to the Zarr version 2 or 3 specification.
 In addition, certain non-Zarr features are allowed and used.
 Specifically the XArray ''\_ARRAY\_DIMENSIONS'' attribute is one such.
 
@@ -74,8 +72,8 @@ When specified, they are treated as chunked where the file consists of only one 
 This means that testing for contiguous or compact is not possible; the _nc_inq_var_chunking_ function will always return NC_CHUNKED and the chunksizes will be the same as the dimension sizes of the variable's dimensions.
 
 Additionally, it should be noted that NCZarr supports scalar variables,
-but Zarr does not; Zarr only supports dimensioned variables.
-In order to support interoperability, NCZarr does the following.
+but Zarr Version 2 does not; Zarr V2 only supports dimensioned variables.
+In order to support interoperability, NCZarr V2 does the following.
 1. A scalar variable is recorded in the Zarr metadata as if it has a shape of **[1]**.
 2. A note is stored in the NCZarr metadata that this is actually a netCDF scalar variable.
 
@@ -118,22 +116,29 @@ The fragment part of a URL is used to specify information that is interpreted to
 For reading, _key=value_ pairs are provided for specifying the storage format.
 - mode=nczarr|zarr
 
-Additional pairs are provided to specify the storage medium: Amazon S3 vs File tree vs Zip file.
-- mode=file|zip|s3
-
 Additional pairs are provided to specify the Zarr version.
 - mode=v2|v3
 
-Typically one will specify two mode flags: one to indicate what format
-to use and one to specify the way the dataset is to be stored.
-For example, a common one is "mode=zarr,file"
-The version will be the default specified when the netcdf-c library was built.
+Additional pairs are provided to specify the storage medium: Amazon S3 vs File tree vs Zip file.
+- mode=file|zip|s3
 
-When reading an existing store, it is necessary to specify the storage medium (e.g. s3),
-but it is only necessary to indicate that the store is formatted as some form of Zarr (e.g. zarr or nczarr).
-The library will automatically detect whether the file is actually Zarr vs NCZarr and whether it is Version 2 vs Version 3.
+Note that when reading, an attempt will be made to infer the
+format and Zarr version and storage medium format by probing the
+file. If inferencing fails, then it is reported.  In this case,
+the client may need to add specific mode flags to avoid
+inferencing.
 
-When writing, both the storage medium and the exact storage format must be specified.
+Typically one will specify three mode flags: one to indicate what format
+to use and one to specify the way the dataset is to be stored,
+and one to specifiy the Zarr format version.
+For example, a common one is "mode=zarr,file,v2"
+If not specified, the version will be the default specified when
+the netcdf-c library was built.
+
+Obviously, when creating a file, inferencing is not
+possible so the mode flags must be set specifically.
+This means that both the storage medium and the exact storage
+format must be specified.
 Using _mode=nczarr_ causes the URL to be interpreted as a
 reference to a dataset that is stored in NCZarr format.
 The _zarr_ mode tells the library to use NCZarr, but to restrict its operation to operate on pure Zarr
@@ -150,9 +155,10 @@ As an aside, it should be the case that zipping a _file_
 format directory tree will produce a file readable by the
 _zip_ storage format, and vice-versa.
 
-By default, the XArray convention is supported and used for
-both NCZarr files and pure Zarr files. This
-means that every variable in the root group whose named dimensions
+By default, the XArray convention is supported for Zarr Version 2
+and used for both NCZarr files and pure Zarr files. It is not
+needed for Version 3 and is ignored.
+This means that every variable in the root group whose named dimensions
 are also in the root group will have an attribute called
 *\_ARRAY\_DIMENSIONS* that stores those dimension names.
 The _noxarray_ mode tells the library to disable the XArray support.
@@ -277,14 +283,15 @@ As with other URLS (e.g. DAP), these kind of URLS can be passed as the path argu
 
 # NCZarr versus Pure Zarr. {#nczarr_purezarr}
 
-The NCZARR format extends the pure Zarr format by adding extra keys such as ''\_nczarr\_array'' inside the ''.zarray'' object.
-It is possible to suppress the use of these extensions so that the netcdf library can read and write a pure zarr formatted file.
-This is controlled by using ''mode=zarr'', which is an alias for the
-''mode=nczarr,zarr'' combination.
-The primary effects of using pure zarr are described in the [Translation Section](@ref nczarr_translation).
+The NCZARR format extends the pure Zarr format by adding extra attributes such as ''\_nczarr\_array'' inside the ''.zattr'' object.
+It is possible to suppress the use of these extensions so that the netcdf library can write a pure zarr formatted file. But this probably unnecessary
+since these attributes should be readable by any other Zarr implementation.
+But these extra attributes might be seen as clutter and so it is possible
+to suppress them when writing using *mode=zarr*.
 
-There are some constraints on the reading of Zarr datasets using the NCZarr implementation.
-
+Reading of pure Zarr files created using other implementations is a necessary
+compatibility feature of NCZarr.
+This requirement imposed some constraints on the reading of Zarr datasets using the NCZarr implementation.
 1. Zarr allows some primitive types not recognized by NCZarr.
 Over time, the set of unrecognized types is expected to diminish.
 Examples of currently unsupported types are as follows:
@@ -348,8 +355,7 @@ Containment is modeled using the fact that the dataset's key is a prefix of the 
 So for example, if variable _v1_ is contained in top level group g1 -- _/g1 -- then the key for _v1_ is _/g1/v_.
 Additional meta-data information is stored in special objects whose name start with ".z".
 
-In Zarr, the following special objects exist.
-
+In Zarr Version 2, the following special objects exist.
 1. Information about a group is kept in a special object named _.zgroup_;
 so for example the object _/g1/.zgroup_.
 2. Information about an array is kept as a special object named _.zarray_;
@@ -360,13 +366,13 @@ so for example the objects _/g1/.zattr_ and _/g1/v1/.zattr_.
 
 The first three contain meta-data objects in the form of a string representing a JSON-formatted dictionary. 
 The NCZarr format uses the same objects as Zarr, but inserts NCZarr
-specific key-value pairs in them to hold NCZarr specific information
-The value of each of these keys is a JSON dictionary containing a variety
+specific attributes in the *.zattr* object to hold NCZarr specific information
+The value of each of these attributes is a JSON dictionary containing a variety
 of NCZarr specific information.
 
-These keys are as follows:
+These attributes are as follows:
 
-_\_nczarr_superblock\__ -- this is in the top level group -- key _/.zarr_.
+_\_nczarr_superblock\__ -- this is in the top level group's *.zattr* object.
 It is in effect the "superblock" for the dataset and contains
 any netcdf specific dataset level information.
 It is also used to verify that a given key is the root of a dataset.
@@ -374,7 +380,7 @@ Currently it contains one key that is ignored and is only to ensure that
 older netcdf library versions do not crash.
 * "version" -- the NCZarr version defining the format of the dataset (deprecated).
 
-_\_nczarr_group\__ -- this key appears in every _.zgroup_ object.
+_\_nczarr_group\__ -- this key appears in every group's _.zattr_ object.
 It contains any netcdf specific group information.
 Specifically it contains the following keys:
 * "dims" -- the name and size of shared dimensions defined in this group, as well an optional flag indictating if the dimension is UNLIMITED.
@@ -382,24 +388,22 @@ Specifically it contains the following keys:
 * "groups" -- the name of sub-groups defined in this group.
 These lists allow walking the NCZarr dataset without having to use the potentially costly search operation.
 
-_\_nczarr_array\__ -- this key appears in every _.zarray_ object.
+_\_nczarr_array\__ -- this key appears in the *.zattr* object associated
+with a _.zarray_ object.
 It contains netcdf specific array information.
 Specifically it contains the following keys:
-* dimrefs -- the names of the shared dimensions referenced by the variable.
+* dimensions -- the names of the shared dimensions referenced by the variable.
 * storage -- indicates if the variable is chunked vs contiguous in the netcdf sense.
 
-_\_nczarr_attr\__ -- this key appears in every _.zattr_ object.
-This means that technically, it is attribute, but one for which access
-is normally surpressed .
+_\_nczarr_attr\__ -- this attribute appears in every _.zattr_ object.
 Specifically it contains the following keys:
 * types -- the types of all of the other attributes in the _.zattr_ object.
 
 ## Translation {#nczarr_translation}
 
-With some constraints, it is possible for an nczarr library to read the pure Zarr format and for a zarr library to read the nczarr format.
-The latter case, zarr reading nczarr is possible if the zarr library is willing to ignore keys whose name it does not recognize; specifically anything beginning with _\_nczarr\__.
+With some constraints, it is possible for an nczarr library to read the pure Zarr format and for other zarr libraries to read the nczarr format.
 
-The former case, nczarr reading zarr is also possible if the nczarr can simulate or infer the contents of the missing _\_nczarr\_xxx_ objects.
+The former case, nczarr reading zarr is possible if the nczarr code can simulate or infer the contents of the missing _\_nczarr\_xxx_ attributes.
 As a rule this can be done as follows.
 1. _\_nczarr_group\__ -- The list of contained variables and sub-groups can be computed using the search API to list the keys "contained" in the key for a group.
 The search looks for occurrences of _.zgroup_, _.zattr_, _.zarray_ to infer the keys for the contained groups, attribute sets, and arrays (variables).
@@ -407,7 +411,7 @@ Constructing the set of "shared dimensions" is carried out
 by walking all the variables in the whole dataset and collecting
 the set of unique integer shapes for the variables.
 For each such dimension length, a top level dimension is created
-named  ".zdim_<len>" where len is the integer length.
+named  "_Anonymous_Dimension_<len>" where len is the integer length.
 2. _\_nczarr_array\__ -- The dimrefs are inferred by using the shape
 in _.zarray_ and creating references to the simulated shared dimension.
 netcdf specific information.
@@ -425,13 +429,15 @@ The value of this attribute is a list of dimension names (strings).
 An example might be ````["time", "lon", "lat"]````.
 It is essentially equivalent to the ````_nczarr_array "dimrefs" list````, except that the latter uses fully qualified names so the referenced dimensions can be anywhere in the dataset.
 
-As of _netcdf-c_ version 4.8.2, The Xarray ''_ARRAY_DIMENSIONS'' attribute is supported for both NCZarr and pure Zarr.
+The Xarray ''_ARRAY_DIMENSIONS'' attribute is supported for both NCZarr and pure Zarr.
 If possible, this attribute will be read/written by default,
 but can be suppressed if the mode value "noxarray" is specified.
 If detected, then these dimension names are used to define shared dimensions.
 The following conditions will cause ''_ARRAY_DIMENSIONS'' to not be written.
 * The variable is not in the root group,
 * Any dimension referenced by the variable is not in the root group.
+
+Note that this attribute is not needed for Zarr Version 3, and is ignored.
 
 # Examples {#nczarr_examples}
 
@@ -556,7 +562,7 @@ This affects the depth to which groups can be nested because the key encodes the
 
 # Appendix C. JSON Attribute Convention. {#nczarr_json}
 
-The Zarr V2 specification is somewhat vague on what is a legal
+The Zarr V2 (and V3) specification is somewhat vague on what is a legal
 value for an attribute. The examples all show one of two cases:
 1. A simple JSON scalar atomic values (e.g. int, float, char, etc), or
 2. A JSON array  of such values.
@@ -569,7 +575,7 @@ complex JSON expression.  An example is the GDAL Driver
 convention <a href='#ref_gdal'>[12]</a>, where the value is a complex
 JSON dictionary.
 
-In order for NCZarr to be as consistent as possible with Zarr Version 2,
+In order for NCZarr to be as consistent as possible with Zarr,
 it is desirable to support this convention  for attribute values.
 This means that there must be some way to handle an attribute
 whose value is not either of the two cases above. That is, its value
@@ -690,24 +696,10 @@ the above types should always appear as strings,
 and the type that signals NC_CHAR (in NCZarr)
 would be handled by Zarr as a string of length 1.
 
-# Appendix E. NCZarr Version 1 Meta-Data Representation. {#nczarr_version1}
+# Appendix E. Zarr Version 3: NCZarr Version 3 Meta-Data Representation. {#nczarr_version3}
 
-In NCZarr Version 1, the NCZarr specific metadata was represented using new objects rather than as keys in existing Zarr objects.
-Due to conflicts with the Zarr specification, that format is deprecated in favor of the one described above.
-However the netcdf-c NCZarr support can still read the version 1 format.
-
-The version 1 format defines three specific objects: _.nczgroup_, _.nczarray_,_.nczattr_.
-These are stored in parallel with the corresponding Zarr objects. So if there is a key of the form "/x/y/.zarray", then there is also a key "/x/y/.nczarray".
-The content of these objects is the same as the contents of the corresponding keys. So the value of the ''_NCZARR_ARRAY'' key is the same as the content of the ''.nczarray'' object. The list of connections is as follows:
-
-* ''.nczarr'' <=> ''_nczarr_superblock_''
-* ''.nczgroup <=> ''_nczarr_group_''
-* ''.nczarray <=> ''_nczarr_array_''
-* ''.nczattr <=> ''_nczarr_attr_''
-
-# Appendix F. Zarr Version 3: NCZarr Version 3 Meta-Data Representation. {#nczarr_version3}
-
-For Zarr version 3, the added NCZarr specific metadata is stored in a different way than in Zarr version 2.
+For Zarr version 3, the added NCZarr specific metadata is stored 
+as attributes pretty much the same as for Version 2.
 Specifically, the following Netcdf-4 meta-data information needs to be captured by NCZarr:
     1. Shared dimensions: name and size.
     2. Unlimited dimensions: which dimensions are unlimited.
@@ -744,7 +736,7 @@ But strings are important in Netcdf, so a forward compatible
 representation is provided where the type is string
 and its maximum size is specified.
 
-So, the Netcdf types "char" and "string" are stored
+For arrays, the Netcdf types "char" and "string" are stored
 in the Zarr file as of type "uint8" and "r<8*n>", respectively
 where _n_ is the maximum length of the string in bytes (not characters).
 The fact that they represent "char" and "string" is encoded in the "_nczarr_array" attribute (see below).
@@ -803,7 +795,7 @@ Similarly ````/g1/g2/d2```` defines a dimension "d2" defined in the
 group g2, which in turn is a subgroup of group g1, which is a subgroup
 of the root group.
 
-The *type-alias* key is used to annotate the type of an array
+The *type_alias* key is used to annotate the type of an array
 to allow discovery of netcdf-4 specific types.
 Specifically, there are three current cases:
 | dtype | type_alias |
@@ -819,8 +811,7 @@ implementations. So, for example, if the netcdf-4 type is *char*, then the array
 dtype is *uint8*, but its type alias is *char*.
 
 ## Attribute Type Annotation
-In Zarr version 2, attributes are stored in a separate _.zattr_ object.
-In Zarr version 3, group and array attributes are now stored inside
+In Zarr version 3, group and array attributes are stored inside
 the corresponding _zarr.info_. object under the dictionary key "attributes".
 Note that this decision is still under discussion and it may be changed
 to store attributes in an object separate from _zarr.info_.
@@ -868,6 +859,9 @@ intended to be a detailed chronology. Rather, it provides highlights
 that will be of interest to NCZarr users. In order to see exact changes,
 It is necessary to use the 'git diff' command.
 
+## 03/31/2024
+1. Document the change to V2 to using attributes to hold NCZarr metadata.
+
 ## 01/31/2024
 1. Add description of support for Zarr version 3 as an appendix.
 
@@ -890,4 +884,4 @@ include arbitrary JSON expressions; see Appendix D for more details.
 __Author__: Dennis Heimbigner<br>
 __Email__: dmh at ucar dot edu<br>
 __Initial Version__: 4/10/2020<br>
-__Last Revised__: 01/31/2024
+__Last Revised__: 4/02/2024
