@@ -132,28 +132,11 @@ AC_DEFINE_UNQUOTED([WINVERBUILD], [$WINVERBUILD], [windows version build])
 
 AC_MSG_NOTICE([checking supported formats])
 
-# An explicit disable of netcdf-4 | netcdf4 is treated as if it was disable-hdf5
-AC_MSG_CHECKING([whether we should build with netcdf4 (alias for HDF5)])
-AC_ARG_ENABLE([netcdf4], [AS_HELP_STRING([--disable-netcdf4],
-              [(Deprecated) Synonym for --enable-hdf5)])])
-test "x$enable_netcdf4" = xno || enable_netcdf4=yes
-AC_MSG_RESULT([$enable_netcdf4 (Deprecated) Please use --disable-hdf5)])
-AC_MSG_CHECKING([whether we should build with netcdf-4 (alias for HDF5)])
-AC_ARG_ENABLE([netcdf-4], [AS_HELP_STRING([--disable-netcdf-4],
-              [(synonym for --disable-netcdf4)])])
-test "x$enable_netcdf_4" = xno || enable_netcdf_4=yes
-AC_MSG_RESULT([$enable_netcdf_4])
-# Propagate the alias
-if test "x$enable_netcdf_4" = xno ; then enable_netcdf4=no; fi
-if test "x$enable_netcdf4" = xno ; then enable_netcdf_4=no; fi
-
 # Does the user want to use HDF5?
 AC_MSG_CHECKING([whether we should build with HDF5])
 AC_ARG_ENABLE([hdf5], [AS_HELP_STRING([--disable-hdf5],
               [do not build with HDF5])])
 test "x$enable_hdf5" = xno || enable_hdf5=yes
-if test "x$enable_netcdf4" = xno ; then enable_hdf5=no ; fi
-# disable-netcdf4 is synonym for disable-hdf5
 AC_MSG_RESULT([$enable_hdf5])
 
 # Check whether we want to enable CDF5 support.
@@ -229,15 +212,6 @@ DFALTZARRFORMAT=2
 fi
 AC_DEFINE_UNQUOTED([DFALTZARRFORMAT], [$DFALTZARRFORMAT], [Default Zarr format])
 AC_SUBST([DFALTZARRFORMAT],[$DFALTZARRFORMAT])
-
-# HDF5 | HDF4 | NCZarr => netcdf-4
-if test "x$enable_hdf5" = xyes || test "x$enable_hdf4" = xyes || test "x$enable_nczarr" = xyes ; then
-enable_netcdf_4=yes
-fi
-AC_MSG_CHECKING([whether netcdf-4 should be forcibly enabled])
-AC_MSG_RESULT([$enable_netcdf_4])
-# Synonym
-enable_netcdf4=${enable_netcdf_4}
 
 AC_MSG_NOTICE([checking user options])
 
@@ -469,18 +443,6 @@ AC_ARG_ENABLE([logging],
 			      Ignored if netCDF-4 is not enabled.])])
 test "x$enable_logging" = xyes || enable_logging=no
 AC_MSG_RESULT([$enable_logging])
-
-# Does the user want to turn off nc_set_log_level() function? (It will
-# always be defined if --enable-logging is used.)
-AC_MSG_CHECKING([whether nc_set_log_level() function is included (will do nothing unless enable-logging is also used)])
-AC_ARG_ENABLE([set_log_level_func], [AS_HELP_STRING([--disable-set-log-level-func],
-              [disable the nc_set_log_level function])])
-test "x$enable_set_log_level_func" = xno -a "x$enable_logging" = xno || enable_set_log_level_func=yes
-if test "x$enable_set_log_level_func" = xyes -a "x$enable_netcdf_4" = xyes; then
-   AC_DEFINE([NETCDF_ENABLE_SET_LOG_LEVEL], 1, [If true, define nc_set_log_level.])
-fi
-AC_MSG_RESULT($enable_set_log_level_func)
-
 
 # CURLOPT_USERNAME is not defined until curl version 7.19.1
 # CURLOPT_PASSWORD is not defined until curl version 7.19.1
@@ -716,14 +678,6 @@ AC_MSG_RESULT([$enable_dap_long_tests])
 if test "x$enable_dap_remote_tests" = "xno" || test "x$enable_external_server_tests" = "xno" ; then
   AC_MSG_NOTICE([--disable-dap-remote|external-server-tests => --disable_dap_long_tests])
   enable_dap_long_tests=no
-fi
-
-# Control zarr storage
-if test "x$enable_nczarr" = xyes ; then
-  if test "x$enable_netcdf_4" = xno ; then
-    AC_MSG_WARN([netCDF-4 disabled, so you must not enable nczarr])
-    enable_nczarr=no
-  fi
 fi
 
 if test "x$enable_nczarr" = xyes; then
@@ -1002,6 +956,26 @@ else
    AC_MSG_WARN([*** DO NOT SPECIFY WITH_S3_TESTING=YES UNLESS YOU HAVE ACCESS TO THE UNIDATA S3 BUCKET! ***])
    AC_DEFINE([NETCDF_ENABLE_S3_TESTALL], [yes], [control S3 testing.])
    fi
+fi
+
+# For convenience, define USE_NETCDF4
+if test "x${enable_hdf5}" = xyes || test "x${enable_nczarr}" = xyes || test "x${enable_dap4}" = xyes ; then
+enable_netcdf4=yes
+AC_DEFINE([USE_NETCDF4], [1], [convenience to avoid having to specify the above test])
+else
+enable_netcdf4=no
+fi
+AM_CONDITIONAL([USE_NETCDF4], [test x$enable_netcdf4 = xyes])
+
+# Does the user want to turn off nc_set_log_level() function? (It will
+# always be defined if --enable-logging is used.)
+AC_MSG_CHECKING([whether nc_set_log_level() function is included (will do nothing unless enable-logging is also used)])
+AC_ARG_ENABLE([set_log_level_func], [AS_HELP_STRING([--disable-set-log-level-func],
+              [disable the nc_set_log_level function])])
+test "x$enable_set_log_level_func" = xno -a "x$enable_logging" = xno || enable_set_log_level_func=yes
+AC_MSG_RESULT($enable_set_log_level_func)
+if test "x$enable_set_log_level_func" = xyes -a "x$enable_netcdf4" = xyes; then
+   AC_DEFINE([NETCDF_ENABLE_SET_LOG_LEVEL], 1, [If true, define nc_set_log_level.])
 fi
 
 # Check whether we want to enable strict null byte header padding.
@@ -1600,10 +1574,6 @@ fi
 AC_CHECK_LIB([m], [floor], [],
 [AC_MSG_ERROR([Can't find or link to the math library.])])
 
-if test "x$enable_netcdf_4" = xyes; then
-   AC_DEFINE([USE_NETCDF4], [1], [if true, build netCDF-4])
-fi
-
 # Set defaults
 hdf5_parallel=no
 hdf5_supports_par_filters=no
@@ -1853,10 +1823,6 @@ if test "x$enable_erange_fill" = xyes ; then
 fi
 AC_SUBST(M4FLAGS)
 
-# No logging for netcdf-3.
-if test "x$enable_netcdf_4" = xno; then
-   enable_logging=no
-fi
 if test "x$enable_logging" = xyes; then
    AC_DEFINE([LOGGING], 1, [If true, turn on logging.])
 fi
@@ -1927,11 +1893,10 @@ AM_CONDITIONAL(NETCDF_ENABLE_DAP_LONG_TESTS, [test "x$enable_dap_long_tests" = x
 AM_CONDITIONAL(USE_PNETCDF_DIR, [test ! "x$PNETCDFDIR" = x])
 AM_CONDITIONAL(USE_LOGGING, [test "x$enable_logging" = xyes])
 AM_CONDITIONAL(CROSS_COMPILING, [test "x$cross_compiling" = xyes])
-AM_CONDITIONAL(USE_NETCDF4, [test x$enable_netcdf_4 = xyes])
 AM_CONDITIONAL(USE_HDF5, [test x$enable_hdf5 = xyes])
 AM_CONDITIONAL(USE_HDF4, [test x$enable_hdf4 = xyes])
 AM_CONDITIONAL(USE_HDF4_FILE_TESTS, [test x$enable_hdf4_file_tests = xyes])
-AM_CONDITIONAL(USE_RENAMEV3, [test x$enable_netcdf_4 = xyes -o x$enable_dap = xyes])
+AM_CONDITIONAL(USE_RENAMEV3, [test x$enable_hdf5 = xyes -o x$enable_dap = xyes])
 AM_CONDITIONAL(USE_PNETCDF, [test x$enable_pnetcdf = xyes])
 AM_CONDITIONAL(USE_DISPATCH, [test x$enable_dispatch = xyes])
 AM_CONDITIONAL(BUILD_MMAP, [test x$enable_mmap = xyes])
@@ -1958,12 +1923,9 @@ AM_CONDITIONAL(HAVE_ZSTD, [test "x$have_zstd" = xyes])
 
 # If the machine doesn't have a long long, and we want netCDF-4, then
 # we've got problems!
-if test "x$enable_netcdf_4" = xyes; then
+if test "x$enable_hdf5" = xyes; then
    AC_TYPE_LONG_LONG_INT
    AC_TYPE_UNSIGNED_LONG_LONG_INT
-dnl    if test ! "x$ac_cv_type_long_long_int" = xyes -o ! "x$ac_cv_type_unsigned_long_long_int" = xyes; then
-dnl       AC_MSG_ERROR([This platform does not support long long types. These are required for netCDF-4.])
-dnl    fi
 fi
 
 # Create the file name for a "make ftpbin" which is used to generate a
@@ -1975,7 +1937,7 @@ fi
 # meteor strike.
 AC_MSG_CHECKING([what to call the output of the ftpbin target])
 BINFILE_NAME=binary-netcdf-$PACKAGE_VERSION
-test "x$enable_netcdf_4" = xno && BINFILE_NAME=${BINFILE_NAME}_nc3
+test "x$enable_hdf5" = xno && BINFILE_NAME=${BINFILE_NAME}_nc3
 BINFILE_NAME=${BINFILE_NAME}.tar
 AC_SUBST(BINFILE_NAME)
 AC_MSG_RESULT([$BINFILE_NAME $FC $CXX])
@@ -2036,7 +1998,6 @@ AC_SUBST(HAS_DAP,[$enable_dap])
 AC_SUBST(HAS_DAP2,[$enable_dap])
 AC_SUBST(HAS_DAP4,[$enable_dap4])
 AC_SUBST(HAS_NC2,[$nc_build_v2])
-AC_SUBST(HAS_NC4,[$enable_netcdf_4])
 AC_SUBST(HAS_CDF5,[$enable_cdf5])
 AC_SUBST(HAS_HDF4,[$enable_hdf4])
 AC_SUBST(HAS_BENCHMARKS,[$enable_benchmarks])
@@ -2202,7 +2163,6 @@ AC_DEFUN([AX_SET_META],[
 #####
 AC_SUBST([NC_VERSION]) NC_VERSION=$VERSION
 AX_SET_META([NC_HAS_NC2],[$nc_build_v2],[yes])
-AX_SET_META([NC_HAS_NC4],[$enable_netcdf_4],[yes])
 AX_SET_META([NC_HAS_HDF4],[$enable_hdf4],[yes])
 AX_SET_META([NC_HAS_BENCHMARKS],[$enable_benchmarks],[yes])
 AX_SET_META([NC_HAS_HDF5],[$enable_hdf5],[yes])

@@ -67,7 +67,7 @@ static int NC4_move_in_NCList(NC* nc, int new_id);
 static int bincmp(const void* arg1, const void* arg2);
 static int sortcmp(const void* arg1, const void* arg2);
 
-#if NC_HAS_LOGGING
+#if LOGGING
 /* This is the severity level of messages which will be logged. Use
    severity 0 for errors, 1 for important log messages, 2 for less
    important, etc. */
@@ -137,7 +137,7 @@ nc_log(int severity, const char *fmt, ...)
     fprintf(f, "\n");
     fflush(f);
 }
-#endif /* NC_HAS_LOGGING */
+#endif /* LOGGING */
 
 /**
  * @internal Check and normalize and name.
@@ -1729,7 +1729,7 @@ nc4_init_logging(void)
 {
     int ret = NC_NOERR;
 
-#if NC_HAS_LOGGING
+#if LOGGING
 #if NC_HAS_PARALLEL4
     if (!LOG_FILE && nc_log_level >= 0)
     {
@@ -1755,7 +1755,7 @@ nc4_init_logging(void)
             return NC_EINTERNAL;
     }
 #endif /* NC_HAS_PARALLEL4 */
-#endif /* NC_HAS_LOGGING */
+#endif /* LOGGING */
 
     return ret;
 }
@@ -1769,7 +1769,7 @@ nc4_init_logging(void)
 void
 nc4_finalize_logging(void)
 {
-#if NC_HAS_LOGGING
+#if LOGGING
 #if NC_HAS_PARALLEL4
     if (LOG_FILE)
     {
@@ -1777,7 +1777,7 @@ nc4_finalize_logging(void)
         LOG_FILE = NULL;
     }
 #endif /* NC_HAS_PARALLEL4 */
-#endif /* NC_HAS_LOGGING */
+#endif /* LOGGING */
 }
 
 /**
@@ -1796,7 +1796,7 @@ nc4_finalize_logging(void)
 int
 nc_set_log_level(int new_level)
 {
-#if NC_HAS_LOGGING
+#if LOGGING
     /* Remember the new level. */
     nc_log_level = new_level;
 
@@ -1813,13 +1813,13 @@ nc_set_log_level(int new_level)
 #endif /* NC_HAS_PARALLEL4 */
     
     LOG((1, "log_level changed to %d", nc_log_level));
-#endif /*NC_HAS_LOGGING */
+#endif /*LOGGING */
     
     return NC_NOERR;
 }
 #endif /* NETCDF_ENABLE_SET_LOG_LEVEL */
 
-#if NC_HAS_LOGGING
+#if LOGGING
 #define MAX_NESTS 10
 /**
  * @internal Recursively print the metadata of a group.
@@ -1988,7 +1988,7 @@ log_metadata_nc(NC_FILE_INFO_T *h5)
     return NC_NOERR;
 }
 
-#endif /*NC_HAS_LOGGING */
+#endif /*LOGGING */
 
 /**
  * @internal Show the in-memory metadata for a netcdf file. This
@@ -2005,7 +2005,7 @@ int
 NC4_show_metadata(int ncid)
 {
     int retval = NC_NOERR;
-#if NC_HAS_LOGGING
+#if LOGGING
     NC_FILE_INFO_T *h5;
     int old_log_level = nc_log_level;
 
@@ -2017,7 +2017,7 @@ NC4_show_metadata(int ncid)
     nc_log_level = 2;
     retval = log_metadata_nc(h5);
     nc_log_level = old_log_level;
-#endif /*NC_HAS_LOGGING*/
+#endif /*LOGGING*/
     return retval;
 }
 

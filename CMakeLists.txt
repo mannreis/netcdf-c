@@ -431,20 +431,11 @@ endif()
 # Format Option checks
 ################################
 
-# We need to now treat enable-netcdf4 and enable-hdf5 as separate,
-# but for back compatability, we need to treat enable-netcdf4
+# As of this branch, --enable-netcdf4 and --enable_netcdf-4
+# are removed in favor of enable-hdf5.
 # as equivalent to enable-hdf5.
-# We detect this using these rules:
-# 1. if NETCDF_ENABLE_HDF5 is off then disable hdf5
-# 2. if NETCDF_ENABLE_NETCDF_4 is off then disable hdf5
-# 3. else enable hdf5
-option(NETCDF_ENABLE_NETCDF_4 "Use HDF5." ON)
 option(NETCDF_ENABLE_HDF5 "Use HDF5." ON)
-if(NOT NETCDF_ENABLE_HDF5 OR NOT NETCDF_ENABLE_NETCDF_4)
-  set(NETCDF_ENABLE_HDF5 OFF CACHE BOOL "Use HDF5" FORCE)
-endif()
 option(NETCDF_ENABLE_HDF4 "Build netCDF-4 with HDF4 read capability(HDF4, HDF5 and Zlib required)." OFF)
-
 
 option(NETCDF_ENABLE_DAP "Enable DAP2 and DAP4 Client." ON)
 option(NETCDF_ENABLE_NCZARR "Enable NCZarr Client." ON)
@@ -452,8 +443,15 @@ option(NETCDF_ENABLE_PNETCDF "Build with parallel I/O for CDF-1, 2, and 5 files 
 set(NETCDF_ENABLE_CDF5 AUTO CACHE STRING "AUTO")
 option(NETCDF_ENABLE_CDF5 "Enable CDF5 support" ON)
 
-if(DEFINED NETCDF_ENABLE_NETCDF4)
-  message(FATAL_ERROR "NETCDF_ENABLE_NETCDF4 is deprecated. Please use NETCDF_ENABLE_NETCDF_4 instead.")
+# Fail on use of ENABLE_NETCDF4/ENABLE_NETCDF_4
+option(NETCDF_ENABLE_NETCDF4 "" OFF)
+option(NETCDF_ENABLE_NETCDF_4 "" OFF)
+
+if(NETCDF_ENABLE_NETCDF4)
+message(FATAL_ERROR "-DNETCDF_ENABLE_NETCDF4 is no longer supported: Please use ENABLE_HDF5")
+endif()
+if(NETCDF_ENABLE_NETCDF_4)
+message(FATAL_ERROR "-DNETCDF_ENABLE_NETCDF_4 is no longer supported: Please use ENABLE_HDF5")
 endif()
 
 # Decide default Zarr Format for creation
@@ -471,10 +469,11 @@ ELSE()
   SET(ENABLE_NCZARR_V3 OFF CACHE BOOL "Enable Zarr V3" FORCE)
 ENDIF()
 
-# Netcdf-4 support (i.e. libsrc4) is required by more than just HDF5 (e.g. NCZarr)
-# So depending on what above formats are enabled, enable netcdf-4
-if(NETCDF_ENABLE_HDF5 OR NETCDF_ENABLE_HDF4 OR NETCDF_ENABLE_NCZARR)
-  set(NETCDF_ENABLE_NETCDF_4 ON CACHE BOOL "Enable netCDF-4 API" FORCE)
+# For convenience, define USE_NETCDF4
+if(USE_HDF5 OR NETCDF_ENABLE_NCZARR OR NETCDF_ENABLE_DAP4)
+set(USE_NETCDF4 ON CACHE BOOL "Enable USE_NETCDF4" FORCE)
+else()
+set(USE_NETCDF4 OF CACHE BOOL "Enable USE_NETCDF4" FORCE)
 endif()
 
 # enable|disable all forms of network access
@@ -498,10 +497,7 @@ endif()
 # Did the user specify a default minimum blocksize for posixio?
 set(NCIO_MINBLOCKSIZE 256 CACHE STRING "Minimum I/O Blocksize for netCDF classic and 64-bit offset format files.")
 
-if(NETCDF_ENABLE_NETCDF_4)
-  set(USE_NETCDF4 ON CACHE BOOL "")
-  set(NETCDF_ENABLE_NETCDF_4 ON CACHE BOOL "")
-else()
+if(NOT USE_NETCDF4)
   set(USE_HDF4_FILE_TESTS OFF)
   set(USE_HDF4 OFF)
   set(NETCDF_ENABLE_HDF4_FILE_TESTS OFF)
@@ -510,7 +506,7 @@ endif()
 
 # Option Logging, only valid for netcdf4.
 option(NETCDF_ENABLE_LOGGING "Enable Logging." OFF)
-if(NOT NETCDF_ENABLE_NETCDF_4)
+if(NOT USE_NETCDF4)
 set(NETCDF_ENABLE_LOGGING OFF)
 endif()
 if(NETCDF_ENABLE_LOGGING)
@@ -519,9 +515,9 @@ if(NETCDF_ENABLE_LOGGING)
   set(NETCDF_ENABLE_SET_LOG_LEVEL ON)
 endif()
 option(NETCDF_ENABLE_SET_LOG_LEVEL_FUNC "Enable definition of nc_set_log_level()." ON)
-if(NETCDF_ENABLE_NETCDF_4 AND NOT NETCDF_ENABLE_LOGGING AND NETCDF_ENABLE_SET_LOG_LEVEL_FUNC)
-  target_compile_definitions(netcdf PRIVATE -DNETCDF_ENABLE_SET_LOG_LEVEL)
-  set(NETCDF_ENABLE_SET_LOG_LEVEL ON)
+if(USE_NETCDF4 AND NOT NETCDF_ENABLE_LOGGING AND NETCDF_ENABLE_SET_LOG_LEVEL_FUNC)
+  target_compile_definitions(netcdf PRIVATE -DENABLE_SET_LOG_LEVEL)
+  set(ENABLE_SET_LOG_LEVEL ON)
 endif()
 
 # Option to allow for strict null file padding.
@@ -976,7 +972,7 @@ endif()
 option(NETCDF_ENABLE_PARALLEL_TESTS "Enable Parallel IO Tests. Requires HDF5/NetCDF4 with parallel I/O Support." "${HDF5_PARALLEL}")
 if(NETCDF_ENABLE_PARALLEL_TESTS AND USE_PARALLEL)
   set(TEST_PARALLEL ON CACHE BOOL "")
-  if(USE_NETCDF4)
+  if(USE_HDF5)
     set(TEST_PARALLEL4 ON CACHE BOOL "")
   endif()
 endif()
@@ -1397,7 +1393,7 @@ if(USE_PNETCDF)
 endif(USE_PNETCDF)
 
 if(USE_NETCDF4)
-  add_subdirectory(libsrc4)
+add_subdirectory(libsrc4)
 endif()
 
 if(USE_HDF5)
@@ -1636,7 +1632,6 @@ is_disabled(BUILD_SHARED_LIBS enable_static)
 is_enabled(BUILD_SHARED_LIBS enable_shared)
 
 is_enabled(ENABLE_V2_API HAS_NC2)
-is_enabled(NETCDF_ENABLE_NETCDF_4 HAS_NC4)
 is_enabled(NETCDF_ENABLE_HDF4 HAS_HDF4)
 is_enabled(USE_HDF5 HAS_HDF5)
 is_enabled(OFF HAS_BENCHMARKS)
