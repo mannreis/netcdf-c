@@ -131,7 +131,7 @@ IF(NETCDF_ENABLE_TESTS)
   if(USE_HDF5)
     build_bin_test_with_util_lib(ncdumpchunks ut_util)
     target_include_directories(ncdumpchunks PUBLIC ../libnczarr)
-    target_include_directories(ncdumpchunks PUBLIC ${HDF5_INCLUDE_DIR})
+    target_include_directories(ncdumpchunks PUBLIC HDF5::HDF5)
     target_link_libraries(ncdumpchunks netcdf HDF5::HDF5 hdf5::hdf5_hl)
   endif()
 

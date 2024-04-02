@@ -780,7 +780,7 @@ So, many of the tests in *v3_nczarr_test* are copies of the tests in *nczarr_tes
 It turns out that automake is not easily capable of copying those tests on the fly.
 This is principally because the automake *make distcheck* command does not allow
 modifications to the source directory, but only to the build directory.
-This means that the tests must be heavily modified to handle the two cases where scripts, programs, and test data are in *$$\{srcdir\}* versus when they are in *$$\{builddir\}*.
+This means that the tests must be heavily modified to handle the two cases where scripts, programs, and test data are in *\$\$\{srcdir\}* versus when they are in *\$\$\{builddir\}*.
 
 
 Rather than copying the shared files on the fly, I chose instead to 
