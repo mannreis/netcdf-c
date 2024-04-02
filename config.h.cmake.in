@@ -625,9 +625,6 @@ with zip */
 /* if true, use mmap for in-memory files */
 #cmakedefine USE_MMAP 1
 
-/* if true, build netCDF-4 */
-#cmakedefine USE_NETCDF4 1
-
 /* build the netCDF version 2 API */
 #cmakedefine USE_NETCDF_2 1
 
