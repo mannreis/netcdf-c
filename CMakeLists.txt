@@ -455,19 +455,19 @@ message(FATAL_ERROR "-DNETCDF_ENABLE_NETCDF_4 is no longer supported: Please use
 endif()
 
 # Decide default Zarr Format for creation
-OPTION(ENABLE_DEFAULT_ZARR_FORMAT_V3 "Specify the default Zarr format is V3" OFF)
-IF(ENABLE_DEFAULT_ZARR_FORMAT_V3)
-SET(DFALTZARRFORMAT 3 CACHE STRING "")
-ELSE()
-SET(DFALTZARRFORMAT 2 CACHE STRING "")
-ENDIF()
+option(NETCDF_ENABLE_DEFAULT_ZARR_FORMAT_V3 "Specify the default Zarr format is V3" OFF)
+if(NETCDF_ENABLE_DEFAULT_ZARR_FORMAT_V3)
+set(DFALTZARRFORMAT 3 CACHE STRING "")
+else()
+set(DFALTZARRFORMAT 2 CACHE STRING "")
+endif()
 
-IF(ENABLE_NCZARR)
-  SET(ENABLE_NCZARR_V3 ON CACHE BOOL "Enable Zarr V3" FORCE)
+if(NETCDF_ENABLE_NCZARR)
+  set(NETCDF_ENABLE_NCZARR_V3 ON CACHE BOOL "Enable Zarr V3" FORCE)
   # V3 is enabled if NCzarr is enabled
-ELSE()
-  SET(ENABLE_NCZARR_V3 OFF CACHE BOOL "Enable Zarr V3" FORCE)
-ENDIF()
+else()
+  set(ENABLE_NCZARR_V3 OFF CACHE BOOL "Enable Zarr V3" FORCE)
+endif()
 
 # For convenience, define USE_NETCDF4
 if(USE_HDF5 OR NETCDF_ENABLE_NCZARR OR NETCDF_ENABLE_DAP4)
@@ -1425,10 +1425,10 @@ endif()
 
 if(NETCDF_ENABLE_NCZARR)
   add_subdirectory(libnczarr)
-#  file(COPY ${netCDF_SOURCE_DIR}/unit_test/timer_utils.h
-#       DESTINATION ${netCDF_BINARY_DIR}/nczarr_test/)
-#  file(COPY ${netCDF_SOURCE_DIR}/unit_test/timer_utils.c
-#       DESTINATION ${netCDF_BINARY_DIR}/nczarr_test/)
+  file(COPY ${netCDF_SOURCE_DIR}/unit_test/timer_utils.h
+       DESTINATION ${netCDF_BINARY_DIR}/nczarr_test/)
+  file(COPY ${netCDF_SOURCE_DIR}/unit_test/timer_utils.c
+       DESTINATION ${netCDF_BINARY_DIR}/nczarr_test/)
   file(COPY ${netCDF_SOURCE_DIR}/nc_test4/test_filter.c
        DESTINATION ${netCDF_BINARY_DIR}/nczarr_test/)
   file(COPY ${netCDF_SOURCE_DIR}/nc_test4/test_filter_misc.c

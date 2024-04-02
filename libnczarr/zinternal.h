@@ -121,7 +121,7 @@ Optionally inserted into any group zarr.json as an attribute:
 \"subgroups\": ["<name>",...]
 }"
 
-Optionally Inserted into any array zarr.json as an attribute:
+Optionally inserted into any array zarr.json as an attribute:
 ````
 "_nczarr_array": "{
 \"dimension_references\": [\"/g1/g2/d1\", \"/d2\",...],

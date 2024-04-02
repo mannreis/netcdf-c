@@ -1868,13 +1868,6 @@ if test "x$enable_nczarr_filters" = xyes; then
    AC_DEFINE([NETCDF_ENABLE_NCZARR_FILTERS], [1], [if true, enable NCZarr filters])
 fi
 
-# Client side filter registration is permanently disabled
-enable_clientside_filters=no
-
-AM_CONDITIONAL(NETCDF_ENABLE_CLIENTSIDE_FILTERS, [test x$enable_clientside_filters = xyes])
-AM_CONDITIONAL(NETCDF_ENABLE_FILTER_TESTING, [test x$enable_filter_testing = xyes])
-AM_CONDITIONAL(NETCDF_ENABLE_NCZARR_FILTERS, [test x$enable_nczarr_filters = xyes])
-
 # Automake conditionals need to be called, whether the answer is yes
 # or no.
 AM_CONDITIONAL(BUILD_PARALLEL, [test x$enable_parallel = xyes])

@@ -777,25 +777,22 @@ Similarly, when the tests in *v3_nczarr_test* are executed, they default to usin
 
 It turns out that most (but not all) of the V2 tests can be reused for testing V3.
 So, many of the tests in *v3_nczarr_test* are copies of the tests in *nczarr_test*.
-It turns out that automake is not easily capable of copying those tests on the fly.
-This is principally because the automake *make distcheck* command does not allow
-modifications to the source directory, but only to the build directory.
-This means that the tests must be heavily modified to handle the two cases where scripts, programs, and test data are in *\$\$\{srcdir\}* versus when they are in *\$\$\{builddir\}*.
 
+## AutoMake Testing
+For AutoMake testing, selected V2 tests are copied to the *v3_nczarr_test*
+directory using the *BUILT_SOURCES* mechanism.
+If a new test is added to the *nczarr_test* directory, then its manifestation
+in the *v3_nczarr_test* must be decided.
 
-Rather than copying the shared files on the fly, I chose instead to 
-keep copies of the files in both *nczarr_test* and *v3_nczarr_test*.
-The two sets are kept in synch by adding this command:
-````make update_testfiles````.
-This command copies the relevant files from *nczarr_test* -- the base tests --
-to *v3_nczarr_test*.
-So if any test program or script or test input file is modified in *nczarr_test*,
-then *v3_nczarr_test* is kept up-to-date via this process.
-1. make distclean
-2. autoreconf -i --force
-3. ./configure \<options\>
-4. cd v3_test_nczarr
-5. make update_testfiles
+If the test can be used directly, then the file v3_nczarr_test must be modified
+and added to the TESTFILES_NCZARR variable. If the data files
+referenced by the test can be used directly, then they should be added to the
+TESTDATA_NCZARR variable.
+
+If the test must be modified for V3 use, then the modified
+test should be github-add'ed to the v3_nczarr_test directory
+and inserted into the Makefile.am. Similarly, any V3 specific
+data files must be manually added to the Makefile.am and github-add'ed.
 
 # Point of Contact {#intern_poc}
 
