@@ -96,10 +96,10 @@ usage(int err)
 
 
 const char*
-printvector(int rank, size_t* vec)
+printvector(size_t rank, size_t* vec)
 {
     char svec[NC_MAX_VAR_DIMS*3+1];
-    int i;
+    size_t i;
     svec[0] = '\0';
     for(i=0;i<rank;i++) {
 	char s[3+1];
@@ -151,7 +151,7 @@ odom_more(Odometer* odom)
 int
 odom_next(Odometer* odom)
 {
-     int i;
+     size_t i;
      for(i=odom->rank-1;i>=0;i--) {
 	 odom->index[i]++;
 	 if(odom->index[i] < odom->stop[i]) break;
@@ -202,12 +202,12 @@ odom_print(Odometer* odom)
 
 #ifdef DEBUG
 char*
-chunk_key(int format->rank, size_t* indices)
+chunk_key(size_t formatrank, size_t* indices)
 {
     char key[NC_MAX_VAR_DIMS*3+1];
-    int i;
+    size_t i;
     key[0] = '\0';
-    for(i=0;i<format->rank;i++) {
+    for(i=0;i<formatrank;i++) {
 	char s[3+1];
 	if(i > 0) strlcat(key,".",sizeof(key));
 	snprintf(s,sizeof(s),"%u",(unsigned)indices[i]);
@@ -265,7 +265,7 @@ static void
 printchunk(Format* format, int* chunkdata, size_t indent)
 {
     size_t k[3];
-    int rank = format->rank;
+    size_t rank = format->rank;
     size_t cols[3], pos;
     size_t* chl = format->chunklens;
 

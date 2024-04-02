@@ -176,7 +176,7 @@ endif
 endif
 endif
 
-if NETCDF_ENABLE_NCDUMPCHUNKS
+if USE_HDF5
 # Given a netcdf4|NCZarr file, dump the actual chunk contents.
 # Used to validate nczarr chunking code.
 AM_CPPFLAGS += -I$(top_srcdir)/libnczarr
@@ -212,7 +212,6 @@ endif
 # This set of tests is almost exactly the same as those of nczarr_test.
 # So provide a Makefile target to update the files here with copies
 # of those in nczarr test and elsewhere.
-
 
 .PHONY: testfiles_nczarr testdata_nczarr
 

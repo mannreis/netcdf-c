@@ -7,6 +7,29 @@
 
 set(abs_top_srcdir ${CMAKE_CURRENT_SOURCE_DIR})
 
+# This set of tests is almost exactly the same as those of nczarr_test.
+# So provide a Makefile target to update the files here with copies
+# of those in nczarr test and elsewhere.
+
+# Sources that are copies of same files from nczarr_test
+set(TESTFILES_NCZARR test_nczarr.sh test_chunking.c test_filter_vlen.c test_h5_endians.c test_put_vars_two_unlim_dim.c test_quantize.c test_unlim_vars.c tst_pure_awssdk.cpp)
+set(TESTFILES_NCZARR ${TESTFILES_NCZARR} zhex.c zisjson.c zmapio.c zs3parse.c s3util.c ncdumpchunks.c)
+set(TESTFILES_NCZARR ${TESTFILES_NCZARR} run_chunkcases.sh run_corrupt.sh run_external.sh run_fillonlyz.sh run_filter.sh run_filterinstall.sh run_filter_misc.sh run_filter_vlen.sh run_interop.sh run_jsonconvention.sh run_misc.sh run_mud.sh run_nccopy5.sh run_nccopyz.sh run_ncgen4.sh run_nczarr_fill.sh run_nczfilter.sh run_newformat.sh run_notzarr.sh run_nulls.sh run_perf_chunks1.sh run_purezarr.sh run_quantize.sh run_scalar.sh run_specific_filters.sh run_strings.sh run_unknown.sh run_unlim_io.sh run_ut_map.sh run_ut_mapapi.sh run_ut_misc.sh)
+
+set(TESTDATA_NCZARR ref_nulls_nczarr.baseline ref_zarr_test_data.cdl.gz ref_avail1.cdl ref_byte.cdl ref_byte_fill_value_null.cdl ref_fillonly.cdl ref_misc1.cdl ref_ndims.cdl ref_newformatpure.cdl ref_nulls.cdl ref_oldformat.cdl ref_perdimspecs.cdl ref_power_901_constants.cdl ref_purezarr_base.cdl ref_quotes.cdl ref_rem.cdl ref_scalar.cdl ref_skip.cdl ref_skipw.cdl ref_string.cdl ref_t_meta_dim1.cdl ref_t_meta_var1.cdl ref_ut_mapapi_create.cdl ref_ut_mapapi_data.cdl ref_ut_mapapi_meta.cdl ref_ut_map_create.cdl ref_ut_map_writedata.cdl ref_ut_map_writemeta.cdl ref_ut_map_writemeta2.cdl ref_ut_testmap_create.cdl ref_whole.cdl ref_avail1.dmp ref_misc1.dmp ref_ndims.dmp ref_rem.dmp ref_noshape.file.zip ref_groups.h5 ref_notzarr.tar.gz ref_avail1.txt ref_skip.txt ref_ut_json_build.txt ref_ut_json_parse.txt ref_ut_mapapi_search.txt ref_ut_map_readmeta.txt ref_ut_map_readmeta2.txt ref_ut_map_search.txt ref_ut_proj.txt ref_whole.txt ref_byte.zarr.zip ref_byte_fill_value_null.zarr.zip ref_oldformat.zip ref_power_901_constants_orig.zip ref_quotes_orig.zip)
+
+for(TF ${TESTFILES_NCZARR})
+  file(COPY "${netCDF_SOURCE_DIR}/nczarr_test/${TF}"
+      DESTINATION ${netCDF_BINARY_DIR}/v3_nczarr_test/${TF}"
+      FILE_PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE)
+endforeach()
+
+for(TD ${TESTDATA_NCZARR})
+  file(COPY "${netCDF_SOURCE_DIR}/nczarr_test/${TD}"
+      DESTINATION ${netCDF_BINARY_DIR}/v3_nczarr_test/${TD}"
+      FILE_PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE)
+endforeach()
+
 remove_definitions(-DDLL_EXPORT)
 
 file(GLOB COPY_FILES ${CMAKE_CURRENT_SOURCE_DIR}/*.sh
@@ -20,30 +43,19 @@ if(USE_X_GETOPT)
 set(XGETOPTSRC "${CMAKE_CURRENT_SOURCE_DIR}/../libdispatch/XGetopt.c")
 endif()
 
-# Built Sources that are copies from nczarr_test
-set(NCZARRFILES run_corrupt.sh run_external.sh run_interop.sh run_chunkcases.sh run_fillonlyz.sh run_filter.sh run_nccopyz.sh run_nczarr_fill.sh run_nczfilter.sh run_newformat.sh run_perf_chunks1.sh run_unlim_io.sh run_ut_map.sh run_ut_mapapi.sh run_ncgen4.sh run_quantize.sh run_purezarr.sh run_misc.sh run_jsonconvention.sh run_strings.sh run_scalar.sh run_nulls.sh run_notzarr.sh)
-
-set(NCZARRFILES ${NCZARRFILES} ref_noshape.file.zip ref_power_901_constants.cdl ref_power_901_constants_orig.zip ref_avail1.cdl ref_avail1.dmp ref_avail1.txt ref_byte.cdl ref_byte_fill_value_null.cdl ref_byte_fill_value_null.zarr.zip ref_byte.zarr.zip ref_fillonly.cdl ref_groups.h5 ref_misc1.cdl ref_misc1.dmp ref_ndims.cdl ref_ndims.dmp ref_newformatpure.cdl ref_notzarr.tar.gz ref_nulls.cdl ref_nulls_nczarr.baseline ref_oldformat.cdl ref_oldformat.zip ref_perdimspecs.cdl ref_purezarr_base.cdl ref_quotes.cdl ref_quotes_orig.zip ref_rem.cdl ref_rem.dmp ref_scalar.cdl ref_skip.cdl ref_skip.txt ref_skipw.cdl ref_string.cdl ref_t_meta_dim1.cdl ref_t_meta_var1.cdl ref_ut_json_build.txt ref_ut_json_parse.txt ref_ut_mapapi_create.cdl ref_ut_mapapi_data.cdl ref_ut_mapapi_meta.cdl ref_ut_mapapi_search.txt ref_ut_map_create.cdl ref_ut_map_readmeta2.txt ref_ut_map_readmeta.txt ref_ut_map_search.txt ref_ut_map_writedata.cdl ref_ut_map_writemeta2.cdl ref_ut_map_writemeta.cdl ref_ut_proj.txt ref_ut_testmap_create.cdl ref_whole.cdl ref_whole.txt ref_zarr_test_data.cdl.gz ref_bzip2.cdl ref_filtered.cdl)
-
-for(NZ ${NCZARRFILES})
-  file(COPY "${netCDF_SOURCE_DIR}/nczarr_test/${NZ}"
-      DESTINATION ${netCDF_BINARY_DIR}/v3_nczarr_test/${NZ}"
-      FILE_PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE)
-endforeach()
-
-if(ENABLE_TESTS)
+if(NETCDF_ENABLE_TESTS)
 
   add_library(ut_util STATIC ut_util.c ut_test.c ut_includes.h ut_test.h ${XGETOPTSRC})
-  if(ENABLE_DLL)
+  if(NETCDF_ENABLE_DLL)
     target_compile_definitions(ut_util PUBLIC -DDLL_EXPORT -DDLL_NETCDF)
-  endif(ENABLE_DLL)
+  endif(NETCDF_ENABLE_DLL)
   target_include_directories(ut_util PUBLIC ../libnczarr ../plugins ${CMAKE_CURRENT_LIST_DIR})
   target_link_libraries(ut_util PUBLIC netcdf ${ALL_TLL_LIBS})
 
   add_library(test_utils STATIC test_utils.c test_utils.h ${XGETOPTSRC})
-  if(ENABLE_DLL)
+  if(NETCDF_ENABLE_DLL)
     target_compile_definitions(test_utils PUBLIC -DDLL_EXPORT -DDLL_NETCDF)
-  endif(ENABLE_DLL)
+  endif(NETCDF_ENABLE_DLL)
   target_include_directories(test_utils PUBLIC ../libnczarr ../plugins ${CMAKE_CURRENT_LIST_DIR})
   target_link_libraries(test_utils PUBLIC netcdf ${ALL_TLL_LIBS})
 
@@ -97,11 +109,11 @@ if(ENABLE_TESTS)
   target_include_directories(zs3parse PUBLIC ../libnczarr)
   build_bin_test_with_util_lib(zmapio ut_util)
 
-  if(ENABLE_S3 AND NOT WITH_S3_TESTING STREQUAL "NO")
+  if(NETCDF_ENABLE_S3 AND NOT WITH_S3_TESTING STREQUAL "NO")
   # Helper programs for testing
     build_bin_test(s3util ${COMMONSRC})
   # Pure AWS Test
-    if(ENABLE_S3_AWS)
+    if(NETCDF_ENABLE_S3_AWS)
       set(TMP_CMAKE_CXX_STANDARD ${MAKE_CXX_STANDARD})
       set(CMAKE_CXX_STANDARD 11)
       add_executable(tst_pure_awssdk tst_pure_awssdk.cpp)
@@ -119,11 +131,11 @@ if(ENABLE_TESTS)
       endif(MSVC)      
 
       SET(CMAKE_CXX_STANDARD ${TMP_CMAKE_CXX_STANDARD})
-    endif(ENABLE_S3_AWS)
+    endif(NETCDF_ENABLE_S3_AWS)
     target_include_directories(s3util PUBLIC ../libnczarr)
   endif()
   
-  if(ENABLE_NCDUMPCHUNKS)
+  if(USE_HDF5)
     build_bin_test_with_util_lib(ncdumpchunks ut_util)
   endif()
 
@@ -160,8 +172,8 @@ if(ENABLE_TESTS)
     add_sh_test(nczarr_test run_fillonlyz)
     endif()
 
-  if(ENABLE_NCZARR_FILTERS)
-  if(ENABLE_FILTER_TESTING)
+  if(NETCDF_ENABLE_NCZARR_FILTERS)
+  if(NETCDF_ENABLE_FILTER_TESTING)
 	  build_bin_test(test_nczfilter)
   	  build_bin_test(test_filter_vlen)
 	  build_bin_test(testfilter)
@@ -178,10 +190,10 @@ if(ENABLE_TESTS)
             # It causes race conditions. So suppress and only test by hand.
             add_sh_test(nczarr_test run_unknown)
 	  endif(FALSE)
-  endif(ENABLE_FILTER_TESTING)
-  endif(ENABLE_NCZARR_FILTERS)
+  endif(NETCDF_ENABLE_FILTER_TESTING)
+  endif(NETCDF_ENABLE_NCZARR_FILTERS)
 
-  if(ENABLE_NCZARR_ZIP)
+  if(NETCDF_ENABLE_NCZARR_ZIP)
       add_sh_test(nczarr_test run_newformat)
       # Test various corrupted files
       add_sh_test(nczarr_test run_corrupt.sh)
@@ -193,7 +205,7 @@ if(ENABLE_TESTS)
 
   endif(BUILD_UTILITIES)
 
-endif(ENABLE_TESTS)
+endif(NETCDF_ENABLE_TESTS)
 
 ## Specify files to be distributed by 'make dist'
 FILE(GLOB CUR_EXTRA_DIST RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_SOURCE_DIR}/*.c ${CMAKE_CURRENT_SOURCE_DIR}/*.h ${CMAKE_CURRENT_SOURCE_DIR}/*.sh ${CMAKE_CURRENT_SOURCE_DIR}/*.cdl)

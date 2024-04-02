@@ -133,8 +133,8 @@ are set when opening a binary file on Windows. */
 /* if true, enable CDF5 Support */
 #cmakedefine NETCDF_ENABLE_CDF5 1
 
-/* if true, enable client side filters */
-#cmakedefine NETCDF_ENABLE_CLIENT_FILTERS 1
+/* if true, enable filter testing */
+#cmakedefine NETCDF_ENABLE_FILTER_TESTING 1
 
 /* if true, enable strict null byte header padding. */
 #cmakedefine USE_STRICT_NULL_BYTE_HEADER_PADDING 1

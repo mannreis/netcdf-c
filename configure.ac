@@ -1698,8 +1698,6 @@ if test "x$enable_hdf5" = xyes; then
 
 fi
 
-AM_CONDITIONAL(NETCDF_ENABLE_NCDUMPCHUNKS, [test "x$has_readchunks" = xyes ])
-
 # If the user wants hdf4 built in, check it out.
 if test "x$enable_hdf4" = xyes; then
    AC_CHECK_LIB([jpeg], [jpeg_CreateCompress], [],
@@ -1898,7 +1896,6 @@ fi
 if test "x$enable_nczarr" = xno; then
 AC_MSG_WARN([--disable-nczarr => --disable-nczarr-filters])
 enable_nczarr_filters=no
-enable_nczarr_filter_testing=no
 fi
 
 if test "x$enable_nczarr_filters" = xyes; then

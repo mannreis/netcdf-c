@@ -203,7 +203,7 @@ endif
 endif
 endif
 
-if NETCDF_ENABLE_NCDUMPCHUNKS
+if USE_HDF5
 # Given a netcdf4|NCZarr file, dump the actual chunk contents.
 # Used to validate nczarr chunking code.
 AM_CPPFLAGS += -I$(top_srcdir)/libnczarr

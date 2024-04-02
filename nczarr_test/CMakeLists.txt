@@ -7,6 +7,17 @@
 
 set(abs_top_srcdir ${CMAKE_CURRENT_SOURCE_DIR})
 
+NCZARR_C_TEST(tst_quantize test_quantize nc_test4)
+NCZARR_C_TEST(tst_filter_vlen test_filter_vlen nc_test4)
+NCZARR_C_TEST(tst_unlim_vars test_unlim_vars nc_test4)
+NCZARR_C_TEST(tst_h5_endians test_endians nc_test4)
+NCZARR_C_TEST(tst_put_vars_two_unlim_dim test_put_vars_two_unlim_dim nc_test4)
+NCZARR_C_TEST(tst_chunking test_chunking ncdump)
+
+NCZARR_SH_TEST(specific_filters nc_test4)
+NCZARR_SH_TEST(unknown nc_test4)
+NCZARR_SH_TEST(filter_vlen nc_test4)
+
 remove_definitions(-DDLL_EXPORT)
 
 file(GLOB COPY_FILES ${CMAKE_CURRENT_SOURCE_DIR}/*.sh
@@ -19,17 +30,6 @@ file(COPY ${COPY_FILES} DESTINATION ${CMAKE_CURRENT_BINARY_DIR}/ FILE_PERMISSION
 if(USE_X_GETOPT)
 set(XGETOPTSRC "${CMAKE_CURRENT_SOURCE_DIR}/../libdispatch/XGetopt.c")
 endif()
-
-NCZARR_C_TEST(tst_quantize test_quantize nc_test4)
-NCZARR_C_TEST(tst_filter_vlen test_filter_vlen nc_test4)
-NCZARR_C_TEST(tst_unlim_vars test_unlim_vars nc_test4)
-NCZARR_C_TEST(tst_h5_endians test_endians nc_test4)
-NCZARR_C_TEST(tst_put_vars_two_unlim_dim test_put_vars_two_unlim_dim nc_test4)
-NCZARR_C_TEST(tst_chunking test_chunking ncdump)
-
-NCZARR_SH_TEST(specific_filters nc_test4)
-NCZARR_SH_TEST(unknown nc_test4)
-NCZARR_SH_TEST(filter_vlen nc_test4)
 
 # Unlimited tests
 NCZARR_SH_TEST(mud ncdump)
@@ -128,6 +128,12 @@ IF(NETCDF_ENABLE_TESTS)
   build_bin_test_with_util_lib(zs3parse ut_util)
   target_include_directories(zs3parse PUBLIC ../libnczarr)
   build_bin_test_with_util_lib(zmapio ut_util)
+  if(USE_HDF5)
+    build_bin_test_with_util_lib(ncdumpchunks ut_util)
+    target_include_directories(ncdumpchunks PUBLIC ../libnczarr)
+    target_include_directories(ncdumpchunks PUBLIC ${HDF5_INCLUDE_DIR})
+    target_link_libraries(ncdumpchunks netcdf HDF5::HDF5 hdf5::hdf5_hl)
+  endif()
 
   IF(NETCDF_ENABLE_S3 AND NOT WITH_S3_TESTING STREQUAL "NO")
   # Helper programs for testing
@@ -155,10 +161,6 @@ IF(NETCDF_ENABLE_TESTS)
     target_include_directories(s3util PUBLIC ../libnczarr)
   endif()
   
-  if(ENABLE_NCDUMPCHUNKS)
-    build_bin_test_with_util_lib(ncdumpchunks ut_util)
-  endif()
-
   IF(NETCDF_BUILD_UTILITIES)
     add_sh_test(nczarr_test run_ut_map)
     add_sh_test(nczarr_test run_ut_mapapi)
