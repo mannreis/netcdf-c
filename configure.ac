@@ -1854,11 +1854,6 @@ AC_MSG_WARN([--disable-plugins => --disable-filter-testing])
 enable_filter_testing=no
 fi
 
-if test "x$enable_filter_testing" = xno; then
-AC_MSG_WARN([--disable-filter-testing => --disable-nczarr-filter-testing])
-enable_nczarr_filter_testing=no
-fi
-
 if test "x$enable_nczarr" = xno; then
 AC_MSG_WARN([--disable-nczarr => --disable-nczarr-filters])
 enable_nczarr_filters=no
@@ -1899,6 +1894,8 @@ AM_CONDITIONAL(NETCDF_ENABLE_METADATA_PERF, [test x$enable_metadata_perf = xyes]
 AM_CONDITIONAL(NETCDF_ENABLE_BYTERANGE, [test "x$enable_byterange" = xyes])
 AM_CONDITIONAL(RELAX_COORD_BOUND, [test "xyes" = xyes])
 AM_CONDITIONAL(HAS_PAR_FILTERS, [test x$hdf5_supports_par_filters = xyes ])
+AM_CONDITIONAL(NETCDF_ENABLE_FILTER_TESTING, [test x$$enable_filter_testing=yes])
+AM_CONDITIONAL(NETCDF_ENABLE_NCZARR_FILTERS, [test x$enable_nczarr_filters=yes])
 # We need to simplify the set of S3 and Zarr flag combinations
 AM_CONDITIONAL(NETCDF_ENABLE_S3, [test "x$enable_s3" = xyes])
 AM_CONDITIONAL(NETCDF_ENABLE_S3_AWS, [test "x$enable_s3_aws" = xyes])
