@@ -179,7 +179,7 @@ nc_inq_var_filterx(int ncid, int varid, char** textp)
 /**************************************************/
 /* Support direct user defined filters */
 
-#ifdef ENABLE_CLIENTSIDE_FILTERS
+#ifdef NETCDF_ENABLE_CLIENTSIDE_FILTERS
 
 /* Use void* to avoid having to include hdf.h*/
 EXTERNL int
@@ -240,4 +240,4 @@ int stat = NC_NOERR;
 #endif
     return stat;
 }
-#endif /*ENABLE_CLIENTSIDE_FILTERS*/
+#endif /*NETCDF_ENABLE_CLIENTSIDE_FILTERS*/

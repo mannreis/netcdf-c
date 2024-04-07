@@ -20,7 +20,7 @@
 #include "netcdf.h"
 #include "netcdf_filter.h"
 
-#ifdef ENABLE_BLOSC
+#ifdef NETCDF_ENABLE_BLOSC
 #include <blosc.h>
 #endif
 
@@ -32,7 +32,7 @@ static int NC4_hdf5_filter_free(struct NC_HDF5_Filter* spec);
 /**************************************************/
 /* Filter registration support */
 
-#ifdef ENABLE_CLIENTSIDE_FILTERS
+#ifdef NETCDF_ENABLE_CLIENTSIDE_FILTERS
 
 /* Mnemonic */
 #define FILTERACTIVE 1
@@ -155,7 +155,7 @@ done:
     return THROW(stat);
 } 
 
-#endif /*ENABLE_CLIENTSIDE_FILTERS*/
+#endif /*NETCDF_ENABLE_CLIENTSIDE_FILTERS*/
 
 /**************************************************/
 /**************************************************/

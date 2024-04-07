@@ -146,7 +146,7 @@ Similarly ````/g1/g2/d2```` defines a dimension "d2" defined in the
 group g2, which in turn is a subgroup of group g1, which is a subgroup
 of the root group.
 
-The *type-alias* key is used to annotate the type of an array
+The *type_alias* key is used to annotate the type of an array
 to allow discovery of netcdf-4 specific types.
 Specifically, there are three current cases:
 | dtype | type_alias |
@@ -160,7 +160,6 @@ it is actually of unsigned 8-bit integer type. But it may actually be of some
 netcdf-4 type that is encoded as *uint8* in order to be recognized by other -- pure zarr--
 implementations. So, for example, if the netcdf-4 type is *char*, then the array's
 dtype is *uint8*, but its type alias is *char*.
-
 
 Optionally Inserted into any group zarr.json or array zarr.json is the extra attribute.
 "_nczarr_attrs": {\"attribute_types\": [{\"name\": \"attr1\", \"configuration\": {\"type\": \"<dtype>\"}}, ...]}
@@ -187,6 +186,8 @@ Optionally Inserted into any group zarr.json or array zarr.json is the extra att
 #define NOXARRAYCONTROL "noxarray"
 #define XARRAYSCALAR "_scalar_"
 #define DIMSCALAR "/_scalar_"
+#define NCZARR_MAXSTRLEN_ATTR "_nczarr_maxstrlen"
+#define NCZARR_DEFAULT_MAXSTRLEN_ATTR "_nczarr_default_maxstrlen"
 #define FORMAT2CONTROL "v2"
 #define FORMAT3CONTROL "v3"
 
@@ -282,7 +283,6 @@ typedef struct NCZ_VAR_INFO {
     struct NCZChunkCache* cache;
     struct NClist* dimension_names; /* names from _ARRAY_DIMENSIONS or dimension_names key */
     char dimension_separator; /* '.' | '/' */
-    NClist* incompletefilters;
     size_t maxstrlen; /* max length of strings for this variable */
     NCjson* jarray; /* Zarr.json; reclaim */
     const NCjson* jzarray; /* _nczarr_array: contains dimensions, attribute types, and storage type; do not reclaim */
@@ -315,21 +315,6 @@ struct NCZ_AttrInfo {
     NCjson* values;
 };
 
-#if 0
-/* Define the contents of the .nczcontent object */
-/* The .nczcontent field stores the following:
-   1. List of (name,length) for dims in the group
-   2. List of (name,type) for user-defined types in the group
-   3. List of var names in the group
-   4. List of subgroups names in the group
-*/
-typedef struct NCZCONTENT{
-    NClist* dims;
-    NClist* types; /* currently not used */
-    NClist* vars;
-    NClist* grps;
-} NCZCONTENT;
-#endif
 
 /**************************************************/
 
@@ -380,6 +365,10 @@ int ncz_gettype(NC_FILE_INFO_T*, NC_GRP_INFO_T*, int xtype, NC_TYPE_INFO_T** typ
 int ncz_find_default_chunksizes2(NC_GRP_INFO_T *grp, NC_VAR_INFO_T *var);
 int NCZ_ensure_quantizer(int ncid, NC_VAR_INFO_T* var);
 int NCZ_write_var_data(NC_FILE_INFO_T* file, NC_VAR_INFO_T* var);
+int NCZ_fillin_var(NC_FILE_INFO_T* h5, NC_VAR_INFO_T* var, NC_TYPE_INFO_T* type, size_t ndims, const int* dimids, size64_t* shape, size64_t* chunksizes, int endianness);
+
+/* zvar.c */
+int NCZ_reclaim_dim(NC_DIM_INFO_T* dim);
 
 /* Undefined */
 /* Find var, doing lazy var metadata read if needed. */

@@ -10,7 +10,7 @@
 extern int parseslices(const char* s0, int* nslicesp, NCZSlice* slices);
 extern int parsedimdef(const char* s0, Dimdef** defp);
 extern int parsevardef(const char* s0, NClist* dimdefs, Vardef** varp);
-extern int parsestringvector(const char* s0, int stopchar, char*** namesp);
+extern size_t parsestringvector(const char* s0, int stopchar, char*** namesp);
 extern void freedimdefs(NClist* defs);
 extern void freevardefs(NClist* defs);
 extern void freeranges(NCZChunkRange* ranges);

@@ -6,7 +6,7 @@
 
 #include "includes.h"
 
-#ifdef ENABLE_JAVA
+#ifdef NETCDF_ENABLE_JAVA
 
 #undef EXCEPTWRAP
 
@@ -601,4 +601,4 @@ genj_writeattr(Generator* generator, Symbol* asym, Bytebuffer* code,
 }
 
 
-#endif /*ENABLE_JAVA*/
+#endif /*NETCDF_ENABLE_JAVA*/

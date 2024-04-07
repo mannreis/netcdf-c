@@ -25,7 +25,7 @@
 #include "hdf5internal.h"
 #endif
 
-#ifdef ENABLE_NCZARR
+#ifdef NETCDF_ENABLE_NCZARR
 #include "zdispatch.h"
 #endif
 
@@ -221,7 +221,7 @@ done:
 /**************************************************/
 /* Support direct user defined filters */
 
-#ifdef ENABLE_CLIENTSIDE_FILTERS
+#ifdef NETCDF_ENABLE_CLIENTSIDE_FILTERS
 
 /** Register filer client.
  * @note  Use void* to avoid having to include hdf.h
@@ -308,7 +308,7 @@ int stat = NC_NOERR;
 #endif
     return stat;
 }
-#endif /*ENABLE_CLIENTSIDE_FILTERS*/
+#endif /*NETCDF_ENABLE_CLIENTSIDE_FILTERS*/
 
 /**************************************************/
 /* Functions for accessing standardized filters */

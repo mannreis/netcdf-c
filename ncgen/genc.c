@@ -7,7 +7,7 @@
 #include "includes.h"
 #include <ctype.h>	/* for isprint() */
 
-#ifdef ENABLE_C
+#ifdef NETCDF_ENABLE_C
 
 #undef TRACE
 
@@ -1297,4 +1297,4 @@ cname(Symbol* sym)
     return name;
 }
 
-#endif /*ENABLE_C*/
+#endif /*NETCDF_ENABLE_C*/

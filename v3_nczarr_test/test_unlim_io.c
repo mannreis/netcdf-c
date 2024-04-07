@@ -14,7 +14,7 @@
 #include <H5DSpublic.h>
 #endif
 
-#ifdef ENABLE_NCZARR
+#ifdef NETCDF_ENABLE_NCZARR
 #include "zincludes.h"
 #endif
 
@@ -94,7 +94,7 @@ int
 main(int argc, char** argv)
 {
     int stat = NC_NOERR;
-    int i;
+    size_t i;
     
     if((stat=getoptions(&argc,&argv))) goto done;
     if((stat=verifyoptions(options))) goto done;

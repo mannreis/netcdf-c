@@ -9,12 +9,7 @@
 #include "ncpathmgr.h"
 #include "nclist.h"
 
-#ifdef HAVE_HDF5_H
-#include <hdf5.h>
-#include <H5DSpublic.h>
-#endif
-
-#ifdef ENABLE_NCZARR
+#ifdef NETCDF_ENABLE_NCZARR
 #include "zincludes.h"
 #endif
 
@@ -94,7 +89,7 @@ int
 main(int argc, char** argv)
 {
     int stat = NC_NOERR;
-    int i;
+    size_t i;
     
     if((stat=getoptions(&argc,&argv))) goto done;
     if((stat=verifyoptions(options))) goto done;

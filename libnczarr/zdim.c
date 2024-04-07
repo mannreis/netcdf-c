@@ -272,3 +272,14 @@ NCZ_rename_dim(int ncid, int dimid, const char *name)
 
     return NC_NOERR;
 }
+
+int
+NCZ_reclaim_dim(NC_DIM_INFO_T* dim)
+{
+    int stat = NC_NOERR;
+    if(dim != NULL) {
+	nullfree(dim->format_dim_info);
+	stat = nc4_dim_list_del(dim->container,dim);
+    }
+    return stat;
+}

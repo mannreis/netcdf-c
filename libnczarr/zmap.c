@@ -21,10 +21,11 @@ nczmap_features(NCZM_IMPL impl)
 {
     switch (impl) {
     case NCZM_FILE: return zmap_file.features;
-#ifdef ENABLE_NCZARR_ZIP
+#ifdef NETCDF_ENABLE_NCZARR_ZIP
     case NCZM_ZIP: return zmap_zip.features;
 #endif
-#ifdef ENABLE_S3
+
+#ifdef NETCDF_ENABLE_S3
     case NCZM_S3: case NCZM_GS3:
         return zmap_s3sdk.features;
 #endif
@@ -55,13 +56,13 @@ nczmap_create(NCZM_IMPL impl, const char *path, mode_t mode, size64_t flags, voi
         stat = zmap_file.create(path, mode, flags, parameters, &map);
 	if(stat) goto done;
 	break;
-#ifdef ENABLE_NCZARR_ZIP
+#ifdef NETCDF_ENABLE_NCZARR_ZIP
     case NCZM_ZIP:
         stat = zmap_zip.create(path, mode, flags, parameters, &map);
 	if(stat) goto done;
 	break;
 #endif
-#ifdef ENABLE_S3
+#ifdef NETCDF_ENABLE_S3
     case NCZM_S3:
     case NCZM_GS3:
         stat = zmap_s3sdk.create(path, mode, flags, parameters, &map);
@@ -94,13 +95,13 @@ nczmap_open(NCZM_IMPL impl, const char *path, mode_t mode, size64_t flags, void*
         stat = zmap_file.open(path, mode, flags, parameters, &map);
 	if(stat) goto done;
 	break;
-#ifdef ENABLE_NCZARR_ZIP
+#ifdef NETCDF_ENABLE_NCZARR_ZIP
     case NCZM_ZIP:
         stat = zmap_zip.open(path, mode, flags, parameters, &map);
 	if(stat) goto done;
 	break;
 #endif
-#ifdef ENABLE_S3
+#ifdef NETCDF_ENABLE_S3
     case NCZM_S3:
     case NCZM_GS3:
         stat = zmap_s3sdk.open(path, mode, flags, parameters, &map);
@@ -127,12 +128,12 @@ nczmap_truncate(NCZM_IMPL impl, const char *path)
     case NCZM_FILE:
         if((stat = zmap_file.truncate(path))) goto done;
 	break;
-#ifdef ENABLE_NCZARR_ZIP
+#ifdef NETCDF_ENABLE_NCZARR_ZIP
     case NCZM_ZIP:
         if((stat = zmap_zip.truncate(path))) goto done;
 	break;
 #endif
-#ifdef ENABLE_S3
+#ifdef NETCDF_ENABLE_S3
     case NCZM_S3:
     case NCZM_GS3:
         if((stat = zmap_s3sdk.truncate(path))) goto done;
@@ -564,76 +565,6 @@ NCZ_mapkind(NCZM_IMPL impl)
     return "Unknown";
 }
 
-/**
-Walk a subtree of paths and invoke a function on each path.
-The walk is breadth-first.
-
-The function signature is:
-int (*fcn)(NCZMAP* map, const char* path, void* param);
-
-If the function returns NC_NOERR, then the walk continues.
-If the function returns an error, then the walk terminates and returns the error.
-
-@param map -- the containing map
-@param prefix -- the key into the tree where the search is to occur
-@param fcn -- the function to invoke
-@param param -- passed as extra argument to fcn
-@return NC_NOERR if the operation succeeded
-@return NC_EXXX if the operation failed for one of several possible reasons
-*/
-#if 0
-int
-nczmap_walk(NCZMAP* map, const char* prefix, NCZWALKFCN fcn, void* param)
-{
-    int stat = NC_NOERR;
-    NCbytes* path = ncbytesnew();
-
-    assert(prefix != NULL && strlen(prefix) > 0);
-    if(prefix[0] != '/') ncbytescat(path,"/");
-    ncbytescat(path,prefix);
-    stat = nczmap_walkR(map, path, fcn, param);
-    ncbytesfree(path);
-    return THROW(stat);
-}
-
-static int
-nczmap_walkR(NCZMAP* map, NCbytes* prefix, NCZWALKFCN fcn, void* param)
-{
-    int i,stat = NC_NOERR;
-    NClist* nextlevel = nclistnew();
-    size_t prefixlen = ncbyteslength(prefix);
-
-    /* get list of next level segments (partial keys) */
-    if((stat=nczmap_list(map,ncbytescontents(prefix),nextlevel))) goto done;
-    if(nclistlength(nextlevel) == 0) goto done; /* max depth reached */
-
-    /* Apply fcn to all paths at nextlevel */
-    for(i=0;i<nclistlength(nextlevel);i++) {
-        const char* segment = nclistget(nextlevel,i);
-	if(segment == NULL) continue;
-	/* invoke function */
-	stat = fcn(map,ncbytescontents(prefix),segment,param);
-	if(stat != NC_NOERR) goto done;
-    }
-
-    /* Recurse on each segment */
-    for(i=0;i<nclistlength(nextlevel);i++) {
-        const char* segment = nclistget(nextlevel,i);
-	if(segment == NULL) continue;
-	/* recurse */
-	ncbytescat(prefix,segment);
-	stat = nczmap_walkR(map,prefix,fcn,param);
-	ncbytessetlength(prefix,prefixlen); /* pop path "stack" */
-	if(stat != NC_NOERR) goto done;
-    }
-
-done:
-    /* Cleanup */
-    ncbytessetlength(prefix,prefixlen); /* restore path "stack" */
-    nclistfreeall(nextlevel);
-    return THROW(stat);
-}
-#else /*0*/
 int
 nczmap_walk(NCZMAP* map, const char* prefix, NCZWALKFCN fcn, void* param)
 {
@@ -664,6 +595,3 @@ done:
     nclistfreeall(subtree);
     return THROW(stat);
 }
-
-
-#endif /*0*/

@@ -219,39 +219,6 @@ reportchunking("find_default: ",var);
     return NC_NOERR;
 }
 
-#if 0
-/**
- * @internal Give a var a secret ZARR name. This is needed when a var
- * is defined with the same name as a dim, but it is not a coord var
- * of that dim. In that case, the var uses a secret name inside the
- * ZARR file.
- *
- * @param var Pointer to var info.
- * @param name Name to use for base of secret name.
- *
- * @returns ::NC_NOERR No error.
- * @returns ::NC_EMAXNAME Name too long to fit secret prefix.
- * @returns ::NC_ENOMEM Out of memory.
- * @author Dennis Heimbigner, Ed Hartnett
- */
-static int
-give_var_secret_name(NC_VAR_INFO_T *var, const char *name)
-{
-    /* Set a different ncz name for this variable to avoid name
-     * clash. */
-    if (strlen(name) + strlen(NON_COORD_PREPEND) > NC_MAX_NAME)
-	return NC_EMAXNAME;
-	size_t ncz_name_size = (strlen(NON_COORD_PREPEND) + strlen(name) + 1) *
-	                       sizeof(char);
-    if (!(var->ncz_name = malloc(ncz_name_size)))
-	return NC_ENOMEM;
-
-    snprintf(var->ncz_name, ncz_name_size, "%s%s", NON_COORD_PREPEND, name);
-
-    return NC_NOERR;
-}
-#endif /*0*/
-
 /**
  * @internal This is called when a new netCDF-4 variable is defined
  * with nc_def_var().
@@ -285,20 +252,18 @@ give_var_secret_name(NC_VAR_INFO_T *var, const char *name)
  */
 int
 NCZ_def_var(int ncid, const char *name, nc_type xtype, int ndims,
-	    const int *dimidsp, int *varidp)
+	    const int *dimids, int *varidp)
 {
     NC_GRP_INFO_T *grp;
     NC_VAR_INFO_T *var;
     NC_DIM_INFO_T *dim;
     NC_FILE_INFO_T *h5;
-    NC_TYPE_INFO_T *type = NULL;
-    NCZ_VAR_INFO_T* zvar = NULL;
     char norm_name[NC_MAX_NAME + 1];
     int d;
     int retval;
-    NCglobalstate* gstate = NC_getglobalstate();
+    NC_TYPE_INFO_T *type = NULL;
 
-    ZTRACE(1,"ncid=%d name=%s xtype=%d ndims=%d dimids=%s",ncid,name,xtype,ndims,nczprint_idvector(ndims,dimidsp));
+    ZTRACE(1,"ncid=%d name=%s xtype=%d ndims=%d dimids=%s",ncid,name,xtype,ndims,nczprint_idvector(ndims,dimids));
     
     /* Find info for this file and group, and set pointer to each. */
     if ((retval = nc4_find_grp_h5(ncid, &grp, &h5)))
@@ -348,12 +313,12 @@ NCZ_def_var(int ncid, const char *name, nc_type xtype, int ndims,
 	BAIL(retval);
 
     /* For non-scalar vars, dim IDs must be provided. */
-    if (ndims && !dimidsp)
+    if (ndims && !dimids)
 	BAIL(NC_EINVAL);
 
     /* Check all the dimids to make sure they exist. */
     for (d = 0; d < ndims; d++)
-	if ((retval = nc4_find_dim(grp, dimidsp[d], &dim, NULL)))
+	if ((retval = nc4_find_dim(grp, dimids[d], &dim, NULL)))
 	    BAIL(retval);
 
     /* These degrubbing messages sure are handy! */
@@ -362,7 +327,7 @@ NCZ_def_var(int ncid, const char *name, nc_type xtype, int ndims,
     {
 	int dd;
 	for (dd = 0; dd < ndims; dd++)
-	    LOG((4, "dimid[%d] %d", dd, dimidsp[dd]));
+	    LOG((4, "dimid[%d] %d", dd, dimids[dd]));
     }
 #endif
 
@@ -376,12 +341,46 @@ NCZ_def_var(int ncid, const char *name, nc_type xtype, int ndims,
     if ((retval = nc4_var_list_add(grp, norm_name, ndims, &var)))
 	BAIL(retval);
 
+    retval = NCZ_fillin_var(h5, var, type, (size_t)ndims, dimids, NULL, NULL, NC_ENDIAN_NATIVE);
+
+    if(retval == NC_NOERR) {
+        /* Return the varid. */
+        if (varidp)
+   	    *varidp = var->hdr.id;
+        type = NULL;
+    }
+exit:    
+    if (type)
+	if ((retval = nc4_type_free(type)))
+	    BAILLOG(retval);
+    return ZUNTRACE(retval);
+}
+
+/**
+Since variables are created in two places, encapsulate
+the fillin of the variable data. Not all data is filled in,
+but important &/or complex data is filled in.
+*/
+int
+NCZ_fillin_var(NC_FILE_INFO_T* file, NC_VAR_INFO_T* var, NC_TYPE_INFO_T* type,
+		size_t ndims, const int* dimids,
+		size64_t* shape, size64_t* chunksizes,
+		int endianness)
+{
+    int stat = NC_NOERR;
+    size_t d;
+    NC_GRP_INFO_T* grp = file->root_grp; /* only used to get back to file */
+    NC_DIM_INFO_T* dim = NULL;
+    NCZ_FILE_INFO_T* zfile = (NCZ_FILE_INFO_T*)file->format_file_info;
+    NCZ_VAR_INFO_T* zvar = NULL;
+    NCglobalstate* gstate = NC_getglobalstate();
+
     /* Add storage for NCZ-specific var info. */
-    if (!(var->format_var_info = calloc(1, sizeof(NCZ_VAR_INFO_T))))
-	BAIL(NC_ENOMEM);
-    zvar = var->format_var_info;
-    zvar->common.file = h5;
+    if (!(zvar = calloc(1, sizeof(NCZ_VAR_INFO_T)))) {stat = NC_ENOMEM; goto done;}
+    var->format_var_info = zvar;
+    zvar->common.file = file;
     zvar->scalar = (ndims == 0 ? 1 : 0);
+    zmaxstrlen(&zvar->maxstrlen,zfile->default_maxstrlen);
 
     zvar->dimension_separator = gstate->zarr.dimension_separator;
     assert(zvar->dimension_separator != 0);
@@ -391,7 +390,7 @@ NCZ_def_var(int ncid, const char *name, nc_type xtype, int ndims,
     var->meta_read = NC_TRUE;
     NCZ_setatts_read((NC_OBJ*)var);
 
-#ifdef ENABLE_NCZARR_FILTERS
+#ifdef NETCDF_ENABLE_NCZARR_FILTERS
     /* Set the filter list */
     assert(var->filters == NULL);
     var->filters = (void*)nclistnew();
@@ -402,55 +401,56 @@ NCZ_def_var(int ncid, const char *name, nc_type xtype, int ndims,
 #ifdef LOOK
 var->type_info->rc++;
 #endif
-    type = NULL;
 
     /* Propagate the endianness */
-    var->endianness = var->type_info->endianness;
+    if(endianness == NC_ENDIAN_NATIVE)
+        var->endianness = var->type_info->endianness;
+    else
+	var->endianness = endianness;
+    var->type_info->endianness = var->endianness; /* back prop */
 
-    /* Set variables no_fill to match the database default unless the
-     * variable type is variable length (NC_STRING or NC_VLEN) or is
-     * user-defined type. */
-    if (var->type_info->nc_type_class <= NC_STRING) { /* Make fill flags consistent */
-	int no_fill = (h5->fill_mode == NC_NOFILL);
-	if((retval = NCZ_set_fill_value(h5,var,no_fill,NULL))) BAIL(retval);
-        var->fill_val_changed = 0; /* But pretend it has not been changed */
-    }
+    /* Indicate we do not have quantizer yet */
+    var->quantize_mode = -1;
 
-    /* Assign dimensions to the variable. At the same time, check to
-     * see if this is a coordinate variable. If so, it will have the
-     * same name as one of its dimensions. If it is a coordinate var,
-     * is it a coordinate var in the same group as the dim? Also, check
-     * whether we should use contiguous or chunked storage. */
-    var->storage = NC_CHUNKED;
+    /* should we use contiguous or chunked storage. */
+    var->storage = (zvar->scalar?NC_CONTIGUOUS:NC_CHUNKED);
+
+    /* Assign dimensions to the variable. */
+
+    /* Save the rank of the variable */
+    if((stat = nc4_var_set_ndims(var, (int)ndims))) goto done;
+
     for (d = 0; d < ndims; d++)
     {
 	NC_GRP_INFO_T *dim_grp;
 	/* Look up each dimension */
-	if ((retval = nc4_find_dim(grp, dimidsp[d], &dim, &dim_grp)))
-	    BAIL(retval);
+	if ((stat = nc4_find_dim(grp, dimids[d], &dim, &dim_grp))) goto done;
 	assert(dim && dim->format_dim_info);
 	/* Check for unlimited dimension and turn off contiguous storage. */
 	if (dim->unlimited)
 	    var->storage = NC_CHUNKED;
 	/* Track dimensions for variable */
-	var->dimids[d] = dimidsp[d];
+	var->dimids[d] = dimids[d];
 	var->dim[d] = dim;
+	if(shape != NULL) assert(shape[d] == (size64_t)var->dim[d]->len);
     }
 
-    /* Determine default chunksizes for this variable. (Even for
-     * variables which may be contiguous.) */
+    /* Determine  chunksizes for this variable. (Even for
+     * variables which may be scalar) */
     LOG((4, "allocating array of %d size_t to hold chunksizes for var %s",
 	 var->ndims, var->hdr.name));
     if(!var->chunksizes) {
 	if(var->ndims) {
-            if (!(var->chunksizes = calloc(var->ndims, sizeof(size_t))))
-	        BAIL(NC_ENOMEM);
-	    if ((retval = ncz_find_default_chunksizes2(grp, var)))
-	        BAIL(retval);
+            if (!(var->chunksizes = calloc(var->ndims, sizeof(size_t)))) {stat = NC_ENOMEM; goto done;}
+	    if(chunksizes != NULL) {
+		size_t j;
+		for(j=0;j<var->ndims;j++) var->chunksizes[j] = (size_t)chunksizes[j];
+	    } else {
+	        if ((stat = ncz_find_default_chunksizes2(grp, var))) goto done;
+	    }
         } else {
 	    /* Pretend that scalars are like var[1] */
-	    if (!(var->chunksizes = calloc(1, sizeof(size_t))))
-	        BAIL(NC_ENOMEM);
+	    if (!(var->chunksizes = calloc(1, sizeof(size_t)))) {stat = NC_ENOMEM; goto done;}
 	    var->chunksizes[0] = 1;
 	}
     }
@@ -465,22 +465,25 @@ var->type_info->rc++;
     var->chunkcache = gstate->chunkcache;
 
     /* Create the cache */
-    if((retval=NCZ_create_chunk_cache(var,zvar->chunkproduct*var->type_info->size,zvar->dimension_separator,&zvar->cache)))
-	BAIL(retval);
+    if((stat=NCZ_create_chunk_cache(var,zvar->chunkproduct*var->type_info->size,zvar->dimension_separator,&zvar->cache)))
+	goto done;
 
     /* Set the per-variable chunkcache defaults */
     zvar->cache->params = var->chunkcache;
 
-    /* Return the varid. */
-    if (varidp)
-	*varidp = var->hdr.id;
-    LOG((4, "new varid %d", var->hdr.id));
+    /* Set variables no_fill to match the database default unless the
+     * variable type is variable length (NC_STRING or NC_VLEN) or is
+     * user-defined type. */
+    if (var->type_info->nc_type_class <= NC_STRING) { /* Make fill flags consistent */
+	int no_fill = (file->fill_mode == NC_NOFILL?1:0);
+	if((stat = NCZ_set_fill_value(file,var,no_fill,NULL))) goto done;
+        var->fill_val_changed = 0; /* But pretend it has not been changed */
+    }
 
-exit:
-    if (type)
-	if ((retval = nc4_type_free(type)))
-	    BAILLOG(retval);
-    return ZUNTRACE(retval);
+    if((stat = NCZ_adjust_var_cache(var))) goto done;
+
+done:
+    return THROW(stat);
 }
 
 /**
@@ -563,7 +566,7 @@ ncz_def_var_extra(int ncid, int varid, int *shuffle, int *unused1,
     
     /* Can't turn on parallel and deflate/fletcher32/szip/shuffle
      * before HDF5 1.10.3. */
-#ifdef ENABLE_NCZARR_FILTERS
+#ifdef NETCDF_ENABLE_NCZARR_FILTERS
 #ifndef HDF5_SUPPORTS_PAR_FILTERS
     if (h5->parallel == NC_TRUE)
 	if (nclistlength(((NClist*)var->filters)) > 0  || fletcher32 || shuffle)
@@ -575,38 +578,6 @@ ncz_def_var_extra(int ncid, int varid, int *shuffle, int *unused1,
      * late to set all the extra stuff. */
     if (var->created)
         {stat = NC_ELATEDEF; goto done;}
-
-#if 0
-    /* Check compression options. */
-    if (deflate && !deflate_level)
-	{stat = NC_EINVAL; goto done;}
-
-    /* Valid deflate level? */
-    if (deflate)
-    {
-	if (*deflate)
-	    if (*deflate_level < NC_MIN_DEFLATE_LEVEL ||
-		*deflate_level > NC_MAX_DEFLATE_LEVEL)
-		{stat = NC_EINVAL; goto done;}
-
-	/* For scalars, just ignore attempt to deflate. */
-	if (!var->ndims)
-	    goto done;
-
-	/* If szip is in use, return an error. */
-	if ((stat = nc_inq_var_szip(ncid, varid, &option_mask, NULL)))
-	    goto done;
-	if (option_mask)
-	    {stat = NC_EINVAL; goto done;}
-
-	/* Set the deflate settings. */
-	var->storage = NC_CONTIGUOUS;
-	var->deflate = *deflate;
-	if (*deflate)
-	    var->deflate_level = *deflate_level;
-	LOG((3, "%s: *deflate_level %d", __func__, *deflate_level));
-    }
-#endif
 
     /* Shuffle filter? */
     if (shuffle && *shuffle) {
@@ -2324,43 +2295,6 @@ exit:
     nullfree(ztype);
     return THROW(retval);
 }
-
-#if 0
-/**
-Given start+count+stride+dim vectors, determine the largest
-index touched per dimension. If that index is greater-than
-the dimension size, then do one of two things:
-1. If the dimension is fixed size, then return NC_EDIMSIZE.
-2. If the dimension is unlimited, then extend the size of that
-   dimension to cover that maximum point.
-
-@param var
-@param start vector
-@param count vector
-@param stride vector
-@param reading vs writing
-@return NC_EXXX error code
-*/
-int
-NCZ_update_dim_extents(NC_VAR_INFO_T* var, size64_t* start, size64_t* count, size64_t* stride, int reading)
-{
-    int r;
-    int rank = var->ndims;
-
-    NC_UNUSED(reading);
-
-    for(r=0;r<rank;r++) {
-	NC_DIM_INFO_T* dim = var->dim[r];
-        size64_t endpoint; /* compute last point touched */
-	endpoint = start[r] + stride[r]*count[r] - stride[r];
-	if(dim->len < endpoint) {
-	    if(!dim->unlimited) return NC_EDIMSIZE;
-	    /*else*/ dim->len = endpoint+1; 
-	}
-    }
-    return NC_NOERR;
-}
-#endif
 
 /*Flush all chunks to disk. Create any that are missing
 and fill as needed.

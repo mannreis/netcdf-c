@@ -5,7 +5,7 @@
 
 #include "zincludes.h"
 #include "zformat.h"
-#ifdef ENABLE_NCZARR_FILTERS
+#ifdef NETCDF_ENABLE_NCZARR_FILTERS
 #include "zfilter.h"
 #endif
 

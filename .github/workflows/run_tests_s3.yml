@@ -9,7 +9,7 @@
 
 name: Run S3 netCDF Tests (under Ubuntu Linux)
 
-on: [workflow_dispatch]
+on: [push,workflow_dispatch]
 
 concurrency:  
   group: ${{ github.workflow}}-${{ github.head_ref }}  
@@ -23,7 +23,7 @@ jobs:
 
     strategy:
       matrix:
-        hdf5: [ 1.10.8, 1.12.2, 1.14.0 ]
+        hdf5: [ 1.10.8, 1.12.2, 1.14.3 ]
 
     steps:
       - uses: actions/checkout@v3
@@ -70,7 +70,7 @@ jobs:
 
     strategy:
       matrix:
-        hdf5: [ 1.14.0 ]
+        hdf5: [ 1.14.3 ]
     steps:
 
       - uses: actions/checkout@v3

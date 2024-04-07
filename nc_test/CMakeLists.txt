@@ -21,18 +21,18 @@ SET (nc_test_SRC
   util.c
   )
 
-
 SET (nc_test_m4_SOURCES test_get test_put test_read test_write)
-FOREACH (F ${nc_test_m4_SOURCES})
+foreach (F ${nc_test_m4_SOURCES})
   GEN_m4(${F} dest)
-  LIST(APPEND nc_test_SRC ${dest})
-ENDFOREACH()
+  list(APPEND nc_test_SRC ${dest})
+endforeach()
 
-ADD_EXECUTABLE(nc_test ${nc_test_SRC})
-TARGET_INCLUDE_DIRECTORIES(nc_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
-TARGET_LINK_LIBRARIES(nc_test
+add_EXECUTABLE(nc_test ${nc_test_SRC})
+target_include_directories(nc_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+target_link_libraries(nc_test
   netcdf
   ${HAVE_LIBM}
+  ${ALL_TLL_LIBS}
   )
 
 ## 
@@ -100,7 +100,7 @@ ENDFOREACH()
 
 ADD_TEST(nc_test ${EXECUTABLE_OUTPUT_PATH}/nc_test)
 
-IF(BUILD_UTILITIES)
+IF(NETCDF_BUILD_UTILITIES)
 
     add_sh_test(nc_test run_diskless)
     IF(BUILD_MMAP)
@@ -117,8 +117,8 @@ IF(BUILD_UTILITIES)
       ENDIF()
     ENDIF()
 
-    IF(ENABLE_BYTERANGE)
-      IF(ENABLE_EXTERNAL_SERVER_TESTS)
+    IF(NETCDF_ENABLE_BYTERANGE)
+      IF(NETCDF_ENABLE_EXTERNAL_SERVER_TESTS)
         build_bin_test_no_prefix(tst_byterange)
         add_sh_test(nc_test test_byterange)
       ENDIF()
@@ -128,7 +128,7 @@ IF(BUILD_UTILITIES)
     add_sh_test(nc_test run_mmap)
   ENDIF()
 
-ENDIF(BUILD_UTILITIES)
+ENDIF(NETCDF_BUILD_UTILITIES)
 
 # Copy some test files from current source dir to out-of-tree build dir.
 FILE(GLOB COPY_FILES ${CMAKE_CURRENT_SOURCE_DIR}/*.nc ${CMAKE_CURRENT_SOURCE_DIR}/*.sh)

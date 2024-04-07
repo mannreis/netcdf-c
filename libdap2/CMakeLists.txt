@@ -19,12 +19,18 @@ set_property(SOURCE ncd2dispatch.c
   PROPERTY
     SKIP_UNITY_BUILD_INCLUSION ON)
 
-
-set_property(SOURCE ncd2dispatch.c
-  PROPERTY
-    SKIP_UNITY_BUILD_INCLUSION ON)
-
 add_library(dap2 OBJECT ${dap2_SOURCES})
+
+target_link_libraries(dap2 PUBLIC ${CURL_LIBRARIES})
+target_include_directories(dap2 PUBLIC ${CURL_INCLUDE_DIRS})
+target_compile_options(dap2
+  PRIVATE
+    -DCURL_STATICLIB=1
+)
+
+if (NETCDF_ENABLE_DLL)
+  target_compile_definitions(dap2 PRIVATE DLL_NETCDF DLL_EXPORT)
+endif()
 
 IF(STATUS_PARALLEL)
   target_link_libraries(dap2 PUBLIC MPI::MPI_C)

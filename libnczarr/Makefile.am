@@ -15,7 +15,7 @@ AM_CXXFLAGS =
 libnczarr_la_LIBADD =
 libnczarr_la_LDFLAGS =
 
-# Remember ENABLE_NCZARR implies USE_NETCDF4
+# Remember NETCDF_ENABLE_NCZARR implies USE_NETCDF4
 
 # We may have to add to these later.
 DISTCLEANFILES =
@@ -69,20 +69,21 @@ zmap.h \
 zodom.h \
 zprovenance.h \
 zfilter.h \
+znc4.h \
 zdebug.h
 
-if ENABLE_NCZARR_ZIP
+if NETCDF_ENABLE_NCZARR_ZIP
 libnczarr_la_SOURCES += zmap_zip.c 
 endif
 
-if ENABLE_S3
+if NETCDF_ENABLE_S3
 libnczarr_la_SOURCES += zmap_s3sdk.c
-if ENABLE_S3_AWS
+if NETCDF_ENABLE_S3_AWS
 AM_CXXFLAGS += -std=c++11
 endif
 endif
 
-if ENABLE_NCZARR_FILTERS
+if NETCDF_ENABLE_NCZARR_FILTERS
 libnczarr_la_SOURCES += zfilter.c
 endif
 

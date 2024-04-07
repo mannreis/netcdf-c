@@ -21,7 +21,7 @@ static Dimdef* finddim(const char* name, NClist* defs);
 
 #if 0
 static void
-ranktest(int rank, char c, int count)
+ranktest(size_t rank, char c, int count)
 {
     if(rank != count) {
 	fprintf(stderr,"Option '%c': rank mismatch: rank=%d count=%d\n",
@@ -99,7 +99,7 @@ parsedimdef(const char* s0, Dimdef** defp)
 int
 parsevardef(const char* s0, NClist* dimdefs, Vardef** varp)
 {
-    int count;
+    size_t count;
     const char* s = NULL;
     Vardef* vd = NULL;    
     const char* p;
@@ -141,7 +141,7 @@ parsevardef(const char* s0, NClist* dimdefs, Vardef** varp)
         if(count >= NC_MAX_VAR_DIMS) return THROW(NC_EINVAL);
         vd->rank = count;
         if(vd->rank > 0) {
-            int j;
+            size_t j;
             for(j=0;j<vd->rank;j++) {
                 Dimdef* dimref = NULL;
                 /* Split on / to get chunksize */
@@ -169,16 +169,16 @@ parsevardef(const char* s0, NClist* dimdefs, Vardef** varp)
     return NC_NOERR;
 }
 
-int
+size_t
 parsestringvector(const char* s0, int stopchar, char*** namesp)
 {
-    int nelems,i;
+    size_t nelems,i;
     const char* s;
     char** names = NULL;
 
     /* First, compute number of elements */
     for(s=s0,nelems=1;*s;s++) {if(*s == ',') nelems++; if(*s == stopchar) break;}
-    if(nelems == 0) return THROW(NC_EINVAL);
+    if(nelems == 0) return 0;
     names = calloc((size_t)nelems+1,sizeof(char*));
     for(s=s0,i=0;i<nelems;i++) {
         ptrdiff_t len;
@@ -243,10 +243,10 @@ freestringvec(char** vec)
 }
 
 void
-freeprojvector(int rank, NCZProjection** vec)
+freeprojvector(size_t rank, NCZProjection** vec)
 {
     if(vec != NULL) {
-        int r;
+        size_t r;
         for(r=0;r<rank;r++) free(vec[r]);
     }
     nullfree(vec);
@@ -363,13 +363,13 @@ computelinearoffset(int R, const size64_t* indices, const size64_t* max, size64_
 }
 
 void
-slices2vector(int rank, NCZSlice* slices, size64_t** startp, size64_t** stopp, size64_t** stridep, size64_t** maxp)
+slices2vector(size_t rank, NCZSlice* slices, size64_t** startp, size64_t** stopp, size64_t** stridep, size64_t** maxp)
 {
     static size64_t start[NC_MAX_VAR_DIMS];
     static size64_t stop[NC_MAX_VAR_DIMS];
     static size64_t stride[NC_MAX_VAR_DIMS];
     static size64_t max[NC_MAX_VAR_DIMS];
-    int i;
+    size_t i;
     for(i=0;i<rank;i++) {
 	start[i] = slices[i].start;
 	stop[i] = slices[i].stop;
@@ -408,7 +408,7 @@ printoptions(struct UTOptions* opts)
     }
 
     for(i=0;i<nclistlength(opts->vardefs);i++) {
-	int j;
+	size_t j;
 	struct Vardef* vd = (struct Vardef*)nclistget(opts->vardefs,i);
         printf(" -v '%d %s[",vd->typeid,vd->name);
 	for(j=0;j<vd->rank;j++) {

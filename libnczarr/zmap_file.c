@@ -36,12 +36,6 @@
 #define S_ISDIR(mode) ((mode) & _S_IFDIR)
 #define S_ISREG(mode) ((mode) & _S_IFREG)
 #endif
-#if 0
-#ifndef __cplusplus
-#include <io.h>
-#include <iostream>
-#endif
-#endif
 #endif
 
 #include "fbits.h"
@@ -492,18 +486,6 @@ zfilelist(NCZMAP* map, const char* prefixkey, NClist* matches)
 
     /* get names of the next level path entries */
     retval = platformdircontent(fullpath, nextlevel);
-#if 0
-    switch (retval) {
-    case NC_NOERR: /* ok */
-	break;
-    case NC_EEMPTY: /* not a dir */
-	retval = NC_NOERR;
-	goto done;
-    case NC_ENOOBJECT:
-    default:
-	goto done;
-    }
-#else
     if(retval == NC_NOERR) {
     } else if(retval == NC_EEMPTY) {
         retval = NC_NOERR;
@@ -513,31 +495,13 @@ zfilelist(NCZMAP* map, const char* prefixkey, NClist* matches)
     } else {
         goto done;
     }
-#endif
 
-#if 0
-    size_t pathreset;
-    /* Suppress pure directories */
-    ncbytescat(path,fullpath);
-    pathreset = ncbyteslength(path);
-    while(nclistlength(nextlevel) > 0) {
-	struct stat statbuf;
-	char* segment = nclistremove(nextlevel,0);
-	/* suppress nextlevel directories */
-	ncbytescat(path,"/");
-	ncbytescat(path,segment);
-	if((retval=NCstat(ncbytescontents(path),&statbuf))) goto done;
-	if(!S_ISDIR(statbuf.st_mode)) nclistpush(matches,segment);
-	ncbytessetlength(path,pathreset);
-    }
-#else
     while(nclistlength(nextlevel) > 0) {
 	char* segment = nclistremove(nextlevel,0);
 	/* remove any leading '/' */
 	if(segment[0] == '/') segment++;
 	nclistpush(matches,segment);
     }
-#endif
 
 done:
     nclistfreeall(nextlevel);
@@ -584,33 +548,7 @@ zfilelistall(NCZMAP* map, const char* prefixkey, NClist* matches)
     ncbytesnull(path); /* make nul terminated */
     prefixlen = ncbyteslength(path); /* remember the prefix string */
 
-#if 0
-    /* Prime the recursion */
-    /* get names of the next level path entries just below prefix */
-    switch (stat = platformdircontent(fullpath, nextlevel)) {
-    case NC_NOERR: /* ok */
-	break;
-    case NC_EEMPTY: /* not a dir */
-	stat = NC_NOERR;
-	goto done;
-    case NC_ENOOBJECT:
-    default:
-	goto done;
-    }
-
-    /* Recurse to walk tree depth first; also record keys */
-    for(i=0;i<nclistlength(nextlevel);i++) {
-	char* segment = nclistget(nextlevel,i);
-	ncbytescat(path,"/");
-	ncbytescat(path,segment);
-	nclistpush(matches,nulldup(ncbytescontents(path)));
-	if((stat = zfile_listallR(zfmap,path,matches))) goto done;
-	/* reset */
-	ncbytessetlength(path,pathlen);
-    }
-#else
     if((stat = zfile_listallR(zfmap,path,0,matches))) goto done;
-#endif /*0*/
 
     /* Remove prefix from all entries in matches */
     ncbytessetlength(path,prefixlen); /* restore */
@@ -1281,19 +1219,6 @@ done:
     return ZUNTRACE(ret);
 }
 
-#if 0
-static int
-platformcwd(char** cwdp)
-{
-    char buf[4096];
-    char* cwd = NULL;
-    cwd = NCcwd(buf,sizeof(buf));
-    if(cwd == NULL) return errno;
-    if(cwdp) *cwdp = strdup(buf);
-    return NC_NOERR;
-}
-#endif
-
 /* When we are finished accessing FD; essentially
    equivalent to closing the file descriptor.
 */
@@ -1305,22 +1230,6 @@ platformrelease(FD* fd)
     fd->fd = -1;
     (void)ZUNTRACE(NC_NOERR);
 }
-
-#if 0
-/* Close FD => return typ to FDNONE */
-*/
-static void
-platformclose(FD* fd)
-{
-    if(fd->typ == FDFILE) {
-        if(fd->fd >=0) close(fd->u,fd);
-	fd->fd = -1;
-    } else if(fd->type == FDDIR) {
-	if(fd->u.dir) NCclosedir(fd->u,dir);
-    }
-    fd->typ = FDNONE;
-}
-#endif
 
 
 #ifdef VERIFY
@@ -1359,38 +1268,3 @@ verifykey(const char* key, int isdir)
 }
 #endif
 
-#if 0
-/* Return NC_EINVAL if path does not exist; els 1/0 in isdirp and local path in canonpathp */
-static int
-testifdir(const char* path, int* isdirp, char** canonpathp)
-{
-    int ret = NC_NOERR;
-    char* tmp = NULL;
-    char* canonpath = NULL;
-    struct stat statbuf;
-
-    /* Make path be windows compatible */
-    if((ret = nczm_fixpath(path,&tmp))) goto done;
-    if((canonpath = NCpathcvt(tmp))==NULL) {ret = NC_ENOMEM; goto done;}
-
-    errno = 0;
-    ret = NCstat(canonpath, &statbuf);
-    if(ret < 0) {
-        if(errno == ENOENT)
-	    ret = NC_ENOTFOUND;  /* path does not exist */
-	else
-	    ret = platformerr(errno);
-	goto done;
-    }
-    /* Check for being a directory */
-    if(isdirp) {
-        if(S_ISDIR(statbuf.st_mode)) {*isdirp = 1;} else {*isdirp = 0;}
-    }
-    if(canonpathp) {*canonpathp = canonpath; canonpath = NULL;}
-done:
-    errno = 0;
-    nullfree(tmp);
-    nullfree(canonpath);
-    return ZUNTRACE(ret);    
-}
-#endif /* 0 */

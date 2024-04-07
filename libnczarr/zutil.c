@@ -15,6 +15,9 @@
 
 #undef DEBUG
 
+/*mnemonic*/
+#define TESTUNLIM 1
+
 /**************************************************/
 /**
 Type Issues:
@@ -123,7 +126,9 @@ NCJ_DICT, /*NC_JSON*/
 
 /* Forward */
 static int splitfqn(const char* fqn0, NClist* segments);
-static int uniquedimname(NC_FILE_INFO_T* file, NC_GRP_INFO_T* parent, NCZ_DimInfo* dimdata, NC_DIM_INFO_T** dimp);
+static int locatedimbyname(NC_FILE_INFO_T* file, NC_GRP_INFO_T* grp, const char* dimname, NC_DIM_INFO_T** dimp, NC_GRP_INFO_T** grpp);
+static int isconsistentdim(NC_DIM_INFO_T* dim, NCZ_DimInfo* dimdata, int testunlim);
+static int locateconsistentdim(NC_FILE_INFO_T* file, NC_GRP_INFO_T* grp, NCZ_DimInfo* dimdata, int testunlim, NC_DIM_INFO_T** dimp, NC_GRP_INFO_T** grpp);
 
 /**************************************************/
 
@@ -265,8 +270,7 @@ NCZ_downloadjson(NCZMAP* zmap, const char* key, NCjson** jsonp)
 	goto done;
     content[len] = '\0';
 
-    if(NCJparse(content,0,&json) < 0)
-	{stat = NC_ENCZARR; goto done;}
+    NCJcheck(NCJparse(content,0,&json));
 
 ret:
     if(jsonp) {*jsonp = json; json = NULL;}
@@ -297,7 +301,7 @@ NCZ_uploadjson(NCZMAP* zmap, const char* key, NCjson* json)
 fprintf(stderr,"uploadjson: %s\n",key); fflush(stderr);
 #endif
     /* Unparse the modified json tree */
-    if(NCJunparse(json,0,&content)) goto done;
+    NCJcheck(NCJunparse(json,0,&content));
     ZTRACEMORE(4,"\tjson=%s",content);
     
 if(getenv("NCS3JSON") != NULL)
@@ -311,68 +315,6 @@ done:
     nullfree(content);
     return ZUNTRACE(stat);
 }
-
-#if 0
-/**
-@internal create object, return empty dict; ok if already exists.
-@param zmap - [in] map
-@param key - [in] key of the object
-@param jsonp - [out] return parsed json
-@return NC_NOERR
-@return NC_EINVAL if object exists
-@author Dennis Heimbigner
-*/
-int
-NCZ_createdict(NCZMAP* zmap, const char* key, NCjson** jsonp)
-{
-    int stat = NC_NOERR;
-    NCjson* json = NULL;
-
-    /* See if it already exists */
-    if((stat = NCZ_downloadjson(zmap,key,&json))) goto done;
-    if(json == NULL) { /* create it */
-        if((stat = nczmap_def(zmap,key,NCZ_ISMETA))) goto done;	    
-    } else {
-	/* Already exists, fail */
-	stat = NC_EINVAL;
-	goto done;
-    }
-    /* Create the empty dictionary */
-    NCJcheck(NCJnew(NCJ_DICT,&json));
-    if(jsonp) {*jsonp = json; json = NULL;}
-done:
-    NCJreclaim(json);
-    return stat;
-}
-
-/**
-@internal create object, return empty array; ok if already exists.
-@param zmap - [in] map
-@param key - [in] key of the object
-@param jsonp - [out] return parsed json
-@return NC_NOERR
-@return NC_EOBJECT if object exits
-@author Dennis Heimbigner
-*/
-int
-NCZ_createarray(NCZMAP* zmap, const char* key, NCjson** jsonp)
-{
-    int stat = NC_NOERR;
-    NCjson* json = NULL;
-
-    if((stat = NCZ_downloadjson(zmap,key,&json))) goto done;
-    if(json != NULL) {stat = NC_EOBJECT; goto done;}
-    /* create it */
-    if((stat = nczmap_def(zmap,key,NCZ_ISMETA))) goto done;	    
-    /* Create the initial array */
-    NCJnew(NCJ_ARRAY,&json);
-    if(json->sort != NCJ_ARRAY) {stat = NC_ENCZARR; goto done;}
-    if(jsonp) {*jsonp = json; json = NULL;}
-done:
-    NCJreclaim(json);
-    return stat;
-}
-#endif /*0*/
 
 /**
 @internal Get contents of a meta object; fail it it does not exist
@@ -390,7 +332,9 @@ NCZ_readdict(NCZMAP* zmap, const char* key, NCjson** jsonp)
     NCjson* json = NULL;
 
     if((stat = NCZ_downloadjson(zmap,key,&json))) goto done;
-    if(NCJsort(json) != NCJ_DICT) {stat = NC_ENCZARR; goto done;}
+    if(json != NULL) {
+        if(NCJsort(json) != NCJ_DICT) {stat = NC_ENCZARR; goto done;}
+    }
     if(jsonp) {*jsonp = json; json = NULL;}
 done:
     NCJreclaim(json);
@@ -419,25 +363,6 @@ done:
     NCJreclaim(json);
     return stat;
 }
-
-#if 0
-/**
-@internal Given an nc_type, produce the corresponding
-default fill value as a string.
-@param nctype - [in] nc_type
-@param defaltp - [out] pointer to hold pointer to the value
-@return NC_NOERR
-@author Dennis Heimbigner
-*/
-
-int
-ncz_default_fill_value(nc_type nctype, const char** dfaltp)
-{
-    if(nctype <= 0 || nctype > N_NCZARR_TYPES) return NC_EINVAL;
-    if(dfaltp) *dfaltp = zfillvalue[nctype];
-    return NC_NOERR;	        
-}
-#endif
 
 /**
 @internal Given an nc_type, produce the corresponding
@@ -839,13 +764,13 @@ NCZ_get_maxstrlen(NC_OBJ* obj)
 	NC_FILE_INFO_T* file = grp->nc4_info;
 	NCZ_FILE_INFO_T* zfile = (NCZ_FILE_INFO_T*)file->format_file_info;
 	if(zfile->default_maxstrlen == 0)
-	    zfile->default_maxstrlen = NCZ_MAXSTR_DEFAULT;
+	    zdfaltstrlen(&zfile->default_maxstrlen,NCZ_MAXSTR_DEFAULT);
 	maxstrlen = zfile->default_maxstrlen;
     } else { /*(obj->sort == NCVAR)*/
         NC_VAR_INFO_T* var = (NC_VAR_INFO_T*)obj;
 	NCZ_VAR_INFO_T* zvar = (NCZ_VAR_INFO_T*)var->format_var_info;
         if(zvar->maxstrlen == 0)
-	    zvar->maxstrlen = NCZ_get_maxstrlen((NC_OBJ*)var->container);
+	    zmaxstrlen(&zvar->maxstrlen,NCZ_get_maxstrlen((NC_OBJ*)var->container));
 	maxstrlen = zvar->maxstrlen;
     }
     return maxstrlen;
@@ -913,31 +838,6 @@ NCZ_copy_data(NC_FILE_INFO_T* file, NC_VAR_INFO_T* var, const void* memory, size
     return stat;
 }
 
-#if 0
-/* Recursive helper */
-static int
-checksimplejson(NCjson* json, int depth)
-{
-    int i;
-
-    switch (NCJsort(json)) {
-    case NCJ_ARRAY:
-	if(depth > 0) return 0;  /* e.g. [...,[...],...]  or [...,{...},...] */
-	for(i=0;i < NCJarraylength(json);i++) {
-	    NCjson* j = NCJith(json,i);
-	    if(!checksimplejson(j,depth+1)) return 0;
-        }
-	break;
-    case NCJ_DICT:
-    case NCJ_NULL:
-    case NCJ_UNDEF:
-	return 0;
-    default: break;
-    }
-    return 1;
-}
-#endif
-
 /* Return 1 if the attribute will be stored as a complex JSON valued attribute; return 0 otherwise */
 int
 NCZ_iscomplexjson(const NCjson* json, nc_type typehint)
@@ -999,9 +899,8 @@ NCZ_iscomplexjsontext(size_t textlen, const char* text, NCjson** jsonp)
 loopexit:
     if(!iscomplex) return 0;
     /* Final test: must be parseable */
-    if(NCJparsen(textlen,text,0,&json) < 0) /* not JSON parseable */
-        return 0;
-    if(json == NULL) return 0;
+    if(NCJparsen(textlen,text,0,&json)<0) return 0;
+    if(json == NULL) return 0;/* not JSON parseable */
     if(jsonp) {*jsonp = json; json = NULL;}
     NCJreclaim(json);
     return 1;
@@ -1036,13 +935,6 @@ NCZ_makeFQN(NC_GRP_INFO_T* parent, const char* objname, NCbytes* fqn)
         ncbytesinsert(fqn,0,strlen(s),s);
         ncbytesinsert(fqn,0,1,"/");
     }
-#if 0
-    for(i=(nclistlength(segments)-1);i>=0;i--) {
-	ncbytescat(fqn,"/");
-	ncbytescat(fqn,nclistget(segments,i));
-    }
-#endif
-
 done:
     nclistfreeall(segments);
     nullfree(escaped);
@@ -1220,26 +1112,6 @@ NCZ_sortstringlist(void* vec, size_t count)
     return NC_NOERR;
 }
 
-#if 0
-/* Define a static qsort comparator for JSON dict (key,value) pairs */
-static int
-cmp_ncjson(const void* a1, const void* a2)
-{
-    const NCjson** j1 = (const NCjson**)a1;
-    const NCjson** j2 = (const NCjson**)a2;
-    return strcmp(NCJstring(*j1),NCJstring(*j2));
-}
-
-int
-NCZ_sortpairlist(void* vec, size_t count)
-{
-    if(vec != NULL && count > 0) {
-        qsort(vec, count, 2*sizeof(void*), cmp_ncjson);
-    }
-    return NC_NOERR;
-}
-#endif
-
 void
 NCZ_freeAttrInfoVec(struct NCZ_AttrInfo* ainfo)
 {
@@ -1259,187 +1131,6 @@ NCZ_setatts_read(NC_OBJ* container)
         ((NC_GRP_INFO_T*)container)->atts_read = 1;
     else /* container->sort == NCVAR */
         ((NC_VAR_INFO_T*)container)->atts_read = 1;
-}
-
-#if 0
-/*
-Given a list of segments, find corresponding group.
-*/
-static int
-locategroup(NC_FILE_INFO_T* file, size_t nsegs, NClist* segments, NC_GRP_INFO_T** grpp)
-{
-    int found, stat = NC_NOERR;
-    size_t i, j;
-    NC_GRP_INFO_T* grp = NULL;
-
-    grp = file->root_grp;
-    for(i=0;i<nsegs;i++) {
-        const char* segment = nclistget(segments,i);
-        char norm_name[NC_MAX_NAME];
-        found = 0;
-        if((stat = nc4_check_name(segment,norm_name))) goto done;
-        for(j=0;j<ncindexsize(grp->children);j++) {
-            NC_GRP_INFO_T* subgrp = (NC_GRP_INFO_T*)ncindexith(grp->children,j);
-            if(strcmp(subgrp->hdr.name,norm_name)==0) {
-                grp = subgrp;
-                found = 1;
-                break;
-            }
-        }
-        if(!found) {stat = NC_ENOGRP; goto done;}
-    }
-    /* grp should be group of interest */
-    if(grpp) *grpp = grp;
-
-done:
-    return THROW(stat);
-}
-#endif
-
-#if 0
-static int
-parsedimrefs(NC_FILE_INFO_T* file, size_t rank, char** dimnames, size64_t* shape, NC_DIM_INFO_T** dims, int create)
-{
-    int stat = NC_NOERR;
-    size_t i;
-    NClist* segments = NULL;
-
-    for(i=0;i<rank;i++) {
-        NC_GRP_INFO_T* g = NULL;
-        NC_DIM_INFO_T* d = NULL;
-        size_t j;
-        const char* dimpath = dimnames[i];
-        const char* dimname = NULL;
-
-        /* Locate the corresponding NC_DIM_INFO_T* object */
-        nclistfreeall(segments);
-        segments = nclistnew();
-        if((stat = ncz_splitkey(dimpath,segments)))
-            goto done;
-        if((stat=locategroup(file,nclistlength(segments)-1,segments,&g)))
-            goto done;
-        /* Lookup the dimension */
-        dimname = nclistget(segments,nclistlength(segments)-1);
-        d = NULL;
-        dims[i] = NULL;
-        for(j=0;j<ncindexsize(g->dim);j++) {
-            d = (NC_DIM_INFO_T*)ncindexith(g->dim,j);
-            if(strcmp(d->hdr.name,dimname)==0) {
-                dims[i] = d;
-                break;
-            }
-        }
-        if(dims[i] == NULL && create) {
-            /* If not found and create then create it */
-	    if((stat = ncz4_create_dim(file,file->root_grp,dimname,shape[i],0,&dims[i]))) goto done;
-        } else {
-            /* Verify consistency */
-            if(dims[i]->len != shape[i])
-                {stat = NC_EDIMSIZE; goto done;}
-        }
-        assert(dims[i] != NULL);
-    }
-done:
-    nclistfreeall(segments);
-    return THROW(stat);
-}
-#endif
-
-/**
-Given the following:
-1. shape of a variable as a vector of integers [in]
-2. rank of the variable [in[
-3. set of dim names as simple names [in]
-4. set of fqns for each dimension [out]
-then create fqns for the dimension names.
-If the dimension does not exist, then use an anonymous name.
-
-We have two sources for the dimension names for this variable.
-1. the "dimension_names":
-   1.1 inside the zarr.json (V3) dictionary; this is the simple dimension name.
-   1.2 the xarray "_ARRAY_DIMENSIONS" (V2) attribute as the simple dimension names.
-2. the "dimension_references" key inside the _nczarr_array dictionary;
-   this contains FQNs for the dimensions.
-Note that we may have both 1.1|1.2 and 2.
-
-If purezarr, then we only have 1.1 or 1.2. In that case, for each name in "dimension_names",
-we need to do the following:
-1. get the i'th size from the "shape" vector.
-2. if the i'th simple dimension name is null, then set the name to "_Anonymous_Dim<n>",
-   where n is the size from the shape vector.
-3. compute an equivalent of "dimension_references" by assuming that each simple dimension
-   name maps to an FQN in the current group containing the given variable.
-
-In any case, we now have an FQN for each dimension reference for the var.
-
-@param file
-@param grp containing var
-@param ndims rank of the variable
-@param shape the shape of the var
-@param diminfo info about each dim
-@return NC_NOERR|NC_EXXX
-*/
-int
-NCZ_computedimrefs(NC_FILE_INFO_T* file, NC_GRP_INFO_T* grp,
-               size_t ndims,
-	       size64_t* shape,
-	       NCZ_DimInfo* diminfo,
-	       int* isscalarp)
-{
-    int stat = NC_NOERR;
-    size_t i;
-    int isscalar;
-    int purezarr;
-    char digits[NC_MAX_NAME];
-    NCZ_FILE_INFO_T* zfile = (NCZ_FILE_INFO_T*)file->format_file_info;
-    NCbytes* fqn = ncbytesnew();
-    NCbytes* newname = ncbytesnew();
-    
-    ZTRACE(3,"file=%s var=%s purezarr=%d ndims=%d shape=%s",
-        file->controller->path,var->hdr.name,purezarr,ndims,nczprint_vector(ndims,shape));
-
-    assert(diminfo != NULL);
-
-    purezarr = (zfile->flags & FLAG_PUREZARR)?1:0;
-
-    /* Check for scalar */
-    if(!purezarr && ndims == 1 && shape[0] == 1 && diminfo[0].name != NULL && strcmp(diminfo[0].name,XARRAYSCALAR) == 0) {
-	isscalar = 1;
-	goto ret;
-    } else
-        isscalar = 0;
-
-    {
-	/* Fill in dimnames */
-        for(i=0;i<ndims;i++) {
-	    NC_DIM_INFO_T* dim = NULL;	    
-	    NC_GRP_INFO_T* parent = grp; /* create dim in this group */
-	    NCZ_DimInfo* dimdata = &diminfo[i];
-
-            if(dimdata->name == NULL) { /* convert null name to anonymous name */
-                /* create anonymous dimension name WRT root group and using the loopcounter */
-                snprintf(digits,sizeof(digits),"_%llu",shape[i]);
-		ncbytesclear(newname);
-		ncbytescat(newname,NCDIMANON);
-		ncbytescat(newname,digits);
-		dimdata->name = ncbytesextract(newname);
-		parent = file->root_grp; /* anonymous are always created in the root group */
-	    }
-	    if((stat = uniquedimname(file,parent,dimdata,&dim))) goto done;
-	    if(dim == NULL) {
-                /* Create the dimension */
-	        if((stat = ncz4_create_dim(file,parent,dimdata->name,dimdata->shape,dimdata->unlimited,&dim))) goto done;
-	    }
-	}
-    }
-
-ret:
-    if(isscalarp) *isscalarp = (isscalar?1:0);
-
-done:
-    ncbytesfree(fqn);
-    ncbytesfree(newname);
-    return ZUNTRACE(THROW(stat));
 }
 
 /* Convert a list of integer strings to size64_t integers */
@@ -1525,59 +1216,137 @@ NCZ_reclaim_diminfo_list(NClist* diminfo)
     }
 }
 
+/** Locate/create a dimension that is either consistent or unique.
+@param dim test this dim for consistency with dimdata
+@param dimdata about the dimension properties 
+@param testunlim 1=>test matching unlimited flags; 0=>test for size only
+*/
 static int
-uniquedimname(NC_FILE_INFO_T* file, NC_GRP_INFO_T* parent, NCZ_DimInfo* dimdata, NC_DIM_INFO_T** dimp)
+isconsistentdim(NC_DIM_INFO_T* dim, NCZ_DimInfo* dimdata, int testunlim)
+{
+    if(dim->len != dimdata->shape) return 0;
+    if(testunlim) {
+	if(dim->unlimited && !dimdata->unlimited) return 0;
+	if(!dim->unlimited && dimdata->unlimited) return 0;
+    }
+    return 1;
+}
+
+/** Locate a dimension by name only moving to higher groups as needed.
+@param file dataset
+@param grp grp to start search
+@param dimname to find
+@param dimp store dim here; null if not found
+@param grpp store grp containing the matched dimension
+Note: *dimp != NULL => *grpp != NULL && *dimp==NULL => *grpp==NULL
+Note: *dimp == NULL => no dim exists with matching name
+*/
+static int
+locatedimbyname(NC_FILE_INFO_T* file, NC_GRP_INFO_T* grp, const char* dimname, NC_DIM_INFO_T** dimp, NC_GRP_INFO_T** grpp)
+{
+    int stat = NC_NOERR;
+    NC_DIM_INFO_T* dim = NULL;
+    NC_GRP_INFO_T* g = NULL;
+    NC_GRP_INFO_T* dimg = NULL;
+        
+    if(dimp) *dimp = NULL;
+    if(grpp) *grpp = NULL;
+
+    /* Search upwards in containing groups */
+    for(g=grp;g != NULL;g=g->parent) {
+	dim = (NC_DIM_INFO_T*)ncindexlookup(g->dim,dimname);
+	if(dim != NULL) {dimg = g; break;}
+	dim = NULL;
+    }
+    if(dimp) *dimp = dim;
+    if(grpp) *grpp = dimg;
+    return THROW(stat);
+}
+
+/** Locate a dimension by dimdata moving to higher groups as needed.
+@param file dataset
+@param grp grp to start search
+@param dimdata for consistency test
+@param testunlim 1 => include unlim in test
+@param dimp store dim here; null if not found
+@param grpp store grp containing dim here;
+Note: *dimp != NULL => *grpp != NULL && *dimp==NULL => *grpp==NULL
+Note that *dimp==NULL && *grpp==NULL => there was no dim with given name.
+*/
+static int
+locateconsistentdim(NC_FILE_INFO_T* file, NC_GRP_INFO_T* grp, NCZ_DimInfo* dimdata, int testunlim, NC_DIM_INFO_T** dimp, NC_GRP_INFO_T** grpp)
+{
+    int stat = NC_NOERR;
+    NC_DIM_INFO_T* dim = NULL;
+    NC_GRP_INFO_T* g = NULL;
+   
+    if(dimp) *dimp = NULL;        
+
+    for(g=grp;g != NULL;g=g->parent,dim=NULL) {
+        if((stat = locatedimbyname(file,g,dimdata->name,&dim,&g))) goto done;
+        if(dim == NULL) break; /* no name match */
+	/* See if consistent */
+	if(isconsistentdim(dim,dimdata,!TESTUNLIM)) break; /* use this dim */
+    }
+
+    if(dimp) *dimp = dim;
+    if(grpp) *grpp = g;
+done:
+    return THROW(stat);
+}
+
+/** Locate/create a dimension that is either consistent or unique.
+@param file dataset
+@param parent default grp for creating group
+@param dimdata about the dimension properties 
+@param dimp store matching dim here
+@param dimname store the unique name
+*/
+int
+NCZ_uniquedimname(NC_FILE_INFO_T* file, NC_GRP_INFO_T* parent, NCZ_DimInfo* dimdata, NC_DIM_INFO_T** dimp, NCbytes* dimname)
 {
     int stat = NC_NOERR;
     size_t loopcounter;
-    NC_OBJ* obj = NULL;
-    NC_DIM_INFO_T* dim = NULL;	    
-    NCbytes* newname = ncbytesnew();
-    NCbytes* fqn = ncbytesnew();
+    NC_DIM_INFO_T* dim = NULL;
+    NC_GRP_INFO_T* grp = NULL;	    
     char digits[NC_MAX_NAME];
+    NCbytes* newname = ncbytesnew();
 
-    /* Loop repeatedly until we have unique dimension FQN */
-    for(loopcounter=0;;loopcounter++) {
+    if(*dimp) *dimp = NULL;
+    
+    ncbytescat(dimname,dimdata->name); /* Use this name as candidate */
+
+    /* See if there is an accessible consistent dimension with same name */
+    if((stat = locateconsistentdim(file,parent,dimdata,!TESTUNLIM,&dim,&grp))) goto done;
+
+    if(dim != NULL) goto ret; /* we found a consistent dim already exists */
+    if(dim == NULL && grp == NULL) goto ret; /* Ok to create the dim in the parent group */
+
+    /* Dim exists, but is inconsistent */
+    /* Otherwise, we have to find a unique name that can be created in parent group */
+    for(loopcounter=1;;loopcounter++) {
 	/* cleanup from last loop */
         dim = NULL; /* reset loop exit */
 	nullfree(dimdata->fqn); dimdata->fqn = NULL;
+        /* Make unique name using loopcounter */
 	ncbytesclear(newname);
 	ncbytescat(newname,dimdata->name);
-   	if(loopcounter > 0) {
-	    /* Make unique name using loopcounter */
-	    snprintf(digits,sizeof(digits),"_%zu",loopcounter);
-	    ncbytescat(newname,digits);
-	}
-	/* convert dimension_name to FQN */
-	assert(ncbyteslength(fqn) == 0);
-	if((stat = NCZ_makeFQN(parent, ncbytescontents(newname), fqn))) goto done;
-	assert(dimdata->fqn == NULL);
-	dimdata->fqn = ncbytesextract(fqn);
-	/* Check for duplicate */
-	stat = NCZ_locateFQN(file->root_grp,dimdata->fqn,NCDIM,&obj,NULL);
-	if(stat == NC_NOERR) { /* dimension already exists */
-	    NC_DIM_INFO_T* olddim = (NC_DIM_INFO_T*)obj;
-	    /* check if the old dim is consistent with the new dimension.
-	       Note that consistent means has same size. The dim reference does
-	       not tell us about unlimited, so we ignore that. */
-	    if(olddim->len != dimdata->shape) {
-		/* Inconsistent size, so loop again to create an alternate dimension name */   
-		dim = NULL;
-		continue; /* loop with this new dim name */
-	    } else {
-		dim = olddim; /* consistent so re-use the old dimension */
-		break;
-	    }
-	} else {
-	    stat = NC_NOERR;
-	    break; /* We have a unique FQN */
-	}
+	snprintf(digits,sizeof(digits),"_%zu",loopcounter);
+	ncbytescat(newname,digits);
+	/* See if there is an accessible dimension with same name and in this parent group */
+	dim = (NC_DIM_INFO_T*)ncindexlookup(parent->dim,dimdata->name);
+	if(dim != NULL && isconsistentdim(dim,dimdata,!TESTUNLIM)) {
+	    /* Return this name */
+	    ncbytesclear(dimname);
+	    ncbytescat(dimname,ncbytescontents(newname));
+	    break;
+	} /* else try another name */
     } /* loopcounter */		
 
+ret:
     if(dimp) *dimp = dim;
 
 done:
     ncbytesfree(newname);
-    ncbytesfree(fqn);
     return THROW(stat);
 }

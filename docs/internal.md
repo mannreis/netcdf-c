@@ -717,7 +717,7 @@ and specific script files.
 The actual cleanup requires different approaches for cmake and for automake.
 In cmake, the CTestCustom.cmake mechanism is used and contains the following command:
 ````
- IF(ENABLE_S3_TESTING)
+ IF(NETCDF_ENABLE_S3_TESTING)
  # Assume run in top-level CMAKE_BINARY_DIR
  set(CTEST_CUSTOM_POST_TEST "bash -x ${CMAKE_BINARY_DIR}/s3cleanup.sh")
  ENDIF()
@@ -727,7 +727,7 @@ In automake, the "clean-local" extension mechanism is used.
 So nczarr_test/Makefile.am contains the following
 equivalent code:
 ````
- if ENABLE_S3_TESTALL
+ if NETCDF_ENABLE_S3_TESTALL
  check-local:
  	bash -x ${top_srcdir}/s3cleanup.sh
  endif
@@ -782,7 +782,7 @@ It turns out that automake is not easily capable of copying those tests on the f
 This is principally because the automake *make distcheck* command does not allow
 modifications to the source directory, but only to the build directory. This means
 that the tests must be heavily modified to handle the two cases where scripts, programs,
-and test data are in *$$\{srcdir\}* versus when they are in *$$\{builddir\}*.
+and test data are in *\$\$\{srcdir\}* versus when they are in *\$\$\{builddir\}*.
 
 Rather than copying the shared files on the fly, I chose instead to just
 keep copies of the files in both *nczarr_test* and *v3_nczarr_test*.

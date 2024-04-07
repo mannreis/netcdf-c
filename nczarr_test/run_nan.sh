@@ -19,7 +19,8 @@ set -e
 
 # Location constants
 cdl="$srcdir/../ncdump/cdl"
-expected="$srcdir/../ncdump/expected"
+#expected="$srcdir/../ncdump/expected"
+expected="$srcdir"
 
 # Functions
 

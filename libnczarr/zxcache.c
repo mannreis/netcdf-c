@@ -324,58 +324,12 @@ done:
     return THROW(stat);
 }
 
-#if 0
-int
-NCZ_write_cache_chunk(NCZChunkCache* cache, const size64_t* indices, void* content)
-{
-    int stat = NC_NOERR;
-    int rank = cache->ndims;
-    NCZCacheEntry* entry = NULL;
-    ncexhashkey_t hkey;
-    
-    /* create the hash key */
-    hkey = ncxcachekey(indices,sizeof(size64_t)*cache->ndims);
-
-    if(entry == NULL) { /*!found*/
-	/* Create a new entry */
-	if((entry = calloc(1,sizeof(NCZCacheEntry)))==NULL)
-	    {stat = NC_ENOMEM; goto done;}
-	memcpy(entry->indices,indices,rank*sizeof(size64_t));
-        if((stat = NCZ_buildchunkpath(cache,indices,&entry->key))) goto done;
-        entry->hashkey = hkey;
-	/* Create the local copy space */
-	entry->size = cache->chunksize;
-	if((entry->data = calloc(1,cache->chunksize)) == NULL)
-	    {stat = NC_ENOMEM; goto done;}
-	memcpy(entry->data,content,cache->chunksize);
-    }
-    setmodified(entry,1);
-    nclistpush(cache->mru,entry); /* MRU order */
-#ifdef DEBUG
-fprintf(stderr,"|cache.write|=%ld\n",nclistlength(cache->mru));
-#endif
-    entry = NULL;
-
-    /* Ensure cache constraints not violated */
-    if((stat=verifycache(cache))) goto done;
-
-done:
-    if(entry) free_cache_entry(cache,entry);
-    return THROW(stat);
-}
-#endif
-
 /* Constrain cache */
 static int
 verifycache(NCZChunkCache* cache)
 {
     int stat = NC_NOERR;
 
-#if 0
-    /* Sanity check; make sure at least one entry is always allowed */
-    if(nclistlength(cache->mru) == 1)
-	goto done;
-#endif
     if((stat = constraincache(cache,USEPARAMSIZE))) goto done;
 done:
     return stat;
@@ -387,14 +341,7 @@ static int
 flushcache(NCZChunkCache* cache)
 {
     int stat = NC_NOERR;
-#if 0
-    size_t oldsize = cache->params.size;
-    cache->params.size = 0;
     stat = constraincache(cache,USEPARAMSIZE);
-    cache->params.size = oldsize;
-#else
-    stat = constraincache(cache,USEPARAMSIZE);
-#endif
     return stat;
 }
 
@@ -629,7 +576,7 @@ put_chunk(NCZChunkCache* cache, NCZCacheEntry* entry)
     }
 
 
-#ifdef ENABLE_NCZARR_FILTERS
+#ifdef NETCDF_ENABLE_NCZARR_FILTERS
     /* Make sure the entry is in filtered state */
     if(!entry->isfiltered) {
         NC_VAR_INFO_T* var = cache->var;
@@ -745,7 +692,7 @@ get_chunk(NCZChunkCache* cache, NCZCacheEntry* entry)
 	if((stat = NCZ_copy_data(file,cache->var,cache->fillchunk,cache->chunkcount,ZREADING,entry->data))) goto done;
 	stat = NC_NOERR;
     }
-#ifdef ENABLE_NCZARR_FILTERS
+#ifdef NETCDF_ENABLE_NCZARR_FILTERS
     /* Make sure the entry is in unfiltered state */
     if(!empty && entry->isfiltered) {
         NC_VAR_INFO_T* var = cache->var;
@@ -801,7 +748,7 @@ NCZ_buildchunkpath(NCZChunkCache* cache, const size64_t* chunkindices, struct Ch
 
     assert(key != NULL);
     /* Get the chunk object name */
-    if((stat = NCZF_buildchunkkey(cache->var->container->nc4_info,(int)cache->ndims, chunkindices, cache->dimension_separator, &chunkname))) goto done;
+    if((stat = NCZF_buildchunkkey(cache->var->container->nc4_info,cache->ndims, chunkindices, cache->dimension_separator, &chunkname))) goto done;
     /* Get the var object key */
     if((stat = NCZ_varkey(cache->var,&varkey))) goto done;
     key->varkey = varkey; varkey = NULL;

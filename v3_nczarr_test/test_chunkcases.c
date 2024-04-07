@@ -13,7 +13,7 @@
 #include <H5DSpublic.h>
 #endif
 
-#ifdef ENABLE_NCZARR
+#ifdef NETCDF_ENABLE_NCZARR
 #include "zincludes.h"
 #endif
 

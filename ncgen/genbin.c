@@ -9,7 +9,7 @@
 #include "netcdf_aux.h"
 #include "netcdf_filter.h"
 
-#ifdef ENABLE_BINARY
+#ifdef NETCDF_ENABLE_BINARY
 
 #undef TRACE
 
@@ -570,4 +570,4 @@ genbin_writeattr(Generator* generator, Symbol* asym, Bytebuffer* databuf,
     return stat;
 }
 
-#endif /*ENABLE_BINARY*/
+#endif /*NETCDF_ENABLE_BINARY*/
