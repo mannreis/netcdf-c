@@ -114,6 +114,7 @@ if(ENABLE_TESTS)
   
   if(ENABLE_NCDUMPCHUNKS)
     build_bin_test_with_util_lib(ncdumpchunks ut_util)
+    target_link_libraries(ncdumpchunks PUBLIC netcdf ${ALL_TLL_LIBS})
   endif()
 
   if(BUILD_UTILITIES)
