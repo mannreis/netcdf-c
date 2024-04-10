@@ -813,8 +813,8 @@ fprintf(stderr,">>> next: alloc=%u used=%u buf=%p\n",(unsigned)next_alloc,(unsig
 	} else {
 	    /* Apply in reverse order */
             for(size_t k=nclistlength(chain); k-->0;) {
-              f = (struct NCZ_Filter*)nclistget(chain, k);
-		if(f->flags & FLAG_SUPPRESS) continue; /* this filter should not be applied */
+                f = (struct NCZ_Filter*)nclistget(chain, k);
+		if(f->suppress) continue; /* this filter should not be applied */
 	        ff = f->plugin->hdf5.filter;
 	        /* code can be simplified */
 	        next_alloc = current_alloc;
