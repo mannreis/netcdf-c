@@ -775,8 +775,13 @@ In support of this, there are two test directories: *nczarr_test* and *v3_nczarr
 When the tests in *nczarr_test* are executed, they default to using Zarr version 2 (=> NCZarr version 2).
 Similarly, when the tests in *v3_nczarr_test* are executed, they default to using Zarr version 3 (=> NCZarr version 3).
 
-It turns out that most (but not all) of the V2 tests can be reused for testing V3.
-So, many of the tests in *v3_nczarr_test* are copies of the tests in *nczarr_test*.
+It turns out that almost all of the V2 tests can be reused for testing V3.
+So, the tests in *v3_nczarr_test* are copies of the tests in *nczarr_test*.
+It turns out that automake is not easily capable of copying those tests on the fly.
+This is principally because the automake *make distcheck* command does not allow
+modifications to the source directory, but only to the build directory. This means
+that the tests must be heavily modified to handle the two cases where scripts, programs,
+and test data are in *\$\$\{srcdir\}* versus when they are in *\$\$\{builddir\}*.
 
 ## AutoMake Testing
 For AutoMake testing, selected V2 tests are copied to the *v3_nczarr_test*
@@ -799,4 +804,4 @@ data files must be manually added to the Makefile.am and github-add'ed.
 *Author*: Dennis Heimbigner<br>
 *Email*: dmh at ucar dot edu<br>
 *Initial Version*: 12/22/2021<br>
-*Last Revised*: 2/4/2024
+*Last Revised*: 4/10/2024

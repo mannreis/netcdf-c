@@ -431,49 +431,45 @@ endif()
 # Format Option checks
 ################################
 
-# As of this branch, --enable-netcdf4 and --enable_netcdf-4
-# are removed in favor of enable-hdf5.
-# as equivalent to enable-hdf5.
+# NETCDF_ENABLE_NETCDF_4/NETCDF_ENABLE_NETCDF4
+# have been deprecated for a while.
+# Here we disable them completely.
+option(NETCDF_ENABLE_NETCDF_4 "Use HDF5." OFF)
+option(NETCDF_ENABLE_NETCDF4 "Use HDF5." OFF)
+if(NETCDF_ENABLE_HDF5 OR NETCDF_ENABLE_NETCDF_4)
+  message(FATAL_ERROR "NETCDF_ENABLE_NETCDF4/NETCDF_ENABLE_NETCDF_4 are obsolete. Please use NETCDF_ENABLE_HDF5 instead.")
+endif()
+
 option(NETCDF_ENABLE_HDF5 "Use HDF5." ON)
 option(NETCDF_ENABLE_HDF4 "Build netCDF-4 with HDF4 read capability(HDF4, HDF5 and Zlib required)." OFF)
-
 option(NETCDF_ENABLE_DAP "Enable DAP2 and DAP4 Client." ON)
 option(NETCDF_ENABLE_NCZARR "Enable NCZarr Client." ON)
 option(NETCDF_ENABLE_PNETCDF "Build with parallel I/O for CDF-1, 2, and 5 files using PnetCDF." OFF)
 set(NETCDF_ENABLE_CDF5 AUTO CACHE STRING "AUTO")
 option(NETCDF_ENABLE_CDF5 "Enable CDF5 support" ON)
 
-# Fail on use of ENABLE_NETCDF4/ENABLE_NETCDF_4
-option(NETCDF_ENABLE_NETCDF4 "" OFF)
-option(NETCDF_ENABLE_NETCDF_4 "" OFF)
-
-if(NETCDF_ENABLE_NETCDF4)
-message(FATAL_ERROR "-DNETCDF_ENABLE_NETCDF4 is no longer supported: Please use ENABLE_HDF5")
-endif()
-if(NETCDF_ENABLE_NETCDF_4)
-message(FATAL_ERROR "-DNETCDF_ENABLE_NETCDF_4 is no longer supported: Please use ENABLE_HDF5")
-endif()
-
 # Decide default Zarr Format for creation
-option(NETCDF_ENABLE_DEFAULT_ZARR_FORMAT_V3 "Specify the default Zarr format is V3" OFF)
+OPTION(ENABLE_DEFAULT_ZARR_FORMAT_V3 "Specify the default Zarr format is V3" OFF)
 if(NETCDF_ENABLE_DEFAULT_ZARR_FORMAT_V3)
-set(DFALTZARRFORMAT 3 CACHE STRING "")
-else()
-set(DFALTZARRFORMAT 2 CACHE STRING "")
-endif()
+SET(DFALTZARRFORMAT 3 CACHE STRING "")
+ELSE()
+SET(DFALTZARRFORMAT 2 CACHE STRING "")
+ENDIF()
 
-if(NETCDF_ENABLE_NCZARR)
-  set(NETCDF_ENABLE_NCZARR_V3 ON CACHE BOOL "Enable Zarr V3" FORCE)
+IF(NETCDF_ENABLE_NCZARR)
+  SET(NETCDF_ENABLE_NCZARR_V3 ON CACHE BOOL "Enable Zarr V3" FORCE)
   # V3 is enabled if NCzarr is enabled
-else()
-  set(ENABLE_NCZARR_V3 OFF CACHE BOOL "Enable Zarr V3" FORCE)
-endif()
+ELSE()
+  SET(NETCDF_ENABLE_NCZARR_V3 OFF CACHE BOOL "Enable Zarr V3" FORCE)
+ENDIF()
 
-# For convenience, define USE_NETCDF4
-if(USE_HDF5 OR NETCDF_ENABLE_NCZARR OR NETCDF_ENABLE_DAP4)
-set(USE_NETCDF4 ON CACHE BOOL "Enable USE_NETCDF4" FORCE)
+# Netcdf-4 support (i.e. libsrc4) is required by more than just HDF5 (e.g. NCZarr)
+# So depending on what above formats are enabled, enable netcdf-4
+# as a short-hand for this boolean expression
+if(NETCDF_ENABLE_HDF5 OR NETCDF_ENABLE_HDF4 OR NETCDF_ENABLE_NCZARR)
+  set(USE_NETCDF4 ON)
 else()
-set(USE_NETCDF4 OF CACHE BOOL "Enable USE_NETCDF4" FORCE)
+  set(USE_NETCDF4 OFF)
 endif()
 
 # enable|disable all forms of network access
@@ -482,6 +478,7 @@ message(">>> NETCDF_ENABLE_REMOTE_FUNCTIONALITY=${NETCDF_ENABLE_REMOTE_FUNCTIONA
 if(NOT NETCDF_ENABLE_REMOTE_FUNCTIONALITY)
 message(WARNING "NETCDF_ENABLE_REMOTE_FUNCTIONALITY=NO => NETCDF_ENABLE_DAP[4]=NO")
 set(NETCDF_ENABLE_DAP OFF CACHE BOOL "NETCDF_ENABLE_REMOTE_FUNCTIONALITY=NO => NETCDF_ENABLE_DAP=NO" FORCE)
+set(NETCDF_ENABLE_DAP2 OFF CACHE BOOL "NETCDF_ENABLE_REMOTE_FUNCTIONALITY=NO => NETCDF_ENABLE_DAP2=NO" FORCE)
 set(NETCDF_ENABLE_DAP4 OFF CACHE BOOL "NETCDF_ENABLE_REMOTE_FUNCTIONALITY=NO => NETCDF_ENABLE_DAP4=NO" FORCE)
 endif()
 
@@ -517,7 +514,7 @@ endif()
 option(NETCDF_ENABLE_SET_LOG_LEVEL_FUNC "Enable definition of nc_set_log_level()." ON)
 if(USE_NETCDF4 AND NOT NETCDF_ENABLE_LOGGING AND NETCDF_ENABLE_SET_LOG_LEVEL_FUNC)
   target_compile_definitions(netcdf PRIVATE -DENABLE_SET_LOG_LEVEL)
-  set(ENABLE_SET_LOG_LEVEL ON)
+  set(NETCDF_ENABLE_SET_LOG_LEVEL ON)
 endif()
 
 # Option to allow for strict null file padding.
@@ -555,7 +552,7 @@ else()
 endif()
 
 # Option to support byte-range reading of remote datasets
-option(NETCDF_ENABLE_BYTERANGE "Enable byte-range access to remote datasets.." ON)
+option(NETCDF_ENABLE_BYTERANGE "Enable byte-range access to remote datasets.." ${NETCDF_ENABLE_DAP})
 if(NOT NETCDF_ENABLE_REMOTE_FUNCTIONALITY)
 message(WARNING "NETCDF_ENABLE_REMOTE_FUNCTIONALITY=NO => NETCDF_ENABLE_BYTERANGE=NO")
 set(NETCDF_ENABLE_BYTERANGE OFF CACHE BOOL "NETCDF_ENABLE_REMOTE_FUNCTIONALITY=NO => NETCDF_ENABLE_BYTERANGE=NO" FORCE)
@@ -609,7 +606,7 @@ if(NOT ENABLE_PLUGIN_INSTALL)
     unset(PLUGIN_INSTALL_DIR CACHE)
 endif()
 
-if(ENABLE_PLUGIN_INSTALL)
+if(NETCDF_ENABLE_PLUGIN_INSTALL)
     if(NOT DEFINED PLUGIN_INSTALL_DIR)
       # Default to HDF5_PLUGIN_PATH or its default directories
       if(DEFINED ENV{HDF5_PLUGIN_PATH})
@@ -625,7 +622,7 @@ if(ENABLE_PLUGIN_INSTALL)
     endif()
 endif()
 
-if(ENABLE_PLUGIN_INSTALL)
+if(NETCDF_ENABLE_PLUGIN_INSTALL)
   # Use the lowest priority dir in the path
   if(NOT ISMSVC AND NOT ISMINGW)
     string(REPLACE ":" ";" PATH_LIST ${PLUGIN_INSTALL_DIR})
@@ -849,12 +846,6 @@ if(NETCDF_ENABLE_FSYNC)
   set(USE_FSYNC ON)
 endif()
 
-# Temporary
-OPTION (ENABLE_JNA "Enable jna bug fix code." OFF)
-if(ENABLE_JNA)
-  set(JNA ON)
-endif()
-
 # Linux specific large file support flags.
 # Modelled after check in CMakeLists.txt for hdf5.
 option(NETCDF_ENABLE_LARGE_FILE_SUPPORT "Enable large file support." ON)
@@ -963,7 +954,7 @@ if(NETCDF_ENABLE_ERANGE_FILL)
   set(M4FLAGS "-DERANGE_FILL" CACHE STRING "")
 endif()
 
-if(ENABLE_ZERO_LENGTH_COORD_BOUND)
+if(NETCDF_ENABLE_ZERO_LENGTH_COORD_BOUND)
   message(STATUS "Enabling a more relaxed check for NC_EINVALCOORDS")
   target_compile_definitions(netcdf PRIVATE RELAX_COORD_BOUND)
 endif()
@@ -1380,6 +1371,7 @@ add_definitions(-DHAVE_CONFIG_H)
 include_directories(${netCDF_BINARY_DIR})
 # End autotools-style checks for config.h
 
+
 #####
 # Set the true names of all the libraries, if customized by external project
 #####
@@ -1457,7 +1449,7 @@ endif()
 
 # Enable tests
 if(NETCDF_ENABLE_TESTS)
-  if(ENABLE_V2_API)
+  if(NETCDF_ENABLE_V2_API)
     add_subdirectory(nctest)
   endif()
   add_subdirectory(nc_test)
@@ -1634,6 +1626,7 @@ is_enabled(BUILD_SHARED_LIBS enable_shared)
 is_enabled(ENABLE_V2_API HAS_NC2)
 is_enabled(NETCDF_ENABLE_HDF4 HAS_HDF4)
 is_enabled(USE_HDF5 HAS_HDF5)
+is_enabled(USE_NETCDF4 HAS_NC4)
 is_enabled(OFF HAS_BENCHMARKS)
 is_enabled(STATUS_PNETCDF HAS_PNETCDF)
 is_enabled(STATUS_PARALLEL HAS_PARALLEL)
