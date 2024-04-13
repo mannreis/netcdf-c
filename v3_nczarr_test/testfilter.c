@@ -43,7 +43,7 @@ data:
 #include <string.h>
 #include <stdlib.h>
 
-#ifdef HAVE_HDF5_H
+#ifdef USE_HDF5
 #include <hdf5.h>
 #endif
 

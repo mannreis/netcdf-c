@@ -436,7 +436,7 @@ endif()
 # Here we disable them completely.
 option(NETCDF_ENABLE_NETCDF_4 "Use HDF5." OFF)
 option(NETCDF_ENABLE_NETCDF4 "Use HDF5." OFF)
-if(NETCDF_ENABLE_HDF5 OR NETCDF_ENABLE_NETCDF_4)
+if(NETCDF_ENABLE_NETCDF4 OR NETCDF_ENABLE_NETCDF_4)
   message(FATAL_ERROR "NETCDF_ENABLE_NETCDF4/NETCDF_ENABLE_NETCDF_4 are obsolete. Please use NETCDF_ENABLE_HDF5 instead.")
 endif()
 
@@ -1476,6 +1476,9 @@ if(NETCDF_ENABLE_TESTS)
   if(NETCDF_ENABLE_NCZARR)
     include_directories(nczarr_test)
     add_subdirectory(nczarr_test)
+    if(NETCDF_ENABLE_S3)
+      add_subdirectory(v3_nczarr_test)
+    endif()
   endif()
 endif()
 
