@@ -128,6 +128,10 @@ if(USE_HDF5)
   # First, find the C and HL libraries.
   #####
   find_package(HDF5 ${HDF5_VERSION_REQUIRED} COMPONENTS C HL REQUIRED)
+message("@@@ HDF5_C_LIBRARY=${HDF5_C_LIBRARY}")
+message("@@@ HDF5_HL_LIBRARY=${HDF5_HL_LIBRARY}")
+message("@@@ HDF5_LIBRARIES=${HDF5_LIBRARIES}")
+message("@@@ HDF5_INCLUDE_DIR=${HDF5_INCLUDE_DIR}")
 
   message(STATUS "Using HDF5 include dir: ${HDF5_INCLUDE_DIRS}")
   target_link_libraries(netcdf
@@ -211,6 +215,7 @@ if(USE_HDF5)
     set(HDF5_HAS_PAR_FILTERS FALSE CACHE BOOL "" )
     set(HAS_PAR_FILTERS no CACHE STRING "" )
   endif()
+
 endif(USE_HDF5)
 
 ################################
