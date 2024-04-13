@@ -356,16 +356,3 @@ function(is_disabled feature ret_val)
     set("NC_${ret_val}" 1 PARENT_SCOPE)
   endif(${feature})
 endfunction()
-
-
-##################################################
-# Wrap existing macros to prepend v3_ in order to avoid
-# "...another target with the same name already exists" errors.
-
-macro(v3_build_bin_test_with_util_lib F UTIL_LIB)
-  build_bin_test_with_util_lib("v3_${F}" "v3_${UTIL_LIB}")
-endmacro()
-
-macro(v3_add_bin_test_with_util_lib PREFIX F UTIL_LIB)
-  add_bin_test_with_util_lib(${PREFIX} "v3_${F}" "v3_${UTIL_LIB}")
-endmacro()
