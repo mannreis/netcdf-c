@@ -224,16 +224,13 @@ BUILT_SOURCES += ${TESTDATA_NCZARR} ${TESTFILES_NCZARR_SH} ${TESTFILES_NCZARR_C}
 
 ${TESTFILES_NCZARR_SH}:
 	for u in ${TESTFILES_NCZARR_SH} ; do \
-	  set -x ; \
 	  SRCPATH="${top_srcdir}/nczarr_test/$$u"; \
 	  DSTPATH="${top_srcdir}/v3_nczarr_test/$$u"; \
 	  rm -f $$DSTPATH ; \
-	  echo cat $${SRCPATH} ">>" $${DSTPATH} ; \
-	  ls -l $$SRCPATH ; \
 	  cat $$SRCPATH >> $$DSTPATH ; \
-	  ls -l $$DSTPATH ; \
 	  chmod a+x $$DSTPATH ; \
 	done 
+	ls -1 "${top_srcdir}/v3_nczarr_test"
 
 ${TESTFILES_NCZARR_C}:
 	for u in ${TESTFILES_NCZARR_C} ; do \
