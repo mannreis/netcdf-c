@@ -155,23 +155,23 @@ endif #NETCDF_ENABLE_NCZARR_FILTERS
 endif #NETCDF_BUILD_UTILITIES
 
 # These programs are used by the test cases
-noinst_PROGRAMS = zhex
-zhex_SOURCES = zhex.c
-noinst_PROGRAMS += zisjson
-zisjson_SOURCES = zisjson.c
-noinst_PROGRAMS += zmapio
-zmapio_SOURCES = zmapio.c
-noinst_PROGRAMS += zs3parse
-zs3parse_SOURCES = zs3parse.c
+#noinst_PROGRAMS = zhex
+#zhex_SOURCES = zhex.c
+#noinst_PROGRAMS += zisjson
+#zisjson_SOURCES = zisjson.c
+#noinst_PROGRAMS += zmapio
+#zmapio_SOURCES = zmapio.c
+#noinst_PROGRAMS += zs3parse
+#zs3parse_SOURCES = zs3parse.c
 
 if NETCDF_ENABLE_S3
-noinst_PROGRAMS += s3util 
-s3util_SOURCES = s3util.c
-if NETCDF_ENABLE_S3_TESTALL
-if NETCDF_ENABLE_S3_AWS
-check_PROGRAMS += tst_pure_awssdk
-tst_pure_awssdk_SOURCES = tst_pure_awssdk.cpp
-AM_CXXFLAGS += -std=c++11
+#noinst_PROGRAMS += s3util 
+#s3util_SOURCES = s3util.c
+#if NETCDF_ENABLE_S3_TESTALL
+#if NETCDF_ENABLE_S3_AWS
+#check_PROGRAMS += tst_pure_awssdk
+#tst_pure_awssdk_SOURCES = tst_pure_awssdk.cpp
+#AM_CXXFLAGS += -std=c++11
 endif 	
 endif
 endif
@@ -179,9 +179,9 @@ endif
 if USE_HDF5
 # Given a netcdf4|NCZarr file, dump the actual chunk contents.
 # Used to validate nczarr chunking code.
-AM_CPPFLAGS += -I$(top_srcdir)/libnczarr
-noinst_PROGRAMS += ncdumpchunks
-ncdumpchunks_SOURCES = ncdumpchunks.c
+#AM_CPPFLAGS += -I$(top_srcdir)/libnczarr
+#noinst_PROGRAMS += ncdumpchunks
+#ncdumpchunks_SOURCES = ncdumpchunks.c
 endif
 
 CLEANFILES = ut_*.txt ut*.cdl tmp*.nc tmp*.cdl tmp*.txt tmp*.dmp tmp*.zip tmp*.nc tmp*.dump tmp*.tmp tmp*.zmap tmp_ngc.c ref_zarr_test_data.cdl tst_*.nc.zip ref_quotes.zip ref_power_901_constants.zip
