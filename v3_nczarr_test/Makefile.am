@@ -228,7 +228,8 @@ ${TESTFILES_NCZARR_SH}:
 	  SRCPATH="${top_srcdir}/nczarr_test/$$u"; \
 	  DSTPATH="${top_srcdir}/v3_nczarr_test/$$u"; \
 	  rm -f $$DSTPATH ; \
-	  echo cat $SRCPATH ">>" $$DSTPATH ; \
+	  echo cat $${SRCPATH} ">>" $${DSTPATH} ; \
+	  ls -l $$SRCPATH ; \
 	  cat $$SRCPATH >> $$DSTPATH ; \
 	  ls -l $$DSTPATH ; \
 	  chmod a+x $$DSTPATH ; \
