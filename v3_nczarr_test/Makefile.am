@@ -213,8 +213,6 @@ endif
 # So provide a Makefile target to update the files here with copies
 # of those in nczarr test and elsewhere.
 
-.PHONY: testfiles_nczarr testdata_nczarr
-
 # Sources that are copies of same files from nczarr_test
 TESTFILES_NCZARR = test_chunking.c test_filter_vlen.c test_h5_endians.c test_put_vars_two_unlim_dim.c test_quantize.c test_unlim_vars.c tst_pure_awssdk.cpp
 
@@ -225,13 +223,14 @@ TESTDATA_NCZARR = ref_nulls_nczarr.baseline ref_zarr_test_data.cdl.gz ref_avail1
 BUILT_SOURCES += ${TESTFILES_NCZARR} ${TESTDATA_NCZARR}
 
 ${TESTFILES_NCZARR}:
-	echo "XXXX" ${TESTFILES_NCZARR}
 	for u in ${TESTFILES_NCZARR} ; do \
 	  SRCPATH="${top_srcdir}/nczarr_test/$$u"; DSTPATH="${top_srcdir}/v3_nczarr_test/$$u"; \
 	  rm -f $$DSTPATH ; \
 	  cat $$SRCPATH >> $$DSTPATH ; \
 	  chmod a+x $$DSTPATH ; \
 	done 
+	PD=`pwd`; echo "@@@ PWD=${PWD}"
+	ls -1 *.sh
 
 ${TESTDATA_NCZARR}:
 	for u in ${TESTDATA_NCZARR} ; do \
