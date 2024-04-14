@@ -56,14 +56,14 @@ if(NETCDF_ENABLE_TESTS)
   target_include_directories(v3_ut_util PUBLIC ../libnczarr ../plugins ${CMAKE_CURRENT_LIST_DIR})
   target_link_libraries(v3_ut_util PUBLIC netcdf ${ALL_TLL_LIBS})
 
-  add_library(v3_test_utils STATIC test_utils.c test_utils.h ${XGETOPTSRC})
+  add_library(test_utils STATIC test_utils.c test_utils.h ${XGETOPTSRC})
   if(NETCDF_ENABLE_DLL)
-    target_compile_definitions(v3_test_utils PUBLIC -DDLL_EXPORT -DDLL_NETCDF)
+    target_compile_definitions(test_utils PUBLIC -DDLL_EXPORT -DDLL_NETCDF)
   endif(NETCDF_ENABLE_DLL)
-  target_include_directories(v3_test_utils PUBLIC ../libnczarr ../plugins ${CMAKE_CURRENT_LIST_DIR})
-  target_link_libraries(v3_test_utils PUBLIC netcdf ${ALL_TLL_LIBS})
+  target_include_directories(test_utils PUBLIC ../libnczarr ../plugins ${CMAKE_CURRENT_LIST_DIR})
+  target_link_libraries(test_utils PUBLIC netcdf ${ALL_TLL_LIBS})
 
-  set_target_properties(v3_ut_util v3_test_utils PROPERTIES
+  set_target_properties(ut_util test_utils PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
     RUNTIME_OUTPUT_DIRECTORY_DEBUG ${CMAKE_CURRENT_BINARY_DIR}
     RUNTIME_OUTPUT_DIRECTORY_RELEASE ${CMAKE_CURRENT_BINARY_DIR}
@@ -74,25 +74,25 @@ if(NETCDF_ENABLE_TESTS)
   # must be run in a particular order. It is painful but will use macros to help
   # keep it from being too bad.
 
-  v3_build_bin_test_with_util_lib(ut_map v3_ut_util)
-  v3_build_bin_test_with_util_lib(ut_mapapi v3_ut_util)
-  v3_build_bin_test_with_util_lib(ut_json v3_ut_util)
+  build_bin_test_with_util_lib(ut_map ut_util)
+  build_bin_test_with_util_lib(ut_mapapi ut_util)
+  build_bin_test_with_util_lib(ut_json ut_util)
 
-  v3_build_bin_test_with_util_lib(test_fillonlyz v3_test_utils)
-  v3_build_bin_test_with_util_lib(test_quantize v3_test_utils)
-  v3_build_bin_test_with_util_lib(test_notzarr v3_test_utils)
+  build_bin_test_with_util_lib(test_fillonlyz test_utils)
+  build_bin_test_with_util_lib(test_quantize test_utils)
+  build_bin_test_with_util_lib(test_notzarr test_utils)
 
-#  v3_add_bin_test(nczarr_test test_endians ${TSTCOMMONSRC})
+#  add_bin_test(nczarr_test test_endians ${TSTCOMMONSRC})
 
   # Unlimited Tests
   if(USE_HDF5)
-  add_bin_test_with_util_lib(nczarr_test test_unlim_vars v3_test_utils)
-  add_bin_test_with_util_lib(nczarr_test test_put_vars_two_unlim_dim v3_test_utils)
-  v3_build_bin_test_with_util_lib(test_zchunks v3_ut_util)
-  v3_build_bin_test_with_util_lib(test_zchunks2 v3_ut_util)
-  v3_build_bin_test_with_util_lib(test_zchunks3 v3_ut_util)
-  v3_build_bin_test_with_util_lib(test_unlim_io v3_test_utils)
-  v3_build_bin_test_with_util_lib(test_chunking v3_test_utils)
+  add_bin_test_with_util_lib(nczarr_test test_unlim_vars test_utils)
+  add_bin_test_with_util_lib(nczarr_test test_put_vars_two_unlim_dim test_utils)
+  build_bin_test_with_util_lib(test_zchunks ut_util)
+  build_bin_test_with_util_lib(test_zchunks2 ut_util)
+  build_bin_test_with_util_lib(test_zchunks3 ut_util)
+  build_bin_test_with_util_lib(test_unlim_io test_utils)
+  build_bin_test_with_util_lib(test_chunking test_utils)
   add_sh_test(nczarr_test run_nccopyz)
   add_sh_test(nczarr_test run_unlim_io)
   add_sh_test(nczarr_test run_nccopy5)
@@ -100,11 +100,11 @@ if(NETCDF_ENABLE_TESTS)
   endif()
   
   # Helper programs for testing
-  v3_build_bin_test_with_util_lib(zisjson v3_ut_util)
+  build_bin_test_with_util_lib(zisjson ut_util)
   target_include_directories(zisjson PUBLIC ../libnczarr)
-  v3_build_bin_test_with_util_lib(zs3parse v3_ut_util)
+  build_bin_test_with_util_lib(zs3parse ut_util)
   target_include_directories(zs3parse PUBLIC ../libnczarr)
-  v3_build_bin_test_with_util_lib(zmapio v3_ut_util)
+  build_bin_test_with_util_lib(zmapio ut_util)
 
   if(NETCDF_ENABLE_S3 AND NOT WITH_S3_TESTING STREQUAL "NO")
   # Pure AWS Test
@@ -127,22 +127,17 @@ if(NETCDF_ENABLE_TESTS)
 
       SET(CMAKE_CXX_STANDARD ${TMP_CMAKE_CXX_STANDARD})
     endif(NETCDF_ENABLE_S3_AWS)
-    target_include_directories(s3util PUBLIC ../libnczarr)
   endif()
   
-  if(USE_HDF5)
-    v3_build_bin_test_with_util_lib(ncdumpchunks v3_ut_util)
-  endif()
-
   if(BUILD_UTILITIES)
     add_sh_test(nczarr_test run_ut_map)
     add_sh_test(nczarr_test run_ut_mapapi)
     add_sh_test(nczarr_test run_ut_misc)
     add_sh_test(nczarr_test run_ncgen4)
     if(LARGE_FILE_TESTS)
-      v3_build_bin_test(test_readcaching)
-      v3_build_bin_test(test_writecaching)
-      v3_build_bin_test(test_chunkcases ${TSTCOMMONSRC})
+      build_bin_test(test_readcaching)
+      build_bin_test(test_writecaching)
+      build_bin_test(test_chunkcases ${TSTCOMMONSRC})
       add_sh_test(nczarr_test run_cachetest)
       add_sh_test(nczarr_test run_chunkcases)
     endif()
@@ -218,7 +213,7 @@ set(TESTFILES_NCZARR ${TESTFILES_NCZARR} run_chunkcases.sh run_corrupt.sh run_ex
 
 set(TESTDATA_NCZARR ref_nulls_nczarr.baseline ref_zarr_test_data.cdl.gz ref_avail1.cdl ref_byte.cdl ref_byte_fill_value_null.cdl ref_fillonly.cdl ref_misc1.cdl ref_ndims.cdl ref_newformatpure.cdl ref_nulls.cdl ref_oldformat.cdl ref_perdimspecs.cdl ref_power_901_constants.cdl ref_purezarr_base.cdl ref_quotes.cdl ref_rem.cdl ref_scalar.cdl ref_skip.cdl ref_skipw.cdl ref_string.cdl ref_t_meta_dim1.cdl ref_t_meta_var1.cdl ref_ut_mapapi_create.cdl ref_ut_mapapi_data.cdl ref_ut_mapapi_meta.cdl ref_ut_map_create.cdl ref_ut_map_writedata.cdl ref_ut_map_writemeta.cdl ref_ut_map_writemeta2.cdl ref_ut_testmap_create.cdl ref_whole.cdl ref_avail1.dmp ref_misc1.dmp ref_ndims.dmp ref_rem.dmp ref_noshape.file.zip ref_groups.h5 ref_notzarr.tar.gz ref_avail1.txt ref_skip.txt ref_ut_json_build.txt ref_ut_json_parse.txt ref_ut_mapapi_search.txt ref_ut_map_readmeta.txt ref_ut_map_readmeta2.txt ref_ut_map_search.txt ref_ut_proj.txt ref_whole.txt ref_byte.zarr.zip ref_byte_fill_value_null.zarr.zip ref_oldformat.zip ref_power_901_constants_orig.zip ref_quotes_orig.zip)
 
-# Add command to update the v3_test source from nczarr_test
+# Add command to update the test source from nczarr_test
 add_custom_target(update_testfiles DEPENDS testfiles_nczarr testdata_nczarr)
 
 add_custom_target(testfiles_nczarr

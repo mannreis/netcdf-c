@@ -781,7 +781,7 @@ It turns out that automake is not easily capable of copying those tests on the f
 This is principally because the automake *make distcheck* command does not allow
 modifications to the source directory, but only to the build directory. This means
 that the tests must be heavily modified to handle the two cases where scripts, programs,
-and test data are in *\$\$\{srcdir\}* versus when they are in *\$\$\{builddir\}*.
+and test data are in _\$\$\{srcdir\}_ versus when they are in _\$\$\{builddir\}_.
 
 ## AutoMake Testing
 For AutoMake testing, selected V2 tests are copied to the *v3_nczarr_test*

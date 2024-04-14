@@ -1477,7 +1477,12 @@ if(NETCDF_ENABLE_TESTS)
     include_directories(nczarr_test)
     add_subdirectory(nczarr_test)
     if(NETCDF_ENABLE_S3)
-      add_subdirectory(v3_nczarr_test)
+        if(NOT ISCMAKE)
+	    # Cannot create target because another target with
+	    # the same name already exists.
+	    # See documentation for policy CMP0002 for more details.
+	    add_subdirectory(v3_nczarr_test)
+	endif()
     endif()
   endif()
 endif()
