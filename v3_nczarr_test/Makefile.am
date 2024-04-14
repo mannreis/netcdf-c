@@ -216,9 +216,7 @@ endif
 .PHONY: testfiles_nczarr testdata_nczarr
 
 # Sources that are copies of same files from nczarr_test
-TESTFILES_NCZARR = test_nczarr.sh test_chunking.c test_filter_vlen.c test_h5_endians.c test_put_vars_two_unlim_dim.c test_quantize.c test_unlim_vars.c tst_pure_awssdk.cpp
-
-TESTFILES_NCZARR += zhex.c zisjson.c zmapio.c zs3parse.c s3util.c ncdumpchunks.c
+TESTFILES_NCZARR = test_chunking.c test_filter_vlen.c test_h5_endians.c test_put_vars_two_unlim_dim.c test_quantize.c test_unlim_vars.c tst_pure_awssdk.cpp
 
 TESTFILES_NCZARR += test_nczarr.sh run_chunkcases.sh run_corrupt.sh run_external.sh run_fillonlyz.sh run_filter.sh run_filterinstall.sh run_filter_misc.sh run_filter_vlen.sh run_interop.sh run_jsonconvention.sh run_misc.sh run_nccopy5.sh run_nccopyz.sh run_ncgen4.sh run_nczarr_fill.sh run_nczfilter.sh run_newformat.sh run_notzarr.sh run_nulls.sh run_perf_chunks1.sh run_purezarr.sh run_quantize.sh run_scalar.sh run_specific_filters.sh run_strings.sh run_unknown.sh run_unlim_io.sh run_ut_map.sh run_ut_mapapi.sh run_ut_misc.sh
 
