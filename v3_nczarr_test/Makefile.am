@@ -223,14 +223,12 @@ TESTDATA_NCZARR = ref_nulls_nczarr.baseline ref_zarr_test_data.cdl.gz ref_avail1
 BUILT_SOURCES += ${TESTFILES_NCZARR} ${TESTDATA_NCZARR}
 
 ${TESTFILES_NCZARR}:
-	for u in ${TESTFILES_NCZARR} ; do \
+	set -x ; for u in ${TESTFILES_NCZARR} ; do \
 	  SRCPATH="${top_srcdir}/nczarr_test/$$u"; DSTPATH="${top_srcdir}/v3_nczarr_test/$$u"; \
 	  rm -f $$DSTPATH ; \
 	  cat $$SRCPATH >> $$DSTPATH ; \
 	  chmod a+x $$DSTPATH ; \
 	done 
-	PD=`pwd`; echo "@@@ PWD=${PWD}"
-	ls -1 *.sh
 
 ${TESTDATA_NCZARR}:
 	for u in ${TESTDATA_NCZARR} ; do \
