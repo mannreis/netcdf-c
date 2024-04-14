@@ -230,7 +230,7 @@ ${TESTFILES_NCZARR_SH}:
 	  cat $$SRCPATH >> $$DSTPATH ; \
 	  chmod a+x $$DSTPATH ; \
 	done 
-	ls -1 "${top_srcdir}/v3_nczarr_test"
+	find . -name run_ut_misc.sh
 
 ${TESTFILES_NCZARR_C}:
 	for u in ${TESTFILES_NCZARR_C} ; do \
