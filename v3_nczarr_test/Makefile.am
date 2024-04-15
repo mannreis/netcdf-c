@@ -155,23 +155,23 @@ endif #NETCDF_ENABLE_NCZARR_FILTERS
 endif #NETCDF_BUILD_UTILITIES
 
 # These programs are used by the test cases
-noinst_PROGRAMS = zhex
-zhex_SOURCES = zhex.c
-noinst_PROGRAMS += zisjson
-zisjson_SOURCES = zisjson.c
-noinst_PROGRAMS += zmapio
-zmapio_SOURCES = zmapio.c
-noinst_PROGRAMS += zs3parse
-zs3parse_SOURCES = zs3parse.c
+#noinst_PROGRAMS = zhex
+#zhex_SOURCES = zhex.c
+#noinst_PROGRAMS += zisjson
+#zisjson_SOURCES = zisjson.c
+#noinst_PROGRAMS += zmapio
+#zmapio_SOURCES = zmapio.c
+#noinst_PROGRAMS += zs3parse
+#zs3parse_SOURCES = zs3parse.c
 
 if NETCDF_ENABLE_S3
-noinst_PROGRAMS += s3util 
-s3util_SOURCES = s3util.c
+#noinst_PROGRAMS += s3util 
+#s3util_SOURCES = s3util.c
 if NETCDF_ENABLE_S3_TESTALL
 if NETCDF_ENABLE_S3_AWS
-check_PROGRAMS += tst_pure_awssdk
-tst_pure_awssdk_SOURCES = tst_pure_awssdk.cpp
-AM_CXXFLAGS += -std=c++11
+#check_PROGRAMS += tst_pure_awssdk
+#tst_pure_awssdk_SOURCES = tst_pure_awssdk.cpp
+#AM_CXXFLAGS += -std=c++11
 endif 	
 endif
 endif
@@ -179,9 +179,9 @@ endif
 if USE_HDF5
 # Given a netcdf4|NCZarr file, dump the actual chunk contents.
 # Used to validate nczarr chunking code.
-AM_CPPFLAGS += -I$(top_srcdir)/libnczarr
-noinst_PROGRAMS += ncdumpchunks
-ncdumpchunks_SOURCES = ncdumpchunks.c
+#AM_CPPFLAGS += -I$(top_srcdir)/libnczarr
+#noinst_PROGRAMS += ncdumpchunks
+#ncdumpchunks_SOURCES = ncdumpchunks.c
 endif
 
 CLEANFILES = ut_*.txt ut*.cdl tmp*.nc tmp*.cdl tmp*.txt tmp*.dmp tmp*.zip tmp*.nc tmp*.dump tmp*.tmp tmp*.zmap tmp_ngc.c ref_zarr_test_data.cdl tst_*.nc.zip ref_quotes.zip ref_power_901_constants.zip
@@ -213,27 +213,40 @@ endif
 # So provide a Makefile target to update the files here with copies
 # of those in nczarr test and elsewhere.
 
-.PHONY: testfiles_nczarr testdata_nczarr
-
 # Sources that are copies of same files from nczarr_test
-TESTFILES_NCZARR = test_chunking.c test_filter_vlen.c test_h5_endians.c test_put_vars_two_unlim_dim.c test_quantize.c test_unlim_vars.c tst_pure_awssdk.cpp
+TESTFILES_NCZARR_C = test_chunking.c test_filter_vlen.c test_h5_endians.c test_put_vars_two_unlim_dim.c test_quantize.c test_unlim_vars.c tst_pure_awssdk.cpp
 
-TESTFILES_NCZARR += test_nczarr.sh run_chunkcases.sh run_corrupt.sh run_external.sh run_fillonlyz.sh run_filter.sh run_filterinstall.sh run_filter_misc.sh run_filter_vlen.sh run_interop.sh run_jsonconvention.sh run_misc.sh run_nccopy5.sh run_nccopyz.sh run_ncgen4.sh run_nczarr_fill.sh run_nczfilter.sh run_newformat.sh run_notzarr.sh run_nulls.sh run_perf_chunks1.sh run_purezarr.sh run_quantize.sh run_scalar.sh run_specific_filters.sh run_strings.sh run_unknown.sh run_unlim_io.sh run_ut_map.sh run_ut_mapapi.sh run_ut_misc.sh
+TESTFILES_NCZARR_SH = test_nczarr.sh run_chunkcases.sh run_corrupt.sh run_external.sh run_fillonlyz.sh run_filter.sh run_filterinstall.sh run_filter_misc.sh run_filter_vlen.sh run_interop.sh run_jsonconvention.sh run_misc.sh run_nccopy5.sh run_nccopyz.sh run_ncgen4.sh run_nczarr_fill.sh run_nczfilter.sh run_newformat.sh run_notzarr.sh run_nulls.sh run_perf_chunks1.sh run_purezarr.sh run_quantize.sh run_scalar.sh run_specific_filters.sh run_strings.sh run_unknown.sh run_unlim_io.sh run_ut_map.sh run_ut_mapapi.sh run_ut_misc.sh
 
 TESTDATA_NCZARR = ref_nulls_nczarr.baseline ref_zarr_test_data.cdl.gz ref_avail1.cdl ref_byte.cdl ref_byte_fill_value_null.cdl ref_fillonly.cdl ref_misc1.cdl ref_ndims.cdl ref_newformatpure.cdl ref_nulls.cdl ref_oldformat.cdl ref_perdimspecs.cdl ref_power_901_constants.cdl ref_purezarr_base.cdl ref_quotes.cdl ref_rem.cdl ref_scalar.cdl ref_skip.cdl ref_skipw.cdl ref_string.cdl ref_t_meta_dim1.cdl ref_t_meta_var1.cdl ref_ut_mapapi_create.cdl ref_ut_mapapi_data.cdl ref_ut_mapapi_meta.cdl ref_ut_map_create.cdl ref_ut_map_writedata.cdl ref_ut_map_writemeta.cdl ref_ut_map_writemeta2.cdl ref_ut_testmap_create.cdl ref_whole.cdl ref_avail1.dmp ref_misc1.dmp ref_ndims.dmp ref_rem.dmp ref_noshape.file.zip ref_groups.h5 ref_notzarr.tar.gz ref_avail1.txt ref_skip.txt ref_ut_json_build.txt ref_ut_json_parse.txt ref_ut_mapapi_search.txt ref_ut_map_readmeta.txt ref_ut_map_readmeta2.txt ref_ut_map_search.txt ref_ut_proj.txt ref_whole.txt ref_byte.zarr.zip ref_byte_fill_value_null.zarr.zip ref_oldformat.zip ref_power_901_constants_orig.zip ref_quotes_orig.zip ref_tst_nans.dmp
 
-BUILT_SOURCES += ${TESTFILES_NCZARR} ${TESTDATA_NCZARR}
+#BUILT_SOURCES += ${TESTDATA_NCZARR} ${TESTFILES_NCZARR_SH} ${TESTFILES_NCZARR_C}
 
-${TESTFILES_NCZARR}:
-	echo "XXXX" ${TESTFILES_NCZARR}
-	for u in ${TESTFILES_NCZARR} ; do \
-	  SRCPATH="${top_srcdir}/nczarr_test/$$u"; DSTPATH="${top_srcdir}/v3_nczarr_test/$$u"; \
+BUILT_SOURCES += testdata_nczarr.built testfiles_nczarr_sh.built testfiles_nczarr_c.built
+DISTCLEANFILES += testdata_nczarr.built testfiles_nczarr_sh.built testfiles_nczarr_c.built
+
+testfiles_nczarr_sh.built:
+	echo "" > $@
+	for u in ${TESTFILES_NCZARR_SH} ; do \
+	  SRCPATH="${top_srcdir}/nczarr_test/$$u"; \
+	  DSTPATH="${top_srcdir}/v3_nczarr_test/$$u"; \
 	  rm -f $$DSTPATH ; \
 	  cat $$SRCPATH >> $$DSTPATH ; \
 	  chmod a+x $$DSTPATH ; \
 	done 
+	find . -name run_ut_misc.sh
 
-${TESTDATA_NCZARR}:
+testfiles_nczarr_c.built:
+	echo "" > $@
+	for u in ${TESTFILES_NCZARR_C} ; do \
+	  SRCPATH="${top_srcdir}/nczarr_test/$$u"; \
+	  DSTPATH="${top_srcdir}/v3_nczarr_test/$$u"; \
+	  rm -f $$DSTPATH ; \
+	  cat $$SRCPATH >> $$DSTPATH ; \
+	done 
+
+testdata_nczarr.built:
+	echo "" > $@
 	for u in ${TESTDATA_NCZARR} ; do \
 	  SRCPATH="${top_srcdir}/nczarr_test/$$u"; DSTPATH="${top_srcdir}/v3_nczarr_test/$$u"; \
 	  rm -f $$DSTPATH ; \
