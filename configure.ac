@@ -840,8 +840,6 @@ else
    AC_MSG_RESULT([${have_zip}])
    enable_nczarr_zip=${have_zip} # alias
 
-
-
    AC_MSG_CHECKING([whether nczarr zip support is enabled])
    AC_MSG_RESULT([${enable_nczarr_zip}])
 
