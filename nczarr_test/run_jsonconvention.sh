@@ -30,6 +30,9 @@ ${ZMD} -h $fileurl > tmp_jsonconvention_${zext}.txt
 sclean tmp_jsonconvention_${zext}.cdl
 zmapclean tmp_jsonconvention_${zext}.txt
 diff -b $srcdir/ref_jsonconvention.cdl tmp_jsonconvention_${zext}.cdl
+echo "@@@@@@@@@@"
+cat tmp_jsonconvention_${zext}.txt
+echo "@@@@@@@@@@"
 diff -b ${srcdir}/ref_jsonconvention.zmap tmp_jsonconvention_${zext}.txt
 }
 
