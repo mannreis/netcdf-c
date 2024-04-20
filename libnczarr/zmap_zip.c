@@ -698,10 +698,8 @@ ziplistall(NCZMAP* map, const char* prefix0, NClist* matches)
 	    key = zip_get_name(zzmap->archive, i, (zip_flags_t)0);
 #endif
 	    keylen = strlen(key);
-	    /* Does this name begin with trueprefix? */
-	    if(keylen > 0
-	       && (keylen <= truelen || strncmp(key,trueprefix,truelen) != 0))
-	        continue; /* no match */
+	    /* Suppress any key that ends in '/' */
+	    if(key[keylen-1] == '/') continue;
 	    nclistpush(matches,nulldup(key));
 	}
 	/* Now remove later duplicates */
@@ -720,7 +718,10 @@ ziplistall(NCZMAP* map, const char* prefix0, NClist* matches)
 	}
     }
 
-    /* Remove prefix from all entries in matches */
+    /* Remove prefix from all entries in matches. */
+    if(trueprefix[strlen(trueprefix)-1] == '/')
+        {trueprefix[strlen(trueprefix)-1] = '\0'; truelen--;}
+
     if((stat = nczm_removeprefix(trueprefix,nclistlength(matches),(char**)nclistcontents(matches)))) goto done;
 
     /* Lexical sort the results */

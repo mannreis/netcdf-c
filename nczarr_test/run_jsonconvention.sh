@@ -33,6 +33,6 @@ diff -b $srcdir/ref_jsonconvention.cdl tmp_jsonconvention_${zext}.cdl
 diff -b ${srcdir}/ref_jsonconvention.zmap tmp_jsonconvention_${zext}.txt
 }
 
-#testcase file
+testcase file
 if test "x$FEATURE_NCZARR_ZIP" = xyes ; then testcase zip; fi
-#if test "x$FEATURE_S3TESTS" = xyes ; then testcase s3; fi
+if test "x$FEATURE_S3TESTS" = xyes ; then testcase s3; fi
