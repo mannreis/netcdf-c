@@ -71,7 +71,7 @@ EXTERNL const char* odom_print(Odometer* odom);
 EXTERNL const char* odom_printshort(Odometer* odom);
 
 EXTERNL size_t parsevector(const char* s0, size_t* vec);
-EXTERNL int parsedata(const char* s0, int* data);
+EXTERNL size_t parsedata(const char* s0, int* data);
 EXTERNL const char* filenamefor(const char* f0);
 EXTERNL const char* printvector(size_t rank, const size_t* vec);
 EXTERNL const char* printvector64(size_t rank, const size64_t* vec);

@@ -65,8 +65,8 @@ int
 getoptions(int* argcp, char*** argvp)
 {
     int ret = NC_NOERR;
-    int c;
     size_t i;
+    int c;
     const char* p;
 
     /* initialize */
@@ -389,12 +389,12 @@ parsevector(const char* s0, size_t* vec)
     return i;
 }
 
-int
+size_t
 parsedata(const char* s0, int* data)
 {
     char* s = strdup(s0);
     char* p = NULL;
-    int i, done;
+    size_t i, done;
 
 
     if(s0 == NULL || data == NULL) abort();
