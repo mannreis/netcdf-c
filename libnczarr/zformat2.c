@@ -359,10 +359,10 @@ write_var_meta(NC_FILE_INFO_T* file, NCZ_FILE_INFO_T* zfile, NCZMAP* map, NC_VAR
     int purezarr = 0;
     size64_t shape[NC_MAX_VAR_DIMS];
     NCZ_VAR_INFO_T* zvar = var->format_var_info;
-#ifdef NETCDF_ENABLE_NCZARR_FILTERS
-    NClist* filterchain = NULL;
     NCjson* jfilters = NULL;
     NCjson* jfilter = NULL;
+#ifdef NETCDF_ENABLE_NCZARR_FILTERS
+    NClist* filterchain = NULL;
 #endif
 
     ZTRACE(3,"file=%s var=%s isclose=%d",file->controller->path,var->hdr.name,isclose);
