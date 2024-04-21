@@ -549,8 +549,7 @@ write_var_meta(NC_FILE_INFO_T* file, NCZ_FILE_INFO_T* zfile, NCZMAP* map, NC_VAR
        because endianness must always be included. */
     /* Add the endianness codec as first entry */
     
-#ifdef NETCDF_ENABLE_NCZARR_FILTERS
-    /* jcodecs holds the array of filters */
+    /* jcodecs holds the array of filters, if any */
     NCJcheck(NCJnew(NCJ_ARRAY,&jcodecs));
     /* Insert the "bytes" codec as first (pseudo-)codec */
     {
@@ -564,7 +563,7 @@ write_var_meta(NC_FILE_INFO_T* file, NCZ_FILE_INFO_T* zfile, NCZMAP* map, NC_VAR
 	if(NCJappend(jcodecs,jtmp)) goto done;
 	jtmp = NULL;
     }
-
+#ifdef NETCDF_ENABLE_NCZARR_FILTERS
     /* Get chain of filters for this variable */
     filterchain = (NClist*)var->filters;
     if(nclistlength(filterchain) > 0) {
@@ -1329,7 +1328,7 @@ static int
 read_var1(NC_FILE_INFO_T* file, NC_GRP_INFO_T* grp, const char* varname)
 {
     int stat = NC_NOERR;
-    size_t i,j,k;
+    size_t i,j;
     NCZ_FILE_INFO_T* zfile = (NCZ_FILE_INFO_T*)file->format_file_info;
     NC_VAR_INFO_T* var = NULL;
     int purezarr = 0;
@@ -1356,6 +1355,7 @@ read_var1(NC_FILE_INFO_T* file, NC_GRP_INFO_T* grp, const char* varname)
     int vtypelen = 0;
 #ifdef NETCDF_ENABLE_NCZARR_FILTERS
     int varsized = 0;
+    size_t k;
 #endif
     NCZ_DimInfo diminfo[NC_MAX_VAR_DIMS];
     /* Capture arguments for ncz4_create_var */
