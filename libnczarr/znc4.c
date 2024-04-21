@@ -142,6 +142,7 @@ ncz4_create_attr(NC_FILE_INFO_T* file, NC_OBJ* container, const char* name,
     return ncz_makeattr(file,container,name,typeid,len,values,attp);
 }
 
+#ifdef NETCDF_ENABLE_NCZARR_FILTERS
 int
 ncz4_create_filter(NC_FILE_INFO_T* file,
 				NCZ_HDF5* hdf5,
@@ -161,3 +162,4 @@ done:
     NCZ_filter_free(filter);
     return THROW(stat);
 }
+#endif NETCDF_ENABLE_NCZARR_FILTERS
