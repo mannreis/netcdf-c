@@ -24,14 +24,14 @@ else
 fi
 
 # Fix execdir
-EXECDIR="${execdir}/../nczarr_test"
+NCZARRDIR="${execdir}/../nczarr_test"
 
-ZMD="${EXECDIR}/${DL}zmapio"
-S3UTIL="${EXECDIR}/${DL}s3util"
-ZS3PARSE="${EXECDIR}/${DL}zs3parse"
-NCDUMPCHUNKS="${EXECDIR}/${DL}ncdumpchunks"
-ZHEX="${EXECDIR}/${DL}zhex"
-ZISJSON="${EXECDIR}/${DL}zisjson"
+ZMD="${NCZARRDIR}/${DL}zmapio"
+S3UTIL="${NCZARRDIR}/${DL}s3util"
+ZS3PARSE="${NCZARRDIR}/${DL}zs3parse"
+NCDUMPCHUNKS="${NCZARRDIR}/${DL}ncdumpchunks"
+ZHEX="${NCZARRDIR}/${DL}zhex"
+ZISJSON="${NCZARRDIR}/${DL}zisjson"
 
 # Check settings
 checksetting() {
@@ -176,7 +176,7 @@ resetrc() {
 }
 
 s3sdkdelete() {
-if test -f ${execdir}/s3util ; then
+if test -f ${S3UTIL} ; then
   ${S3UTIL} ${PROFILE} -u "${NCZARR_S3_TEST_URL}" -k "$1" clear
 elif which aws ; then
   aws s3api delete-object --endpoint-url=https://${NCZARR_S3_TEST_HOST} --bucket=${NCZARR_S3_TEST_BUCKET} --key="/${S3ISOPATH}/$1"
@@ -186,7 +186,7 @@ fi
 }
 
 s3sdkcleanup() {
-if test -f ${execdir}/s3util ; then
+if test -f ${S3UTIL} ; then
   ${S3UTIL} ${PROFILE} -u "${NCZARR_S3_TEST_URL}" -k "$1" clear
 elif which aws ; then
   aws s3api delete-object --endpoint-url=https://${NCZARR_S3_TEST_HOST} --bucket=${NCZARR_S3_TEST_BUCKET} --key="/${S3ISOPATH}/$1"
