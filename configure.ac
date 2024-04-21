@@ -1847,11 +1847,6 @@ AC_MSG_WARN([--disable-plugins => --disable-nczarr-filters])
 enable_nczarr_filters=no
 fi
 
-if test "x$enable_plugins" = xno ; then
-AC_MSG_WARN([--disable-plugins => --disable-filter-testing])
-enable_filter_testing=no
-fi
-
 if test "x$enable_nczarr" = xno; then
 AC_MSG_WARN([--disable-nczarr => --disable-nczarr-filters])
 enable_nczarr_filters=no

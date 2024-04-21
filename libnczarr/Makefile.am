@@ -84,6 +84,7 @@ endif
 endif
 
 if NETCDF_ENABLE_NCZARR_FILTERS
+$(info @@@ NETCDF_ENABLE_NCZARR_FILTERS)
 libnczarr_la_SOURCES += zfilter.c
 endif
 
