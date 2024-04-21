@@ -1845,6 +1845,7 @@ AC_MSG_RESULT($enable_filter_testing)
 if test "x$enable_plugins" = xno ; then
 AC_MSG_WARN([--disable-plugins => --disable-nczarr-filters])
 enable_nczarr_filters=no
+echo "@@@!plug = !filters"
 fi
 
 if test "x$enable_nczarr" = xno; then
