@@ -93,14 +93,15 @@ static int parse_group_content(const NCjson* jcontent, NClist* dimdefs, NClist* 
 static int parse_group_content_pure(NC_FILE_INFO_T*  zinfo, NC_GRP_INFO_T* grp, NClist* varnames, NClist* subgrps);
 static int searchvars(NCZ_FILE_INFO_T* zfile, NC_GRP_INFO_T* grp, NClist* varnames);
 static int searchsubgrps(NCZ_FILE_INFO_T* zfile, NC_GRP_INFO_T* grp, NClist* subgrpnames);
-static int json2filter(NC_FILE_INFO_T* file, const NCjson* jfilter, NCZ_Filter** zfilterp, NClist* filterlist);
 static int nctype2dtype(nc_type nctype, int endianness, int purezarr, size_t len, char** dnamep, const char** tagp);
 static int dtype2nctype(const char* dtype, nc_type* nctypep, size_t* typelenp, int* endianp);
 static int get_att_types(int purezarr, NCjson* jatts, struct Ainfo* ainfo);
 static int collectdimrefs(const NCjson* jdimrefs, struct CVARGS* cvargs, NCZ_DimInfo* diminfo);
 static int collectxarraydims(const NCjson* jxarray, struct CVARGS* cvargs, NCZ_DimInfo* diminfo);
 static int NCZ_computedimrefs(NC_FILE_INFO_T* file, NC_GRP_INFO_T* grp, size_t ndims, size64_t* shape, NCZ_DimInfo* diminfo, int* isscalarp);
-
+#ifdef NETCDF_ENABLE_NCZARR_FILTERS
+static int json2filter(NC_FILE_INFO_T* file, const NCjson* jfilter, NCZ_Filter** zfilterp, NClist* filterlist);
+#endif
 /**************************************************/
 
 /**
@@ -2153,6 +2154,7 @@ done:
     return stat;
 }
 
+#ifdef NETCDF_ENABLE_NCZARR_FILTERS
 /**
 * Convert a JSON codec to an instance of NCZ_Filter
 * @param jfilter json codec
@@ -2206,9 +2208,7 @@ done:
     NCZ_filter_free(filter);
     return THROW(stat);
 }
-
-
-
+#endif /*NETCDF_ENABLE_NCZARR_FILTERS*/
 
 /**************************************************/
 /* Format Dispatch table */

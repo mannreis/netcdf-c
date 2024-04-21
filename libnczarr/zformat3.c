@@ -133,8 +133,10 @@ static int dtype2nctype(const char* dtype, const char* dalias, nc_type* nctypep,
 static int parse_rnnn(const char* dtype, size_t* typelenp);
 static int jtypes2atypes(int purezarr, const NCjson* jattrs, const NCjson* jtypes, nc_type** atypesp);
 static int infer_maxstrlen(const NCjson* jadata, int* typelenp);
-static int json2filter(NC_FILE_INFO_T* file, const NCjson* jfilter, NCZ_Filter** zfilterp, NClist* filterlist);
 static int NCZ_computedimrefs(NC_FILE_INFO_T* file, NC_GRP_INFO_T* grp, size_t ndims, size64_t* shape, NCZ_DimInfo* diminfo);
+#ifdef NETCDF_ENABLE_NCZARR_FILTERS
+static int json2filter(NC_FILE_INFO_T* file, const NCjson* jfilter, NCZ_Filter** zfilterp, NClist* filterlist);
+#endif
 
 /**************************************************/
 
@@ -2177,6 +2179,7 @@ parse_rnnn(const char* dtype, size_t* typelenp)
     return 1;
 }
 
+#ifdef NETCDF_ENABLE_NCZARR_FILTERS
 /**
 * Convert a JSON codec to an instance of NCZ_Filter
 * @param jfilter json codec
@@ -2230,7 +2233,7 @@ done:
     NCZ_filter_free(filter);
     return THROW(stat);
 }
-
+#endif /*NETCDF_ENABLE_NCZARR_FILTERS*/
 
 /*************************************************/
 
