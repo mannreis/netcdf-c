@@ -36,19 +36,20 @@
 #include <netcdf_filter.h>
 
 #ifdef USE_HDF5
+#warning "@@@@ hdf5.h"
 #include <hdf5.h>
 /* Older versions of the hdf library may define H5PL_type_t here */
 #include <H5PLextern.h>
 
 #else /*!USE_HDF5*/ /* Provide replacement definitions */
-
+#warning "@@@@ not hdf5.h"
 /* WARNING: In order make NCZARR independent of HDF5,
    while still using HDF5-style filters, some HDF5
    declarations need to be duplicated here with
    different names. Watch out for changes in
    the underlying HDF5 declarations.
 
-   See the file H5Zpublic.h for more detailed descriptions.
+   See the file H5Zpublic.h or H5Zdevelop.h for more detailed descriptions.
 
    Note that these declarations are always enabled because
    HDF5-style filters may have been created with these definitions
