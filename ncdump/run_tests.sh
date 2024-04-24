@@ -9,7 +9,7 @@ set -e
 echo ""
 echo "*** Testing ncgen and ncdump using some test CDL files."
 echo "*** creating tst_small.nc from ref_tst_small.cdl..."
-${NCGEN} -b -o tst_small.nc $srcdir/ref_tst_small.cdl
+if ${NCGEN} -b -o tst_small.nc $srcdir/ref_tst_small.cdl ; then
 echo "*** creating tst_small.cdl from tst_small.nc..."
 ${NCDUMP} tst_small.nc > tst_small.cdl
 diff -b -w tst_small.cdl $srcdir/ref_tst_small.cdl

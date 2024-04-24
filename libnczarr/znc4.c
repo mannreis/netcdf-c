@@ -93,7 +93,6 @@ ncz4_create_var(NC_FILE_INFO_T* file, NC_GRP_INFO_T* parent,
     if((stat=NCZ_set_fill_value(file,var,no_fill,fill_value))) goto done;
 
 #ifdef NETCDF_ENABLE_NCZARR_FILTERS
-#warning "@@@ 10"
     /* Set the filter list */
     {
         size_t k, nfilters;

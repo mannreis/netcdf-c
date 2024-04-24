@@ -214,9 +214,6 @@ endif()
   if(HAVE_BASH)
 
   ## Start adding tests in the appropriate order
-  add_bin_test_no_prefix(ref_ctest)
-  add_bin_test_no_prefix(ref_ctest64)
-
   add_sh_test(ncdump run_tests)
   add_sh_test(ncdump tst_64bit)
   add_sh_test(ncdump tst_lengths)

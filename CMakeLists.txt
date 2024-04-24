@@ -85,6 +85,7 @@ if(UNAME)
   getuname(osname -s)
   getuname(osrel  -r)
   getuname(cpu    -m)
+  getuname(host   -n)
   set(TMP_BUILDNAME "${osname}-${osrel}-${cpu}")
 endif()
 
@@ -382,13 +383,13 @@ if(MSVC)
 endif()
 
 # Option to build netCDF Version 2
-OPTION (ENABLE_V2_API "Build netCDF Version 2." ON)
-set(BUILD_V2 ${ENABLE_V2_API})
-if(NOT ENABLE_V2_API)
+OPTION (NETCDF_ENABLE_V2_API "Build netCDF Version 2." ON)
+set(BUILD_V2 ${NETCDF_ENABLE_V2_API})
+if(NOT NETCDF_ENABLE_V2_API)
   set(NO_NETCDF_2 ON)
-else(NOT ENABLE_V2_API)
+else(NOT NETCDF_ENABLE_V2_API)
   set(USE_NETCDF_2 TRUE)
-endif(NOT ENABLE_V2_API)
+endif(NOT NETCDF_ENABLE_V2_API)
 
 # Option to build utilities
 option(NETCDF_BUILD_UTILITIES "Build ncgen, ncgen3, ncdump." ON)
@@ -449,7 +450,7 @@ set(NETCDF_ENABLE_CDF5 AUTO CACHE STRING "AUTO")
 option(NETCDF_ENABLE_CDF5 "Enable CDF5 support" ON)
 
 # Decide default Zarr Format for creation
-OPTION(ENABLE_DEFAULT_ZARR_FORMAT_V3 "Specify the default Zarr format is V3" OFF)
+OPTION(NETCDF_ENABLE_DEFAULT_ZARR_FORMAT_V3 "Specify the default Zarr format is V3" OFF)
 if(NETCDF_ENABLE_DEFAULT_ZARR_FORMAT_V3)
 SET(DFALTZARRFORMAT 3 CACHE STRING "")
 ELSE()
@@ -474,7 +475,6 @@ endif()
 
 # enable|disable all forms of network access
 option(NETCDF_ENABLE_REMOTE_FUNCTIONALITY "Enable|disable all forms remote data access (DAP, S3, etc)" ON)
-message(">>> NETCDF_ENABLE_REMOTE_FUNCTIONALITY=${NETCDF_ENABLE_REMOTE_FUNCTIONALITY}")
 if(NOT NETCDF_ENABLE_REMOTE_FUNCTIONALITY)
 message(WARNING "NETCDF_ENABLE_REMOTE_FUNCTIONALITY=NO => NETCDF_ENABLE_DAP[4]=NO")
 set(NETCDF_ENABLE_DAP OFF CACHE BOOL "NETCDF_ENABLE_REMOTE_FUNCTIONALITY=NO => NETCDF_ENABLE_DAP=NO" FORCE)
@@ -771,15 +771,18 @@ if(NETCDF_ENABLE_TESTS)
   set(NC_CTEST_DROP_SITE "cdash.unidata.ucar.edu:443" CACHE STRING "Dashboard location for CTest-based testing purposes.")
   set(NC_CTEST_DROP_LOC_PREFIX "" CACHE STRING "Prefix for Dashboard location on remote server when using CTest-based testing.")
   set(SUBMIT_URL "https://cdash.unidata.ucar.edu:443")
-  find_program(HOSTNAME_CMD NAMES hostname)
-  if(NOT WIN32)
-    set(HOSTNAME_ARG "-s")
+  if("${host}" STREQUAL "")
+    find_program(HOSTNAME_CMD NAMES hostname)
+    if(NOT WIN32)
+      set(HOSTNAME_ARG "-s")
+    endif()
+    if(HOSTNAME_CMD)
+      execute_process(COMMAND ${HOSTNAME_CMD} "${HOSTNAME_ARG}" OUTPUT_VARIABLE HOSTNAME OUTPUT_STRIP_TRAILING_WHITESPACE)
+      set(NC_CTEST_SITE "${HOSTNAME}" CACHE STRING "Hostname of test machine.")
+    endif()
+  else()
+    set(NC_CTEST_SITE "${host}" CACHE STRING "Hostname of test machine.")
   endif()
-  if(HOSTNAME_CMD)
-    execute_process(COMMAND ${HOSTNAME_CMD} "${HOSTNAME_ARG}" OUTPUT_VARIABLE HOSTNAME OUTPUT_STRIP_TRAILING_WHITESPACE)
-    set(NC_CTEST_SITE "${HOSTNAME}" CACHE STRING "Hostname of test machine.")
-  endif()
-
   if(NC_CTEST_SITE)
     set(SITE "${NC_CTEST_SITE}" CACHE STRING "")
   endif()
@@ -931,7 +934,7 @@ endif(NETCDF_ENABLE_ERANGE_FILL)
 # Now NETCDF_ENABLE_ERANGE_FILL is either AUTO, ON, or OFF
 
 # More relaxed coordinate check is now mandatory for all builds.
-set(ENABLE_ZERO_LENGTH_COORD_BOUND ON)
+set(NETCDF_ENABLE_ZERO_LENGTH_COORD_BOUND ON)
 
 # check and conform with PnetCDF settings on ERANGE_FILL and RELAX_COORD_BOUND
 if(USE_PNETCDF)
@@ -1506,12 +1509,16 @@ add_subdirectory(docs)
 # in the libdir.
 ##
 if(MSVC)
-  file(GLOB COPY_FILES ${CMAKE_PREFIX_PATH}/lib/*.lib)
+  foreach(CPP ${CMAKE_PREFIX_PATH})
+    file(GLOB COPY_FILES ${CPP}/lib/*.lib)
+  endforeach()
   install(FILES ${COPY_FILES}
   DESTINATION ${CMAKE_INSTALL_LIBDIR}
   COMPONENT dependencies)
 
-  file(GLOB COPY_FILES ${CMAKE_PREFIX_PATH}/bin/*.dll)
+  foreach(CPP ${CMAKE_PREFIX_PATH})
+    file(GLOB COPY_FILES ${CPP}/bin/*.dll)
+  endforeach()
   string(REGEX REPLACE "msv[.*].dll" "" COPY_FILES "${COPY_FILES}")
   install(FILES ${COPY_FILES}
   DESTINATION ${CMAKE_INSTALL_BINDIR}
@@ -1616,8 +1623,6 @@ ENABLE_MAKEDIST(README.md COPYRIGHT RELEASE_NOTES.md INSTALL INSTALL.cmake test_
 set(host_cpu "${cpu}")
 set(host_vendor "${osname}")
 set(host_os "${osrel}")
-set(abs_top_builddir "${CMAKE_CURRENT_BINARY_DIR}")
-set(abs_top_srcdir "${CMAKE_CURRENT_SOURCE_DIR}")
 string(RANDOM LENGTH 3 ALPHABET "0123456789" PLATFORMUID)
 math(EXPR PLATFORMUID "${PLATFORMUID} + 1" OUTPUT_FORMAT DECIMAL)
        
@@ -1631,7 +1636,7 @@ set(LDFLAGS "${CMAKE_SHARED_LINKER_FLAGS} ${CMAKE_SHARED_LINKER_FLAGS_${CMAKE_BU
 is_disabled(BUILD_SHARED_LIBS enable_static)
 is_enabled(BUILD_SHARED_LIBS enable_shared)
 
-is_enabled(ENABLE_V2_API HAS_NC2)
+is_enabled(NETCDF_ENABLE_V2_API HAS_NC2)
 is_enabled(NETCDF_ENABLE_HDF4 HAS_HDF4)
 is_enabled(USE_HDF5 HAS_HDF5)
 is_enabled(USE_NETCDF4 HAS_NC4)
@@ -1646,7 +1651,7 @@ is_enabled(NETCDF_ENABLE_BYTERANGE HAS_BYTERANGE)
 is_enabled(NETCDF_ENABLE_DISKLESS HAS_DISKLESS)
 is_enabled(USE_MMAP HAS_MMAP)
 is_enabled(JNA HAS_JNA)
-is_enabled(ENABLE_ZERO_LENGTH_COORD_BOUND RELAX_COORD_BOUND)
+is_enabled(NETCDF_ENABLE_ZERO_LENGTH_COORD_BOUND RELAX_COORD_BOUND)
 is_enabled(USE_CDF5 HAS_CDF5)
 is_enabled(NETCDF_ENABLE_ERANGE_FILL HAS_ERANGE_FILL)
 is_enabled(HDF5_HAS_PAR_FILTERS HAS_PAR_FILTERS)
@@ -1755,6 +1760,8 @@ configure_file(
 set(EXTRA_DIST ${EXTRA_DIST} ${CMAKE_CURRENT_SOURCE_DIR}/test_common.in)
 set(TOPSRCDIR "${CMAKE_CURRENT_SOURCE_DIR}")
 set(TOPBUILDDIR "${CMAKE_CURRENT_BINARY_DIR}")
+set(abs_top_builddir "${CMAKE_CURRENT_BINARY_DIR}")
+set(abs_top_srcdir "${CMAKE_CURRENT_SOURCE_DIR}")
 configure_file(${CMAKE_CURRENT_SOURCE_DIR}/test_common.in ${CMAKE_CURRENT_BINARY_DIR}/test_common.sh @ONLY NEWLINE_STYLE LF)
 
 ####

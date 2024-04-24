@@ -134,7 +134,9 @@ unsigned long long int strtoull(const char*, char**, int);
 #endif /*_WIN32*/
 
 #ifndef nulldup
+#ifndef _WIN32
 #pragma GCC diagnostic ignored "-Wnonnull"
+#endif
 #define nulldup(s) ((s)==NULL?NULL:strdup(s))
 #endif
 
