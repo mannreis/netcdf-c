@@ -14,7 +14,6 @@
 #include "config.h"
 #endif
 #include <stdlib.h>
-#include <stdio.h>
 #include <string.h>
 #include <assert.h>
 #if defined(HDF5_PARALLEL) || defined(USE_PNETCDF)

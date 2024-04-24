@@ -10,7 +10,7 @@ Functions for inquiring about variables.
 #include "netcdf_filter.h"
 #include "ncdispatch.h"
 #include "nc4internal.h"
-#ifdef USE_HDF5
+#ifdef USE_HDF5X
 #include <hdf5.h>
 #endif /* USE_HDF5 */
 

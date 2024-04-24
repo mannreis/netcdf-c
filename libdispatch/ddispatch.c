@@ -4,6 +4,16 @@ See LICENSE.txt for license information.
 */
 
 #include "config.h"
+/* Required for getcwd, other functions. */
+#ifdef HAVE_UNISTD_H
+#include <unistd.h>
+#endif
+/* Required for getcwd, other functions. */
+#ifdef _WIN32
+#include <direct.h>
+#endif
+#include <stdio.h>
+
 #include "ncdispatch.h"
 #include "ncuri.h"
 #include "nclog.h"
@@ -14,15 +24,6 @@ See LICENSE.txt for license information.
 #include "ncxml.h"
 #include "nc4internal.h"
 
-/* Required for getcwd, other functions. */
-#ifdef HAVE_UNISTD_H
-#include <unistd.h>
-#endif
-
-/* Required for getcwd, other functions. */
-#ifdef _WIN32
-#include <direct.h>
-#endif
 
 #if defined(NETCDF_ENABLE_BYTERANGE) || defined(NETCDF_ENABLE_DAP) || defined(NETCDF_ENABLE_DAP4)
 #include <curl/curl.h>

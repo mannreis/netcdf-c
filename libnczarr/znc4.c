@@ -162,4 +162,4 @@ done:
     NCZ_filter_free(filter);
     return THROW(stat);
 }
-#endif NETCDF_ENABLE_NCZARR_FILTERS
+#endif /*NETCDF_ENABLE_NCZARR_FILTERS*/

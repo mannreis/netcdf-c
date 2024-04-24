@@ -11,11 +11,11 @@
  */
 
 #include "config.h"
-#include "nc4internal.h"
-#include "nc4dispatch.h"
-#ifdef USE_HDF5
+#ifndef USE_HDF5
 #include "hdf5internal.h"
 #endif
+#include "nc4internal.h"
+#include "nc4dispatch.h"
 #include <math.h>
 
 /** @internal Default size for unlimited dim chunksize. */

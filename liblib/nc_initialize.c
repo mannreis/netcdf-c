@@ -48,7 +48,6 @@ EXTERNL int NC_s3sdkfinalize(void);
 #endif
 
 #ifdef _MSC_VER
-#include <io.h>
 #include <fcntl.h>
 #endif
 

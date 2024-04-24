@@ -10,18 +10,21 @@
 #ifndef NCCONFIGURE_H
 #define NCCONFIGURE_H 1
 
-#ifdef HAVE_CONFIG_H
-#include "config.h"
-#endif
+#include <errno.h>
+#include <assert.h>
 
 #ifdef HAVE_STDLIB_H
 #include <stdlib.h>
 #endif
-#ifdef HAVE_STDIO_H
-#include <stdio.h>
-#endif
 #ifdef HAVE_STDINT_H
 #include <stdint.h>
+#endif
+#ifdef HAVE_STRING_H
+#include <string.h>
+#endif
+
+#ifdef HAVE_STDIO_H
+#include <stdio.h>
 #endif
 
 /*
@@ -31,6 +34,19 @@ typically, alternatives to
 missing functions should be
 defined and missing types defined.
 */
+
+#ifdef _WIN32
+#include <windows.h>
+#include <io.h>
+#endif
+
+#ifdef __CYGWIN__
+#ifdef USE_HDF5
+/* HDF5 tries to defie ssize_t, but it does it wrong; so try to fix */
+#undef H5_SIZEOF_SSIZE_T
+#define H5_SIZEOF_SSIZE_T SIZEOF_SIZE_T
+#endif
+#endif
 
 #ifdef _WIN32
 
@@ -49,7 +65,7 @@ typedef int mode_t;
 #define F_OK 00
 #endif
 
-#endif
+#endif /*_WIN32*/
 
 /*Warning: Cygwin with -ansi does not define these functions
   in its headers.*/

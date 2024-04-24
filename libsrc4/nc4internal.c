@@ -25,6 +25,7 @@
 #include "ncutf8.h"
 #include <stdarg.h>
 #include <stddef.h>
+#include <stdio.h>
 #include "ncrc.h"
 
 /** @internal Number of reserved attributes. These attributes are
