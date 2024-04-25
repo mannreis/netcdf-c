@@ -21,7 +21,6 @@
 
 #include <stddef.h>
 
-#include "ncconfigure.h"
 #include "zincludes.h"
 #include "ncpathmgr.h"
 #include "nclog.h"

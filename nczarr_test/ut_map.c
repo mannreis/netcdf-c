@@ -3,7 +3,6 @@
  *      See netcdf/COPYRIGHT file for copying and redistribution conditions.
  */
 
-#include "ncconfigure.h"
 #include "ut_includes.h"
 
 #undef DEBUG

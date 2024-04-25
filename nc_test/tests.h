@@ -5,9 +5,10 @@
  *********************************************************************/
 
 #include <config.h>
-#include <stdio.h>
-#include <string.h>
 #include <stdlib.h>
+#include <stdio.h>
+#include <stdint.h>
+#include <string.h>
 #include <assert.h>
 #include <limits.h>
 #include <float.h>

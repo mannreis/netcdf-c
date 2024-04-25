@@ -19,12 +19,14 @@
 #ifdef HAVE_STDINT_H
 #include <stdint.h>
 #endif
+#ifdef HAVE_STDIO_H
+#include <stdio.h>
+#endif
 #ifdef HAVE_STRING_H
 #include <string.h>
 #endif
-
-#ifdef HAVE_STDIO_H
-#include <stdio.h>
+#ifdef HAVE_UNISTD_H
+#include <unistd.h>
 #endif
 
 /*
@@ -38,14 +40,6 @@ defined and missing types defined.
 #ifdef _WIN32
 #include <windows.h>
 #include <io.h>
-#endif
-
-#ifdef __CYGWIN__
-#ifdef USE_HDF5
-/* HDF5 tries to defie ssize_t, but it does it wrong; so try to fix */
-#undef H5_SIZEOF_SSIZE_T
-#define H5_SIZEOF_SSIZE_T SIZEOF_SIZE_T
-#endif
 #endif
 
 #ifdef _WIN32
@@ -189,14 +183,14 @@ typedef unsigned long long uint64;
 typedef unsigned long long uint64_t;
 #endif
 
-#ifndef _WIN32
 #ifndef HAVE_UINTPTR_T
 #ifndef uintptr_t
 #if SIZEOF_VOIDP == 8
+static int vp8;
 #define uintptr_t unsigned long
 #else
+static int vp4;
 #define uintptr_t unsigned int
-#endif
 #endif
 #endif
 #endif
