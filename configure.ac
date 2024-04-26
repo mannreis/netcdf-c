@@ -1855,6 +1855,12 @@ AC_ARG_ENABLE([filter-testing],
                               [Do not run filter test and example; otherwise requires shared libraries and HDF5|NCZarr])])
 test "x$enable_filter_testing" = xno || enable_filter_testing=yes
 AC_MSG_RESULT($enable_filter_testing)
+
+if test "x$enable_plugins" = xno ; then
+AC_MSG_WARN([--disable-plugins => --disable-filter-testing])
+enable_filter_testing=no
+fi
+
 if test "x$enable_filter_testing" = xyes; then
   AC_DEFINE([NETCDF_ENABLE_FILTER_TESTING], [1], [if true, enable filter testing])
 fi
