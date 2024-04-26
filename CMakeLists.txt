@@ -783,6 +783,7 @@ if(NETCDF_ENABLE_TESTS)
   else()
     set(NC_CTEST_SITE "${host}" CACHE STRING "Hostname of test machine.")
   endif()
+
   if(NC_CTEST_SITE)
     set(SITE "${NC_CTEST_SITE}" CACHE STRING "")
   endif()
