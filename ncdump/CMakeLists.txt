@@ -213,6 +213,10 @@ endif()
 
   if(HAVE_BASH)
 
+  # Support programs
+  add_bin_test_no_prefix(ref_ctest)
+  add_bin_test_no_prefix(ref_ctest64)
+
   ## Start adding tests in the appropriate order
   add_sh_test(ncdump run_tests)
   add_sh_test(ncdump tst_64bit)
