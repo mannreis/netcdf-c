@@ -61,9 +61,9 @@ NCZ_set_fill_att(NC_FILE_INFO_T* file, NC_VAR_INFO_T* var, NC_ATT_INFO_T* att, i
 	stat = NCZ_fillvalue_disable(file,var);
     } else {
         if(att == NULL) {
-            if((stat = ncz_makeattr(file,(NC_OBJ*)var,_FillValue,var->type_info->hdr.id,0,NULL,&att))) goto done;
+            if((stat = ncz_makeattr(file,(NC_OBJ*)var,NC_FillValue,var->type_info->hdr.id,0,NULL,&att))) goto done;
 	}
-        assert(att != NULL && strcmp(att->hdr.name,_FillValue)==0); /* Verify */
+        assert(att != NULL && strcmp(att->hdr.name,NC_FillValue)==0); /* Verify */
         if((stat = NCZ_copy_value_to_att(file,att,1,fillvalue))) goto done;
 	var->no_fill = NC_FALSE;
 	var->fill_val_changed = 1;
@@ -83,9 +83,9 @@ NCZ_copy_var_to_fillatt(NC_FILE_INFO_T* file, NC_VAR_INFO_T* var, NC_ATT_INFO_T*
 	/* disable fill value */
         stat = NCZ_fillvalue_disable(file,var);
     } else if(att == NULL) {
-        stat = ncz_makeattr(file,(NC_OBJ*)var,_FillValue,var->type_info->hdr.id,1,var->fill_value,NULL);
+        stat = ncz_makeattr(file,(NC_OBJ*)var,NC_FillValue,var->type_info->hdr.id,1,var->fill_value,NULL);
     } else { /* presumably already exists */
-	assert(strcmp(_FillValue,att->hdr.name)==0);
+	assert(strcmp(NC_FillValue,att->hdr.name)==0);
 	stat = NCZ_copy_value_to_att(file,att,1,var->fill_value);
     }
     return THROW(stat);
@@ -99,10 +99,10 @@ NCZ_copy_fillatt_to_var(NC_FILE_INFO_T* file, NC_ATT_INFO_T* att, NC_VAR_INFO_T*
 
     if(att == NULL) {
         /* The att _FillValue must exist */
-        att = (NC_ATT_INFO_T*)ncindexlookup(var->att,_FillValue);
+        att = (NC_ATT_INFO_T*)ncindexlookup(var->att,NC_FillValue);
     }
     assert(var != NULL && att != NULL);
-    assert(strcmp(_FillValue,att->hdr.name)==0 && att->len == 1);
+    assert(strcmp(NC_FillValue,att->hdr.name)==0 && att->len == 1);
     if((stat = NCZ_copy_value_to_var_fillvalue(file,var,att->data))) goto done;
     var->fill_val_changed = 1;
     var->no_fill = 0;
@@ -124,7 +124,7 @@ NCZ_fillvalue_disable(NC_FILE_INFO_T* file, NC_VAR_INFO_T* var)
     /* Reclaim the fill value */
     if((stat = NCZ_reclaim_var_fillvalue(file,var))) return stat;
     stat = NCZ_reclaim_fill_chunk(((NCZ_VAR_INFO_T*)var->format_var_info)->cache); /* Reclaim any existing fill_chunk */
-    stat = NCZ_attr_delete(file,var->att, _FillValue);
+    stat = NCZ_attr_delete(file,var->att,NC_FillValue);
     if (stat && stat != NC_ENOTATT) return stat; else stat = NC_NOERR;
     return stat;    
 }

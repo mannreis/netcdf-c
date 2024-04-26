@@ -698,7 +698,7 @@ build_atts(NC_FILE_INFO_T* file, NC_OBJ* container, NCindex* attlist, NCjson** j
 	    nc_type internaltype = a->nc_typeid;
 
 	    /* Special cases */	
-	    if(container->sort == NCVAR && strcmp(a->hdr.name,_FillValue)==0) continue; /* Ignore _FillValue */
+	    if(container->sort == NCVAR && strcmp(a->hdr.name,NC_FillValue)==0) continue; /* Ignore _FillValue */
 	
 	    if(a->nc_typeid > NC_MAX_ATOMIC_TYPE)
 		{stat = (THROW(NC_ENCZARR)); goto done;}

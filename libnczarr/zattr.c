@@ -423,7 +423,7 @@ ncz_put_att(int ncid, int containerid, const char *name, nc_type file_type,
     NC_VAR_INFO_T *var = NULL;
     void* copy = NULL;
     NC_OBJ* obj = NULL;
-    int isfillvalue = (strcmp(name,_FillValue)==0);
+    int isfillvalue = (strcmp(name,NC_FillValue)==0);
     char norm_name[NC_MAX_NAME + 1];
     const NC_reservedatt* ra = NULL;
     NC_ATT_INFO_T* att = NULL;
