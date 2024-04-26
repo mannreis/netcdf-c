@@ -11,7 +11,7 @@
  */
 
 #include "config.h"
-#ifndef USE_HDF5
+#ifdef USE_HDF5
 #include "hdf5internal.h"
 #endif
 #include "nc4internal.h"
