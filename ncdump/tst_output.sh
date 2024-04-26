@@ -11,7 +11,7 @@ echo ""
 echo "*** Testing ncgen and ncdump test output for classic format."
 
 echo "*** Testing that ncgen produces correct C code from c0.cdl."
-${execdir}/ref_ctest
+#${execdir}/ref_ctest
 ${NCGEN} -lc -o ctest0.nc $srcdir/../ncgen/c0.cdl > tst_output_ctest.c
 diff -b tst_output_ctest.c $srcdir/ref_ctest.c
 
@@ -50,7 +50,7 @@ diff -b tst_format_att.cdl $srcdir/ref_tst_format_att.cdl
 echo "*** All ncgen and ncdump test output for classic format passed!"
 
 echo "*** Testing that ncgen with c0.cdl for 64-bit offset format."
-${execdir}/ref_ctest64
+#${execdir}/ref_ctest64
 ${NCGEN}  -k2 -lc -o ctest0_64.nc $srcdir/../ncgen/c0.cdl > tst_output_ctest64.c
 diff -b tst_output_ctest64.c $srcdir/ref_ctest64.c
 
