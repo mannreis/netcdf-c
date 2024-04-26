@@ -1833,14 +1833,6 @@ AC_ARG_ENABLE([nczarr-filters], [AS_HELP_STRING([--disable-nczarr-filters],
 test "x$enable_nczarr_filters" = xno || enable_nczarr_filters=yes
 AC_MSG_RESULT([$enable_nczarr_filters])
 
-# Control filter test/example
-AC_MSG_CHECKING([whether filter testing should be run])
-AC_ARG_ENABLE([filter-testing],
-              [AS_HELP_STRING([--disable-filter-testing],
-                              [Do not run filter test and example; requires shared libraries and HDF5|NCZarr])])
-test "x$enable_filter_testing" = xno || enable_filter_testing=yes
-AC_MSG_RESULT($enable_filter_testing)
-
 # Apply constraints
 if test "x$enable_plugins" = xno ; then
 AC_MSG_WARN([--disable-plugins => --disable-nczarr-filters])
@@ -1855,6 +1847,14 @@ fi
 if test "x$enable_nczarr_filters" = xyes; then
    AC_DEFINE([NETCDF_ENABLE_NCZARR_FILTERS], [1], [if true, enable NCZarr filters])
 fi
+
+# Control filter test/example
+AC_MSG_CHECKING([whether filter testing should be run])
+AC_ARG_ENABLE([filter-testing],
+              [AS_HELP_STRING([--disable-filter-testing],
+                              [Do not run filter test and example; otherwise requires shared libraries and HDF5|NCZarr])])
+test "x$enable_filter_testing" = xno || enable_filter_testing=yes
+AC_MSG_RESULT($enable_filter_testing)
 
 # Automake conditionals need to be called, whether the answer is yes
 # or no.
@@ -1887,13 +1887,6 @@ AM_CONDITIONAL(NETCDF_ENABLE_METADATA_PERF, [test x$enable_metadata_perf = xyes]
 AM_CONDITIONAL(NETCDF_ENABLE_BYTERANGE, [test "x$enable_byterange" = xyes])
 AM_CONDITIONAL(RELAX_COORD_BOUND, [test "xyes" = xyes])
 AM_CONDITIONAL(HAS_PAR_FILTERS, [test x$hdf5_supports_par_filters = xyes ])
-echo "@@@ 1 ${enable_filter_testing}"
-if test x$enable_filter_testing = xyes ; then
-echo -n "@@@ 2" 
-else
-echo -n "@@@ 3" 
-fi
-
 AM_CONDITIONAL(NETCDF_ENABLE_FILTER_TESTING, [test x$enable_filter_testing = xyes])
 AM_CONDITIONAL(NETCDF_ENABLE_NCZARR_FILTERS, [test x$enable_nczarr_filters = xyes])
 # We need to simplify the set of S3 and Zarr flag combinations
