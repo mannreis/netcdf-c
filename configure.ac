@@ -1887,6 +1887,13 @@ AM_CONDITIONAL(NETCDF_ENABLE_METADATA_PERF, [test x$enable_metadata_perf = xyes]
 AM_CONDITIONAL(NETCDF_ENABLE_BYTERANGE, [test "x$enable_byterange" = xyes])
 AM_CONDITIONAL(RELAX_COORD_BOUND, [test "xyes" = xyes])
 AM_CONDITIONAL(HAS_PAR_FILTERS, [test x$hdf5_supports_par_filters = xyes ])
+echo "@@@ 1 ${enable_filter_testing}"
+if test x$enable_filter_testing = xyes ; then
+echo -n "@@@ 2" 
+else
+echo -n "@@@ 3" 
+fi
+
 AM_CONDITIONAL(NETCDF_ENABLE_FILTER_TESTING, [test x$enable_filter_testing = xyes])
 AM_CONDITIONAL(NETCDF_ENABLE_NCZARR_FILTERS, [test x$enable_nczarr_filters = xyes])
 # We need to simplify the set of S3 and Zarr flag combinations
