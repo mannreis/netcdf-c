@@ -121,7 +121,7 @@ NC4_inq_atomic_typeid(int ncid, const char *name, nc_type *typeidp)
 	    return NC_NOERR;
         }
     }
-    return NC_EBADTYPID;
+    return NC_EBADTYPE;
 }
 
 /**

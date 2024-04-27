@@ -479,7 +479,7 @@ NC4_inq_typeid(int ncid, const char *name, nc_type *typeidp)
     NC_FILE_INFO_T *h5;
     NC_TYPE_INFO_T *type = NULL;
     char *norm_name = NULL;
-    int i, retval = NC_NOERR;
+    int retval = NC_NOERR;
 
     /* Normalize name. */
     if (!(norm_name = (char*)malloc(strlen(name) + 1)))
@@ -489,7 +489,7 @@ NC4_inq_typeid(int ncid, const char *name, nc_type *typeidp)
 
     switch(retval = NC4_inq_atomic_typeid(ncid,norm_name,typeidp)) {
     case NC_NOERR: goto done;
-    case NC_EBADTYPID: retval = NC_NOERR; break;
+    case NC_EBADTYPE: retval = NC_NOERR; break;
     default: goto done;
     }
 
@@ -576,9 +576,10 @@ nc4_get_typeclass(const NC_FILE_INFO_T *h5, nc_type xtype, int *type_class)
     assert(type_class);
 
     /* If this is an atomic type, the answer is easy. */
-    switch (retval = NC4_get_atomic_typeclass(xtype,type_class)) {
+    retval = NC4_get_atomic_typeclass(xtype,type_class);
+    switch (retval) {
     case NC_NOERR: goto exit;
-    case NC_EBADTYPID: break;
+    case NC_EBADTYPE: break;
     default: goto exit;
     }
     /* See if it's a used-defined type */
