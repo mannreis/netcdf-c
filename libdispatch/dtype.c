@@ -6,68 +6,6 @@
 
 #include "ncdispatch.h"
 
-/** \defgroup atomic_types Atomic Types (not including NC_STRING)
-/** \{ */
-
-\ingroup atomic_types
-
-/**
- * @internal Get the name and size of an atomic type. For strings, 1 is
- * returned.
- *
- * @param typeid1 Type ID.
- * @param name Gets the name of the type.
- * @param size Gets the size of one element of the type in bytes.
- *
- * @return ::NC_NOERR No error.
- * @return ::NC_EBADID Bad ncid.
- * @return ::NC_EBADTYPE Type not found.
- * @author Dennis Heimbigner
- */
-int
-NC4_inq_atomic_type(nc_type typeid1, char *name, size_t *size)
-{
-    LOG((2, "nc_inq_atomic_type: typeid %d",  typeid1));
-
-    if (typeid1 >= NUM_ATOMIC_TYPES)
-	return NC_EBADTYPE;
-    if (name)
-            strcpy(name, nc4_atomic_name[typeid1]);
-    if (size)
-            *size = nc4_atomic_size[typeid1];
-    return NC_NOERR;
-}
-
-/**
- * @internal Get the name and size of an atomic type. For strings, 1 is
- * returned.
- *
- * @param typeid1 Type ID.
- * @param name Gets the name of the type.
- * @param size Gets the size of one element of the type in bytes.
- *
- * @return ::NC_NOERR No error.
- * @return ::NC_EBADID Bad ncid.
- * @return ::NC_EBADTYPE Type not found.
- * @author Dennis Heimbigner
- */
-int
-NC4_inq_atomic_type(nc_type typeid1, char *name, size_t *size)
-{
-    LOG((2, "nc_inq_atomic_type: typeid %d",  typeid1));
-
-    if (typeid1 >= NUM_ATOMIC_TYPES)
-	return NC_EBADTYPE;
-    if (name)
-            strcpy(name, nc4_atomic_name[typeid1]);
-    if (size)
-            *size = nc4_atomic_size[typeid1];
-    return NC_NOERR;
-}
-
-/** \} */
-
-
 /** \defgroup user_types User-Defined Types
 
 User defined types allow for more complex data structures.

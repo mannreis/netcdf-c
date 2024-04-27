@@ -278,7 +278,7 @@ static int NCJyytext(NCJparser*, char* start, size_t pdlen);
 static void NCJreclaimArray(struct NCjlist*);
 static void NCJreclaimDict(struct NCjlist*);
 static int NCJunescape(NCJparser* parser);
-static int unescape1(int c);
+static char unescape1(char c);
 static int listappend(struct NCjlist* list, NCjson* element);
 
 static int NCJcloneArray(const NCjson* array, NCjson** clonep);
@@ -533,13 +533,12 @@ done:
 static int
 NCJlex(NCJparser* parser)
 {
-    int c;
     int token = NCJ_UNDEF;
     char* start;
     size_t count;
 
     while(token == 0) { /* avoid need to goto when retrying */
-	c = *parser->pos;
+	char c = *parser->pos;
 	if(c == '\0') {
 	    token = NCJ_EOF;
 	} else if(c <= ' ' || c == '\177') {/* ignore whitespace */
@@ -585,7 +584,7 @@ NCJlex(NCJparser* parser)
 		token = NCJ_UNDEF;
 		goto done;
 	    }
-	    count = (size_t)(parser->pos - start) - 1; /* -1 for trailing quote */
+	    count = (size_t)((parser->pos) - start) - 1; /* -1 for trailing quote */
 	    if(NCJyytext(parser,start,count)==NCJ_ERR) goto done;
 	    if(NCJunescape(parser)==NCJ_ERR) goto done;
 	    token = NCJ_STRING;
@@ -812,7 +811,7 @@ NCJunescape(NCJparser* parser)
 {
     char* p = parser->yytext;
     char* q = p;
-    int c;
+    char c;
     for(;(c=*p++);) {
 	if(c == NCJ_ESCAPE) {
 	    c = *p++;
@@ -822,9 +821,9 @@ NCJunescape(NCJparser* parser)
 	    case 'n': c = '\n'; break;
 	    case 'r': c = '\r'; break;
 	    case 't': c = '\t'; break;
-	    case NCJ_QUOTE: c = c; break;
-	    case NCJ_ESCAPE: c = c; break;
-	    default: c = c; break;/* technically not Json conformant */
+	    case NCJ_QUOTE: break;
+	    case NCJ_ESCAPE: break;
+	    default: break;/* technically not Json conformant */
 	    }
 	}
 	*q++ = (char)c;
@@ -834,8 +833,8 @@ NCJunescape(NCJparser* parser)
 }
 
 /* Unescape a single character */
-static int
-unescape1(int c)
+static char
+unescape1(char c)
 {
     switch (c) {
     case 'b': c = '\b'; break;
@@ -843,7 +842,7 @@ unescape1(int c)
     case 'n': c = '\n'; break;
     case 'r': c = '\r'; break;
     case 't': c = '\t'; break;
-    default: c = c; break;/* technically not Json conformant */
+    default: break;/* technically not Json conformant */
     }
     return c;
 }
@@ -1217,7 +1216,7 @@ static int
 escape(const char* text, NCJbuf* buf)
 {
     const char* p = text;
-    int c;
+    char c;
     for(;(c=*p++);) {
         char replace = 0;
         switch (c) {

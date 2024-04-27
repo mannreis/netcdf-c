@@ -83,9 +83,6 @@ typedef enum {NCNAT, NCVAR, NCDIM, NCATT, NCTYP, NCFLD, NCGRP, NCFIL} NC_SORT;
 #define X_DOUBLE_MAX    1.7976931348623157e+308 /**< Maximum double value. */
 #define X_DOUBLE_MIN    (-X_DOUBLE_MAX)         /**< Minimum double value. */
 
-/** This is the number of netCDF atomic types. */
-#define NUM_ATOMIC_TYPES (NC_MAX_ATOMIC_TYPE + 1)
-
 /** Number of parameters needed for ZLIB filter. */
 #define CD_NELEMS_ZLIB 1
 
@@ -476,9 +473,6 @@ extern void nc4_hdf5_finalize(void);
 #ifdef LOGGING
 extern int log_metadata_nc(NC_FILE_INFO_T *h5);
 #endif
-
-/** @internal Names of atomic types. */
-extern const char* nc4_atomic_name[NUM_ATOMIC_TYPES];
 
 /* Binary searcher for reserved attributes */
 extern const NC_reservedatt* NC_findreserved(const char* name);

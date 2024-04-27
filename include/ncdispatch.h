@@ -254,10 +254,17 @@ EXTERNL int
 NCDISPATCH_get_att(int ncid, int varid, const char* name, void* value, nc_type t);
 
 /*
-Stick the functions in datomic.c here temporarily
+Stick these functions and data from datomic.c here temporarily
 until enough atomic related functions are accumulated
 in datomic.c.
 */
+
+/** This is the number of netCDF atomic types (as opposed to max) . */
+#define NUM_ATOMIC_TYPES (NC_MAX_ATOMIC_TYPE + 1)
+
+/** @internal Names of atomic types. */
+EXTERNL const char* nc4_atomic_name[NUM_ATOMIC_TYPES];
+
 #if defined(__cplusplus)
 extern "C" {
 #endif

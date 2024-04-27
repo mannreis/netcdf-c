@@ -15,6 +15,8 @@
 #include "nc4dispatch.h"
 #include <stddef.h>
 
+#define NC_STRING_LEN sizeof(char *)  /**< @internal Size of char *. */
+
 /**
  * @internal Find all user-defined types for a location. This finds
  * all user-defined types in a group.

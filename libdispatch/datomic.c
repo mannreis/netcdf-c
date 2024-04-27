@@ -34,10 +34,11 @@ static const size_t nc4_atomic_size[NUM_ATOMIC_TYPES] = {0, NC_BYTE_LEN, NC_CHAR
                                                       NC_BYTE_LEN, NC_SHORT_LEN, NC_INT_LEN, NC_INT64_LEN,
                                                       NC_INT64_LEN, NC_STRING_LEN};
 
-/** \defgroup atomic_types Atomic Types (not including NC_STRING)
-/** \{ */
+/** \defgroup atomic_types Atomic Types (not including NC_STRING) */
+/** \{
 
 \ingroup atomic_types
+*/
 
 /**
  * @internal Get the name and size of an atomic type. For strings, 1 is
@@ -55,8 +56,6 @@ static const size_t nc4_atomic_size[NUM_ATOMIC_TYPES] = {0, NC_BYTE_LEN, NC_CHAR
 int
 NC4_inq_atomic_type(nc_type typeid1, char *name, size_t *size)
 {
-    LOG((2, "nc_inq_atomic_type: typeid %d",  typeid1));
-
     if (typeid1 >= NUM_ATOMIC_TYPES)
 	return NC_EBADTYPE;
     if (name)
@@ -82,8 +81,6 @@ int
 NC4_lookup_atomic_type(const char *name, nc_type* idp, size_t *sizep)
 {
     int i;
-
-    LOG((2, "nc_lookup_atomic_type: name %s ", name));
 
     if (name == NULL || strlen(name) == 0)
 	return NC_EBADTYPE;
@@ -168,7 +165,6 @@ NC4_get_atomic_typeclass(nc_type xtype, int *type_class)
         default:
 	   return NC_EBADTYPE;
         }
-    }
     return NC_NOERR;
 }
 
