@@ -253,4 +253,22 @@ NCDISPATCH_inq_var_all(int ncid, int varid, char *name, nc_type *xtypep,
 EXTERNL int
 NCDISPATCH_get_att(int ncid, int varid, const char* name, void* value, nc_type t);
 
+/*
+Stick the functions in datomic.c here temporarily
+until enough atomic related functions are accumulated
+in datomic.c.
+*/
+#if defined(__cplusplus)
+extern "C" {
+#endif
+
+EXTERNL int NC4_inq_atomic_type(nc_type typeid1, char *name, size_t *size);
+EXTERNL int NC4_lookup_atomic_type(const char *name, nc_type* idp, size_t *sizep);
+EXTERNL int NC4_inq_atomic_typeid(int ncid, const char *name, nc_type *typeidp);
+EXTERNL int NC4_get_atomic_typeclass(nc_type xtype, int *type_class);
+
+#if defined(__cplusplus)
+}
+#endif
+
 #endif /* NC_DISPATCH_H */
