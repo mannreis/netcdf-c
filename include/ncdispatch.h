@@ -164,6 +164,7 @@ struct nc_vlen_t;
 #endif /*!USE_NETCDF4*/
 
 struct NC;
+struct NCglobalstate;
 
 int NC_create(const char *path, int cmode,
 	      size_t initialsz, int basepe, size_t *chunksizehintp,
@@ -269,11 +270,20 @@ EXTERNL const char* nc4_atomic_name[NUM_ATOMIC_TYPES];
 extern "C" {
 #endif
 
+EXTERNL int NCDISPATCH_initialize(void);
+EXTERNL int NCDISPATCH_finalize(void);
+EXTERNL struct NCglobalstate* NC_getglobalstate(void);
+EXTERNL void NC_freeglobalstate(void);
+
 EXTERNL int NC4_inq_atomic_type(nc_type typeid1, char *name, size_t *size);
 EXTERNL int NC4_lookup_atomic_type(const char *name, nc_type* idp, size_t *sizep);
 EXTERNL int NC4_inq_atomic_typeid(int ncid, const char *name, nc_type *typeidp);
 EXTERNL int NC4_get_atomic_typeclass(nc_type xtype, int *type_class);
 
+EXTERNL int nc_set_alignment(int threshold, int alignment);
+EXTERNL int nc_get_alignment(int* thresholdp, int* alignmentp);
+
+/* From libdispatch/ddispatch.c */
 #if defined(__cplusplus)
 }
 #endif
