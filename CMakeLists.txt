@@ -559,7 +559,7 @@ set(NETCDF_ENABLE_BYTERANGE OFF CACHE BOOL "NETCDF_ENABLE_REMOTE_FUNCTIONALITY=N
 endif()
 
 # Option to Enable DAP long tests, remote tests.
-option(NETCDF_ENABLE_DAP_REMOTE_TESTS "Enable DAP remote tests." ON)
+option(NETCDF_ENABLE_DAP_REMOTE_TESTS "Enable DAP remote tests." OFF)
 option(NETCDF_ENABLE_EXTERNAL_SERVER_TESTS "Enable external Server remote tests." OFF)
 option(NETCDF_ENABLE_DAP_LONG_TESTS "Enable DAP long tests." OFF)
 
