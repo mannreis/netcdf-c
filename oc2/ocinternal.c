@@ -25,7 +25,8 @@
 #endif
 
 #include <errno.h>
-
+#include "config.h"
+#include "ncdispatch.h"
 #include "nc4internal.h"
 #include "ocinternal.h"
 #include "ocdebug.h"

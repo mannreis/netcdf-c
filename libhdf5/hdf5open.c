@@ -10,6 +10,7 @@
  */
 
 #include "config.h"
+#include "ncdispatch.h"
 #include "hdf5internal.h"
 #include "hdf5err.h"
 #include "hdf5debug.h"
