@@ -25,6 +25,7 @@ See COPYRIGHT for license information.
 #include "config.h"
 #include "netcdf.h"
 #include "netcdf_aux.h"
+#include "ncdispatch.h"
 #include "nc4internal.h"
 #include "ncoffsets.h"
 #include "nclog.h"
