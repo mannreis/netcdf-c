@@ -96,51 +96,51 @@ typedef struct NC_MPI_INFO {
 
 /* Define known dispatch tables and initializers */
 
-extern int NCDISPATCH_initialize(void);
-extern int NCDISPATCH_finalize(void);
+EXTERNL int NCDISPATCH_initialize(void);
+EXTERNL int NCDISPATCH_finalize(void);
 
-extern const NC_Dispatch* NC3_dispatch_table;
-extern int NC3_initialize(void);
-extern int NC3_finalize(void);
+EXTERNL const NC_Dispatch* NC3_dispatch_table;
+EXTERNL int NC3_initialize(void);
+EXTERNL int NC3_finalize(void);
 
 #ifdef NETCDF_ENABLE_DAP
-extern const NC_Dispatch* NCD2_dispatch_table;
-extern int NCD2_initialize(void);
-extern int NCD2_finalize(void);
+EXTERNL const NC_Dispatch* NCD2_dispatch_table;
+EXTERNL int NCD2_initialize(void);
+EXTERNL int NCD2_finalize(void);
 #endif
 #ifdef NETCDF_ENABLE_DAP4
-extern const NC_Dispatch* NCD4_dispatch_table;
-extern int NCD4_initialize(void);
-extern int NCD4_finalize(void);
+EXTERNL const NC_Dispatch* NCD4_dispatch_table;
+EXTERNL int NCD4_initialize(void);
+EXTERNL int NCD4_finalize(void);
 #endif
 
 #ifdef USE_PNETCDF
-extern const NC_Dispatch* NCP_dispatch_table;
-extern int NCP_initialize(void);
-extern int NCP_finalize(void);
+EXTERNL const NC_Dispatch* NCP_dispatch_table;
+EXTERNL int NCP_initialize(void);
+EXTERNL int NCP_finalize(void);
 #endif
 
 #ifdef USE_NETCDF4
-extern int NC4_initialize(void);
-extern int NC4_finalize(void);
+EXTERNL int NC4_initialize(void);
+EXTERNL int NC4_finalize(void);
 #endif
 
 #ifdef USE_HDF5
-extern const NC_Dispatch* HDF5_dispatch_table;
-extern int NC_HDF5_initialize(void);
-extern int NC_HDF5_finalize(void);
+EXTERNL const NC_Dispatch* HDF5_dispatch_table;
+EXTERNL int NC_HDF5_initialize(void);
+EXTERNL int NC_HDF5_finalize(void);
 #endif
 
 #ifdef USE_HDF4
-extern const NC_Dispatch* HDF4_dispatch_table;
-extern int HDF4_initialize(void);
-extern int HDF4_finalize(void);
+EXTERNL const NC_Dispatch* HDF4_dispatch_table;
+EXTERNL int HDF4_initialize(void);
+EXTERNL int HDF4_finalize(void);
 #endif
 
 #ifdef NETCDF_ENABLE_NCZARR
-extern const NC_Dispatch* NCZ_dispatch_table;
-extern int NCZ_initialize(void);
-extern int NCZ_finalize(void);
+EXTERNL const NC_Dispatch* NCZ_dispatch_table;
+EXTERNL int NCZ_initialize(void);
+EXTERNL int NCZ_finalize(void);
 #endif
 
 /* User-defined formats.*/
@@ -150,8 +150,7 @@ extern NC_Dispatch* UDF1_dispatch_table;
 extern char UDF1_magic_number[NC_MAX_MAGIC_NUMBER_LEN + 1];
 
 /* Prototypes. */
-int NC_check_nulls(int ncid, int varid, const size_t *start, size_t **count,
-                   ptrdiff_t **stride);
+EXTERNL int NC_check_nulls(int ncid, int varid, const size_t *start, size_t **count, ptrdiff_t **stride);
 
 /**************************************************/
 /* Forward */
@@ -166,10 +165,10 @@ struct nc_vlen_t;
 struct NC;
 struct NCglobalstate;
 
-int NC_create(const char *path, int cmode,
+EXTERNL int NC_create(const char *path, int cmode,
 	      size_t initialsz, int basepe, size_t *chunksizehintp,
 	      int useparallel, void *parameters, int *ncidp);
-int NC_open(const char *path, int cmode,
+EXTERNL int NC_open(const char *path, int cmode,
 	    int basepe, size_t *chunksizehintp,
 	    int useparallel, void *parameters, int *ncidp);
 
@@ -216,9 +215,9 @@ EXTERNL char* NC_atomictypename(nc_type xtype);
 
 /* Misc */
 
-extern int NC_getshape(int ncid, int varid, int ndims, size_t* shape);
-extern int NC_is_recvar(int ncid, int varid, size_t* nrecs);
-extern int NC_inq_recvar(int ncid, int varid, int* nrecdims, int* is_recdim);
+EXTERNL  int NC_getshape(int ncid, int varid, int ndims, size_t* shape);
+EXTERNL int NC_is_recvar(int ncid, int varid, size_t* nrecs);
+EXTERNL int NC_inq_recvar(int ncid, int varid, int* nrecdims, int* is_recdim);
 
 #define nullstring(s) (s==NULL?"(null)":s)
 
@@ -270,8 +269,6 @@ EXTERNL const char* nc4_atomic_name[NUM_ATOMIC_TYPES];
 extern "C" {
 #endif
 
-EXTERNL int NCDISPATCH_initialize(void);
-EXTERNL int NCDISPATCH_finalize(void);
 EXTERNL struct NCglobalstate* NC_getglobalstate(void);
 EXTERNL void NC_freeglobalstate(void);
 

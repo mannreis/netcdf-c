@@ -8,7 +8,7 @@
 */
 
 #include "config.h"
-#include <nc_tests.h>
+#include "nc_tests.h"
 #include "nc.h"
 #include "nc4internal.h"
 #include "ncdispatch.h"
@@ -23,8 +23,8 @@
 #define DIM_LEN 5
 #define TYPE_NAME "Madonna"
 #define TYPE_SIZE TEST_VAL_42
-#define FIELD_NAME "Britany_Spears"
-#define FIELD_OFFSET 9
+#define TST_FIELD_NAME "Britany_Spears"
+#define TST_FIELD_OFFSET 9
 
 int
 main(int argc, char **argv)
@@ -85,8 +85,10 @@ main(int argc, char **argv)
         char *path;
         void *dispatchdata_in;
         int mode = 0, mode_in;
-        NC_GRP_INFO_T *grp, *grp2;
-        NC_FILE_INFO_T *h5, *h52;
+        NC_GRP_INFO_T *grp;
+        NC_GRP_INFO_T *grp2;
+        NC_FILE_INFO_T *h5;
+        NC_FILE_INFO_T *h52;
 
         /* Create the NC* instance and insert its dispatcher */
         if (new_NC(NC3_dispatch_table, FILE_NAME, mode, &ncp)) ERR;
@@ -244,7 +246,7 @@ main(int argc, char **argv)
         if (nc4_type_list_add(grp, TYPE_SIZE, TYPE_NAME, &type)) ERR;
 
         /* Add a field to the type. */
-        /* if (nc4_field_list_add(type, FIELD_NAME, FIELD_OFFSET, NC_INT, 0, */
+        /* if (nc4_field_list_add(type, TST_FIELD_NAME, TST_FIELD_OFFSET, NC_INT, 0, */
         /*                        NULL)) ERR; */
 
         /* Find it. */
