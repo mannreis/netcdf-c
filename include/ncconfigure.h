@@ -31,9 +31,13 @@
 #ifdef HAVE_UNISTD_H
 #include <unistd.h>
 #endif
-/* GCC strikes again */
-#if defined(__APPLE__) && !defined(HAVE_SYS_TYPES_H)
-#include <sys/types.h>
+#ifdef __APPLE__ /* GCC strikes again */
+#ifndef uint
+typedef unsigned int uint;
+#endif
+#ifndef ushort
+typedef unsigned short ushort;
+#endif
 #endif
 
 /*
