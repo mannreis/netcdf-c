@@ -38,7 +38,7 @@ AC_SUBST([netCDF_SO_VERSION]) netCDF_SO_VERSION=21:2:2
 
 # Create the VERSION file, which contains the package version from AC_INIT.
 # This file is apparently unused. But see the bottom of Makefile.am
-echo AC_PACKAGE_VERSION>VERSION
+#echo AC_PACKAGE_VERSION>VERSION_FILE
 
 AC_SUBST(PACKAGE_VERSION)
 
