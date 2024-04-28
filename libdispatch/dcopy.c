@@ -207,42 +207,6 @@ done:
     return ret;
 }
 
-/**
- * @internal Given a type in one file, find its equal (if any) in
- * another file. It sounds so simple, but it's a real pain!
- *
- * @param ncid1 File ID.
- * @param xtype1 Type ID.
- * @param ncid2 File ID.
- * @param xtype2 Pointer that gets type ID of equal type.
- *
- * @return ::NC_NOERR No error.
- * @author Ed Hartnett
-*/
-static int
-NC_find_equal_type(int ncid1, nc_type xtype1, int ncid2, nc_type *xtype2)
-{
-   int ret = NC_NOERR;
-
-   /* Check input */
-   if(xtype1 <= NC_NAT)
-      return NC_EINVAL;
-
-   /* Handle atomic types. */
-   if (xtype1 <= NC_MAX_ATOMIC_TYPE)
-   {
-      if(xtype2)
-	 *xtype2 = xtype1;
-      return NC_NOERR;
-   }
-
-   /* Recursively search group ncid2 and its children
-      to find a type that is equal (using compare_type)
-      to xtype1. */
-   ret = NC_rec_find_nc_type(ncid1, xtype1 , ncid2, xtype2);
-   return ret;
-}
-
 #endif /* USE_NETCDF4 */
 
 /**
