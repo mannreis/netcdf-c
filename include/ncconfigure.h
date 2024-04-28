@@ -28,6 +28,13 @@
 #ifdef HAVE_UNISTD_H
 #include <unistd.h>
 #endif
+#ifdef HAVE_UNISTD_H
+#include <unistd.h>
+#endif
+/* GCC strikes again */
+#if defined(__APPLE__) && !defined(HAVE_SYS_TYPES_H)
+#include <sys/types.h>
+#endif
 
 /*
 This is included in bottom
