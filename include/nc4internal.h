@@ -317,32 +317,6 @@ typedef struct NC_FILE_INFO
     } mem;
 } NC_FILE_INFO_T;
 
-/* Begin to collect global state info in one place (more to do) */
-typedef struct NCglobalstate {
-    int initialized;
-    char* tempdir; /* track a usable temp dir */
-    char* home; /* track $HOME */
-    char* cwd; /* track getcwd */
-    struct NCRCinfo* rcinfo; /* Currently only one rc file per session */
-    struct GlobalZarr { /* Zarr specific parameters */
-	char dimension_separator;
-	int default_zarrformat;
-    } zarr;
-    struct GlobalAWS { /* AWS S3 specific parameters/defaults */
-	char* default_region;
-	char* config_file;
-	char* profile;
-	char* access_key_id;
-	char* secret_access_key;
-    } aws;
-    struct Alignment { /* H5Pset_alignment parameters */
-        int defined; /* 1 => threshold and alignment explicitly set */
-	int threshold;
-	int alignment;
-    } alignment;
-    struct ChunkCache chunkcache;
-} NCglobalstate;
-
 /** Variable Length Datatype struct in memory. Must be identical to
  * HDF5 hvl_t. (This is only used for VL sequences, not VL strings,
  * which are stored in char *'s) */
@@ -478,10 +452,6 @@ extern int log_metadata_nc(NC_FILE_INFO_T *h5);
 extern const NC_reservedatt* NC_findreserved(const char* name);
 /* reserved attribute initializer */
 extern void NC_initialize_reserved(void);
-
-/* Global State Management */
-extern NCglobalstate* NC_getglobalstate(void);
-extern void NC_freeglobalstate(void);
 
 /* Generic reserved Attributes */
 #define NC_ATT_REFERENCE_LIST "REFERENCE_LIST"

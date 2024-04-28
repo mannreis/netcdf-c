@@ -163,7 +163,6 @@ struct nc_vlen_t;
 #endif /*!USE_NETCDF4*/
 
 struct NC;
-struct NCglobalstate;
 
 EXTERNL int NC_create(const char *path, int cmode,
 	      size_t initialsz, int basepe, size_t *chunksizehintp,
@@ -264,6 +263,32 @@ in datomic.c.
 
 /** @internal Names of atomic types. */
 EXTERNL const char* nc4_atomic_name[NUM_ATOMIC_TYPES];
+
+/* Begin to collect global state info in one place (more to do) */
+typedef struct NCglobalstate {
+    int initialized;
+    char* tempdir; /* track a usable temp dir */
+    char* home; /* track $HOME */
+    char* cwd; /* track getcwd */
+    struct NCRCinfo* rcinfo; /* Currently only one rc file per session */
+    struct GlobalZarr { /* Zarr specific parameters */
+	char dimension_separator;
+	int default_zarrformat;
+    } zarr;
+    struct GlobalAWS { /* AWS S3 specific parameters/defaults */
+	char* default_region;
+	char* config_file;
+	char* profile;
+	char* access_key_id;
+	char* secret_access_key;
+    } aws;
+    struct Alignment { /* H5Pset_alignment parameters */
+        int defined; /* 1 => threshold and alignment explicitly set */
+	int threshold;
+	int alignment;
+    } alignment;
+    struct ChunkCache chunkcache;
+} NCglobalstate;
 
 #if defined(__cplusplus)
 extern "C" {
