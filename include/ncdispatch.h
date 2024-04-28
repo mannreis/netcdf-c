@@ -27,6 +27,9 @@
 #include "netcdf_par.h"
 #endif
 #include "netcdf_dispatch.h"
+#ifdef USE_NETCDF4
+#include "nc4internal.h"
+#endif
 
 #define longtype ((sizeof(long) == sizeof(int) ? NC_INT : NC_INT64))
 
@@ -287,7 +290,9 @@ typedef struct NCglobalstate {
 	int threshold;
 	int alignment;
     } alignment;
+#ifdef USE_NETCDF4
     struct ChunkCache chunkcache;
+#endif
 } NCglobalstate;
 
 #if defined(__cplusplus)
