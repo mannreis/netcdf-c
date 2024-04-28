@@ -5,11 +5,6 @@
  *********************************************************************/
 
 #include <config.h>
-#include <stdlib.h>
-#include <stdio.h>
-#include <stdint.h>
-#include <string.h>
-#include <assert.h>
 #include <limits.h>
 #include <float.h>
 #define NO_NETCDF_2 1
