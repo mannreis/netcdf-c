@@ -2,9 +2,6 @@ name: Run Cygwin-based tests
 
 on: [pull_request,workflow_dispatch]
 
-env:
-  REMOTETESTDOWN: ${{ vars.REMOTETESTDOWN }}
-
 concurrency:  
   group: ${{ github.workflow}}-${{ github.head_ref }}  
   cancel-in-progress: true
@@ -13,6 +10,7 @@ env:
   SHELLOPTS: igncr
   CHERE_INVOKING: 1
   CYGWIN_NOWINPATH: 1
+  REMOTETESTDOWN: ${{ vars.REMOTETESTDOWN }}
 
 jobs:
   build-and-test-autotools:
