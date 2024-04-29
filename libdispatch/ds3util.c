@@ -22,7 +22,6 @@
 #endif
 
 #include "netcdf.h"
-#include "ncdispatch.h"
 #include "nc4internal.h"
 #include "ncuri.h"
 #include "nclist.h"

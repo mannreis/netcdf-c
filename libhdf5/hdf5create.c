@@ -10,8 +10,6 @@
 
 #include "config.h"
 #include "netcdf.h"
-#include "ncdispatch.h"
-#include "ncpathmgr.h"
 #include "ncpathmgr.h"
 #include "hdf5internal.h"
 

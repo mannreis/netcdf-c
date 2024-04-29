@@ -9,7 +9,6 @@
  */
 
 #include "config.h"
-#include "ncdispatch.h"
 #include "nc4internal.h"
 #include "hdf5internal.h"
 #include "hdf5err.h" /* For BAIL2 */

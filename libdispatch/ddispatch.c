@@ -77,9 +77,9 @@ static const size_t nc4_atomic_size[NUM_ATOMIC_TYPES] = {0, NC_BYTE_LEN, NC_CHAR
 /* Forward */
 static int NC_createglobalstate(void);
 
-/**************************************************/
-/** \defgroup dispatch_initialize functions.
-/** \{
+/**************************************************/ 
+/** \defgroup dispatch_initialize functions. */
+/** \{ */
 
 /* Allow dispatch to do general initialization and finalization */
 int
@@ -180,7 +180,7 @@ NCDISPATCH_finalize(void)
 /** \} */
 
 /**************************************************/
-/** \defgroup global_state Global state functions.
+/** \defgroup global_state Global state functions. */
 /** \{
 
 \ingroup global state

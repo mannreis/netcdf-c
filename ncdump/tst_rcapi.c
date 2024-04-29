@@ -14,7 +14,6 @@
 #include <string.h>
 
 #include "netcdf.h"
-#include "ncdispatch.h"
 
 #undef DEBUG
 

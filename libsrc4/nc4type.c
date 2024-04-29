@@ -11,7 +11,6 @@
  *
  * @author Ed Hartnett
  */
-#include "ncdispatch.h"
 #include "nc4internal.h"
 #include "nc4dispatch.h"
 #include <stddef.h>

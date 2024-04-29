@@ -3,7 +3,6 @@
 #include <string.h>
 #include "netcdf.h"
 #include "ncrc.h"
-#include "ncdispatch.h"
 #include "nc4internal.h"
 
 static void

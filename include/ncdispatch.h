@@ -14,6 +14,7 @@
 #include "config.h"
 #endif
 #include <stdlib.h>
+#include <stdio.h>
 #include <string.h>
 #include <assert.h>
 #if defined(HDF5_PARALLEL) || defined(USE_PNETCDF)
@@ -27,9 +28,6 @@
 #include "netcdf_par.h"
 #endif
 #include "netcdf_dispatch.h"
-#ifdef USE_NETCDF4
-#include "nc4internal.h"
-#endif
 
 #define longtype ((sizeof(long) == sizeof(int) ? NC_INT : NC_INT64))
 
@@ -99,51 +97,51 @@ typedef struct NC_MPI_INFO {
 
 /* Define known dispatch tables and initializers */
 
-EXTERNL int NCDISPATCH_initialize(void);
-EXTERNL int NCDISPATCH_finalize(void);
+extern int NCDISPATCH_initialize(void);
+extern int NCDISPATCH_finalize(void);
 
-EXTERNL const NC_Dispatch* NC3_dispatch_table;
-EXTERNL int NC3_initialize(void);
-EXTERNL int NC3_finalize(void);
+extern const NC_Dispatch* NC3_dispatch_table;
+extern int NC3_initialize(void);
+extern int NC3_finalize(void);
 
 #ifdef NETCDF_ENABLE_DAP
-EXTERNL const NC_Dispatch* NCD2_dispatch_table;
-EXTERNL int NCD2_initialize(void);
-EXTERNL int NCD2_finalize(void);
+extern const NC_Dispatch* NCD2_dispatch_table;
+extern int NCD2_initialize(void);
+extern int NCD2_finalize(void);
 #endif
 #ifdef NETCDF_ENABLE_DAP4
-EXTERNL const NC_Dispatch* NCD4_dispatch_table;
-EXTERNL int NCD4_initialize(void);
-EXTERNL int NCD4_finalize(void);
+extern const NC_Dispatch* NCD4_dispatch_table;
+extern int NCD4_initialize(void);
+extern int NCD4_finalize(void);
 #endif
 
 #ifdef USE_PNETCDF
-EXTERNL const NC_Dispatch* NCP_dispatch_table;
-EXTERNL int NCP_initialize(void);
-EXTERNL int NCP_finalize(void);
+extern const NC_Dispatch* NCP_dispatch_table;
+extern int NCP_initialize(void);
+extern int NCP_finalize(void);
 #endif
 
 #ifdef USE_NETCDF4
-EXTERNL int NC4_initialize(void);
-EXTERNL int NC4_finalize(void);
+extern int NC4_initialize(void);
+extern int NC4_finalize(void);
 #endif
 
 #ifdef USE_HDF5
-EXTERNL const NC_Dispatch* HDF5_dispatch_table;
-EXTERNL int NC_HDF5_initialize(void);
-EXTERNL int NC_HDF5_finalize(void);
+extern const NC_Dispatch* HDF5_dispatch_table;
+extern int NC_HDF5_initialize(void);
+extern int NC_HDF5_finalize(void);
 #endif
 
 #ifdef USE_HDF4
-EXTERNL const NC_Dispatch* HDF4_dispatch_table;
-EXTERNL int HDF4_initialize(void);
-EXTERNL int HDF4_finalize(void);
+extern const NC_Dispatch* HDF4_dispatch_table;
+extern int HDF4_initialize(void);
+extern int HDF4_finalize(void);
 #endif
 
 #ifdef NETCDF_ENABLE_NCZARR
-EXTERNL const NC_Dispatch* NCZ_dispatch_table;
-EXTERNL int NCZ_initialize(void);
-EXTERNL int NCZ_finalize(void);
+extern const NC_Dispatch* NCZ_dispatch_table;
+extern int NCZ_initialize(void);
+extern int NCZ_finalize(void);
 #endif
 
 /* User-defined formats.*/
@@ -153,7 +151,8 @@ extern NC_Dispatch* UDF1_dispatch_table;
 extern char UDF1_magic_number[NC_MAX_MAGIC_NUMBER_LEN + 1];
 
 /* Prototypes. */
-EXTERNL int NC_check_nulls(int ncid, int varid, const size_t *start, size_t **count, ptrdiff_t **stride);
+int NC_check_nulls(int ncid, int varid, const size_t *start, size_t **count,
+                   ptrdiff_t **stride);
 
 /**************************************************/
 /* Forward */
@@ -167,10 +166,10 @@ struct nc_vlen_t;
 
 struct NC;
 
-EXTERNL int NC_create(const char *path, int cmode,
+int NC_create(const char *path, int cmode,
 	      size_t initialsz, int basepe, size_t *chunksizehintp,
 	      int useparallel, void *parameters, int *ncidp);
-EXTERNL int NC_open(const char *path, int cmode,
+int NC_open(const char *path, int cmode,
 	    int basepe, size_t *chunksizehintp,
 	    int useparallel, void *parameters, int *ncidp);
 
@@ -217,9 +216,9 @@ EXTERNL char* NC_atomictypename(nc_type xtype);
 
 /* Misc */
 
-EXTERNL  int NC_getshape(int ncid, int varid, int ndims, size_t* shape);
-EXTERNL int NC_is_recvar(int ncid, int varid, size_t* nrecs);
-EXTERNL int NC_inq_recvar(int ncid, int varid, int* nrecdims, int* is_recdim);
+extern int NC_getshape(int ncid, int varid, int ndims, size_t* shape);
+extern int NC_is_recvar(int ncid, int varid, size_t* nrecs);
+extern int NC_inq_recvar(int ncid, int varid, int* nrecdims, int* is_recdim);
 
 #define nullstring(s) (s==NULL?"(null)":s)
 
@@ -254,65 +253,5 @@ NCDISPATCH_inq_var_all(int ncid, int varid, char *name, nc_type *xtypep,
                );
 EXTERNL int
 NCDISPATCH_get_att(int ncid, int varid, const char* name, void* value, nc_type t);
-
-/*
-Stick these functions and data from datomic.c here temporarily
-until enough atomic related functions are accumulated
-in datomic.c.
-*/
-
-/** This is the number of netCDF atomic types (as opposed to max) . */
-#define NUM_ATOMIC_TYPES (NC_MAX_ATOMIC_TYPE + 1)
-
-/** @internal Names of atomic types. */
-EXTERNL const char* nc4_atomic_name[NUM_ATOMIC_TYPES];
-
-/* Begin to collect global state info in one place (more to do) */
-typedef struct NCglobalstate {
-    int initialized;
-    char* tempdir; /* track a usable temp dir */
-    char* home; /* track $HOME */
-    char* cwd; /* track getcwd */
-    struct NCRCinfo* rcinfo; /* Currently only one rc file per session */
-    struct GlobalZarr { /* Zarr specific parameters */
-	char dimension_separator;
-	int default_zarrformat;
-    } zarr;
-    struct GlobalAWS { /* AWS S3 specific parameters/defaults */
-	char* default_region;
-	char* config_file;
-	char* profile;
-	char* access_key_id;
-	char* secret_access_key;
-    } aws;
-    struct Alignment { /* H5Pset_alignment parameters */
-        int defined; /* 1 => threshold and alignment explicitly set */
-	int threshold;
-	int alignment;
-    } alignment;
-#ifdef USE_NETCDF4
-    struct ChunkCache chunkcache;
-#endif
-} NCglobalstate;
-
-#if defined(__cplusplus)
-extern "C" {
-#endif
-
-EXTERNL struct NCglobalstate* NC_getglobalstate(void);
-EXTERNL void NC_freeglobalstate(void);
-
-EXTERNL int NC4_inq_atomic_type(nc_type typeid1, char *name, size_t *size);
-EXTERNL int NC4_lookup_atomic_type(const char *name, nc_type* idp, size_t *sizep);
-EXTERNL int NC4_inq_atomic_typeid(int ncid, const char *name, nc_type *typeidp);
-EXTERNL int NC4_get_atomic_typeclass(nc_type xtype, int *type_class);
-
-EXTERNL int nc_set_alignment(int threshold, int alignment);
-EXTERNL int nc_get_alignment(int* thresholdp, int* alignmentp);
-
-/* From libdispatch/ddispatch.c */
-#if defined(__cplusplus)
-}
-#endif
 
 #endif /* NC_DISPATCH_H */
