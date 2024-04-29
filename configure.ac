@@ -605,7 +605,7 @@ AC_ARG_ENABLE([dap-remote-tests],
                                  [disable dap remote tests])])
 # Default on
 test "x$enable_dap_remote_tests" = xyes || enable_dap_remote_tests=no
-if test "x$enable_dap" = "xno" ; then
+if test "x$enable_dap" = "xno" || test "xREMOTETESTDOWN" != x ; then
   enable_dap_remote_tests=no
 fi
 AC_MSG_RESULT($enable_dap_remote_tests)
