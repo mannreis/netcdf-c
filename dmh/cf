@@ -5,30 +5,30 @@
 #X=-x
 
 #ANSI=1
-MEM=1
+#MEM=1
 LOG=1
 FAST=1
 #PROF=1
 #BENCH=1
 #UNDEF=1
 
-HDF5=1
-NCZARR=1
-DAP=1
-S3=1
-S3I=1
-S3TEST=yes
+#HDF5=1
+#NCZARR=1
+#DAP=1
+#S3=1
+#S3I=1
+#S3TEST=yes
 #S3TEST=public
-SZIP=1
+#SZIP=1
 #HDF4=1
 #PNETCDF=1
 #PAR4=1
-XML2=1
+#XML2=1
 BYTES=1
 #NOTHREADS=1
-#NOFILTER=1
+NOFILTER=1
 #NONETWORK=1
-ZVER=2
+STATICLIB=1
 
 #TESTSERVERS="192.168.56.1:8083,remotetest.unidata.ucar.edu"
 #TESTSERVERS="remotetest.unidata.ucar.edu"
@@ -42,12 +42,12 @@ MPIO=1
 fi
 
 CFLAGS=""
-CFLAGS="$CFLAGS -Wall"
-#CFLAGS="$CFLAGS -Wconversion -Wsign-compare"
-#CFLAGS="$CFLAGS -Wno-unused-parameter"
-#CFLAGS="$CFLAGS -Wno-char-subscripts"
-#CFLAGS="$CFLAGS -Wno-pointer-sign"
-#CFLAGS="$CFLAGS -Wno-format"
+#CFLAGS="-Wall -Wno-unused-but-set-variable -Wno-unused-variable -Wno-unused-parameter -Wconversion ${CFLAGS}"
+#CFLAGS="-Wall -Wno-unused-but-set-variable -Wno-unused-variable -Wno-unused-parameter -Wno-char-subscripts -Wno-pointer-sign -Wno-format ${CFLAGS}"
+CFLAGS="-Wall -Wno-unused-parameter -Wno-char-subscripts -Wno-pointer-sign ${CFLAGS}"
+#CFLAGS="-Wall ${CFLAGS}"
+CFLAGS="$CFLAGS -Wsign-conversion -Wsign-compare"
+#CFLAGS="-Wall -Wunused-parameter -Wno-char-subscripts -Wno-pointer-sign ${CFLAGS}"
 
 if test "x$MEM" = x1 ; then
 #    CFLAGS="$CFLAGS -O0 -ggdb -fsanitize=address -fno-omit-frame-pointer -static-libasan -static-libgcc -lrt"
@@ -58,10 +58,10 @@ if test "x$ANSI" = x1 ; then
 CFLAGS="-ansi ${CFLAGS}"
 fi
 
-#stddir="/usr/local"
-stddir="/tmp/netcdf-c"
+stddir="/usr/local"
+PREFIX="/tmp/netcdf-c"
+DESTDIR=/tmp/netcdf-c
 PLUGINDIR="/tmp/plugins"
-PREFIX="${stddir}"
 
 if test "x${cmds}" = x ; then
   cmds=""
@@ -79,7 +79,7 @@ HDF5=1
 fi
 
 # !HDF5=>!SZIP
-if test "x$HDF5" != x1 ; then
+if test "x$HDF5" = x ; then
 SZIP=0
 fi
 
@@ -88,18 +88,25 @@ CC=gcc
 MALLOC_CHECK=""
 
 CPPFLAGS=""
-#LDFLAGS="-L/usr/lib -L${stddir}/lib"
-LDFLAGS="-L/usr/lib"
+LDFLAGS="-L/usr/lib -L${stddir}/lib"
+#LDFLAGS="-L/usr/lib"
 #LD_LIBRARY_PATH="/usr/lib:${stddir}/lib:$LD_LIBRARY_PATH"
 
-CFLAGS="-g -O0 $CFLAGS -Wl,--no-undefined -Wsign-conversion -Wsign-compare"
-
+CFLAGS="-g -O0 $CFLAGS -Wl,--no-undefined"
 CXXFLAGS="$CFLAGS"
 
 MAKE=make
 IGNORE="test 0 = 1"
 
 FLAGS="--prefix ${PREFIX}"
+
+if test "x$STATICLIB" = x1 ; then
+FLAGS="$FLAGS --disable-shared"
+FLAGS="$FLAGS --enable-static"
+else
+FLAGS="$FLAGS --disable-static"
+FLAGS="$FLAGS --enable-shared"
+fi
 
 if test "x$NOTHREADS" = x1 ; then
 FLAGS="$FLAGS --disable-threadsafe"
@@ -108,8 +115,8 @@ FLAGS="$FLAGS --enable-threadsafe"
 fi
 
 if test "x$HDF5" != x ; then
-#CPPFLAGS="$CPPFLAGS -I${stddir}/include $CPPFLAGS"
-LDFLAGS="$LDFLAGS -lhdf5_hl -lhdf5 -lz $LDFLAGS"
+CPPFLAGS="$CPPFLAGS -I${stddir}/include $CPPFLAGS"
+LDFLAGS="-lhdf5_hl -lhdf5 -lz $LDFLAGS"
 FLAGS="$FLAGS --enable-hdf5"
 else
 #FLAGS="$FLAGS --disable-netcdf-4"
@@ -123,7 +130,8 @@ fi
 if test "x$DAP" = "x" ; then
 FLAGS="$FLAGS --disable-dap"
 else
-FLAGS="$FLAGS --enable-dap-remote-tests"
+FLAGS="$FLAGS --enable-dap"
+#FLAGS="$FLAGS --enable-dap-remote-tests"
 fi
 
 if test "x$MPIO" = x1 ; then
@@ -143,12 +151,6 @@ fi
 
 if test "x$NCZARR" != "x" ; then
 FLAGS="$FLAGS --enable-nczarr"
-fi
-
-if test "x$ZVER" = x3 ; then
-    FLAGS="$FLAGS --enable-default-zarr-format_v3"
-else
-    FLAGS="$FLAGS --disable-default-zarr-format_v3"
 fi
 
 if test "x$S3" != x ; then
@@ -196,7 +198,8 @@ if test "x${UNDEF}" = x1 ; then
 fi
 
 if test "x${NOFILTER}" = x1 ; then
-FLAGS="$FLAGS --disable-filter-testing --disable-nczarr-filters"
+#FLAGS="$FLAGS --disable-filter-testing"
+FLAGS="$FLAGS --disable-nczarr-filters"
 fi
 
 if test "x${BYTES}" = x1 ; then
@@ -209,17 +212,13 @@ if test "x${NONETWORK}" = x1 ; then
 FLAGS="$FLAGS --disable-network-access"
 fi
 
-#FLAGS="$FLAGS --disable-examples"
+#FLAGS="$FLAGS --disable-plugins"
+#FLAGS="$FLAGS --enable-erange-fill"
+#FLAGS="$FLAGS --enable-doxygen --enable-internal-docs"
 FLAGS="$FLAGS --enable-external-server-tests"
-
+#FLAGS="$FLAGS --with-ncproperties-extra=key1=value1|key2=value2"
 FLAGS="$FLAGS --with-plugin-dir=${PLUGINDIR}"
 #FLAGS="$FLAGS --without-plugin-dir"
-#FLAGS="$FLAGS --disable-plugins"
-
-#FLAGS="$FLAGS --enable-erange-fill"
-FLAGS="$FLAGS --enable-doxygen --enable-internal-docs"
-#FLAGS="$FLAGS --with-ncproperties-extra=key1=value1|key2=value2"
-#FLAGS="$FLAGS --enable-large-file-tests"
 
 export PATH
 export CC
@@ -243,7 +242,7 @@ if test "x$NB" != x1 ; then
   if autoreconf -i --force ; then ok=1; else exit ; fi
 fi
 
-sh $X ./configure --disable-dependency-tracking ${FLAGS}
+sh $X ./configure ${FLAGS}
 for c in $cmds; do
   ${MAKE} ${FORCE} $c
 done
