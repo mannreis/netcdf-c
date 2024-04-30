@@ -605,9 +605,17 @@ AC_ARG_ENABLE([dap-remote-tests],
                                  [disable dap remote tests])])
 # Default on
 test "x$enable_dap_remote_tests" = xyes || enable_dap_remote_tests=no
-if test "x$enable_dap" = "xno" || test "xREMOTETESTDOWN" = xyes ; then
+
+if test "x$enable_dap" = "xno"; then
   enable_dap_remote_tests=no
 fi
+
+# Provide a global control for remotetest.
+if test "xREMOTETESTDOWN" = xyes ; then
+  AC_MSG_WARN("ENV(REMOTETESTDOWN) => netcdf_enable_dap_remote_tests == no")
+  enable_dap_remote_tests=no
+fi
+
 AC_MSG_RESULT($enable_dap_remote_tests)
 
 AC_MSG_CHECKING([whether use of external (non-unidata) servers should be enabled])
