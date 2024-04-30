@@ -1,4 +1,5 @@
 #!/bin/sh
+export SETX=1
 # For a netCDF-3 build, test nccopy on netCDF files in this
 # directory. This test depends on a bunch of other ncdump tests
 # running first, to produce the data files that are used to test
