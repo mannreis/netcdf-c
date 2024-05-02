@@ -28,9 +28,6 @@
 #ifdef HAVE_UNISTD_H
 #include <unistd.h>
 #endif
-#ifdef HAVE_UNISTD_H
-#include <unistd.h>
-#endif
 #ifdef __APPLE__ /* GCC strikes again */
 #ifndef uint
 typedef unsigned int uint;

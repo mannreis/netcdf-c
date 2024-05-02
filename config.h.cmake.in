@@ -582,6 +582,9 @@ with zip */
 /* The size of `size_t', as computed by sizeof. */
 #cmakedefine SIZEOF_SIZE_T ${SIZEOF_SIZE_T}
 
+/* The size of `ssize_t', as computed by sizeof. */
+#cmakedefine SIZEOF_SSIZE_T ${SIZEOF_SSIZE_T}
+
 /* The size of `uint', as computed by sizeof. */
 #cmakedefine SIZEOF_UINT ${SIZEOF_UINT}
 
