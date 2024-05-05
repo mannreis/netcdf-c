@@ -41,7 +41,9 @@ jobs:
 ###
 
       - name: (Autotools) Run autoconf
-        run: autoreconf -if
+        run: |
+          which m4
+          autoreconf -if
 
       - name: (Autotools) Configure Build
         run: ./configure --enable-hdf5 --enable-dap --disable-dap-remote-tests --disable-static --disable-byterange --disable-dap-remote-tests --disable-logging --enable-plugins --disable-nczarr-filters --disable-s3
