@@ -33,7 +33,7 @@ jobs:
           update: true
 # install: git mingw-w64-x86_64-toolchain automake libtool autoconf make cmake mingw-w64-x86_64-hdf5 unzip mingw-w64-x86_64-libxml2 mingw-w64-x86_64-zlib
           pacboy: cc:p autotools:p hdf5:p curl:p libxml2:p zlib:p blosc:p bzip2:p
-          install: git unzip
+          install: git unzip m4
 
 ###
 # Configure and build
@@ -104,8 +104,8 @@ jobs:
           -S . \
           -DCMAKE_INSTALL_PREFIX=${MINGW_PREFIX} \
           -DNETCDF_ENABLE_DAP=ON \
-          -DBUILD_UTILITIES=ON \
-          -DBUILD_SHARED_LIBS=ON \
+          -DNETCDF_BUILD_UTILITIES=ON \
+          -DNETCDF_BUILD_SHARED_LIBS=ON \
           -DNETCDF_ENABLE_TESTS=ON \
           -DNETCDF_ENABLE_DAP=TRUE \
           -DNETCDF_ENABLE_HDF5=TRUE \
