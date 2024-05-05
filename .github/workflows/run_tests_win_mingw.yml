@@ -7,8 +7,8 @@
 name: Run MSYS2, MinGW64-based Tests (Not Visual Studio)
 
 env:
-  CPPFLAGS: "-D_BSD_SOURCE"
   REMOTETESTDOWN: ${{ vars.REMOTETESTDOWN }}
+#  CPPFLAGS: "-D_BSD_SOURCE"
 
 on: [push,pull_request,workflow_dispatch]
 
@@ -32,9 +32,9 @@ jobs:
         with:
           msystem: MINGW64
           update: true
-          install: git mingw-w64-x86_64-toolchain automake libtool autoconf make cmake mingw-w64-x86_64-hdf5 unzip mingw-w64-x86_64-libxml2 mingw-w64-x86_64-zlib mingw-w64-x86_64-m4
-#          pacboy: cc:p autotools:p hdf5:p curl:p libxml2:p zlib:p blosc:p bzip2:p
-#          install: git unzip
+#          install: git mingw-w64-x86_64-toolchain automake libtool autoconf make cmake mingw-w64-x86_64-hdf5 unzip mingw-w64-x86_64-libxml2 mingw-w64-x86_64-zlib mingw-w64-x86_64-m4
+          pacboy: cc:p autotools:p hdf5:p curl:p libxml2:p zlib:p blosc:p bzip2:p
+          install: git unzip
 
 ###
 # Configure and build
