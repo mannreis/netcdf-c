@@ -92,7 +92,7 @@ jobs:
           msystem: MINGW64
           update: true
           pacboy: cc:p cmake:p hdf5:p curl:p libxml2:p zlib:p blosc:p bzip2:p
-          install: git unzip
+          install: make m4 diffutils git unzip
 
 ###
 # Configure and build
@@ -100,7 +100,6 @@ jobs:
 
       - name: (CMake) Configure Build
         run: |
-          which m4
           cmake \
           -B build \
           -S . \
