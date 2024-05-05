@@ -8,9 +8,8 @@ name: Run MSYS2, MinGW64-based Tests (Not Visual Studio)
 
 env:
   REMOTETESTDOWN: ${{ vars.REMOTETESTDOWN }}
-  CPPFLAGS: "-D_BSD_SOURCE"
 
-on: [pull_request,workflow_dispatch]
+on: [push,pull_request,workflow_dispatch]
 
 concurrency:  
   group: ${{ github.workflow}}-${{ github.head_ref }}  
@@ -32,7 +31,9 @@ jobs:
         with:
           msystem: MINGW64
           update: true
-          install: git mingw-w64-x86_64-toolchain automake libtool autoconf make cmake mingw-w64-x86_64-hdf5 unzip mingw-w64-x86_64-libxml2 mingw-w64-x86_64-zlib
+# install: git mingw-w64-x86_64-toolchain automake libtool autoconf make cmake mingw-w64-x86_64-hdf5 unzip mingw-w64-x86_64-libxml2 mingw-w64-x86_64-zlib
+          pacboy: cc:p autotools:p hdf5:p curl:p libxml2:p zlib:p blosc:p bzip2:p
+          install: git unzip
 
 ###
 # Configure and build
@@ -74,3 +75,62 @@ jobs:
           path: |
             */*.log
             */*.trs
+
+  build-and-test-cmake:
+
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: msys2 {0}
+
+    steps:
+
+      - uses: actions/checkout@v4
+      - uses: msys2/setup-msys2@v2
+        with:
+          msystem: MINGW64
+          update: true
+          pacboy: cc:p cmake:p hdf5:p curl:p libxml2:p zlib:p blosc:p bzip2:p
+          install: git unzip
+
+###
+# Configure and build
+###
+
+      - name: (CMake) Configure Build
+        run: |
+          cmake \
+          -B build \
+          -S . \
+          -DCMAKE_INSTALL_PREFIX=${MINGW_PREFIX} \
+          -DENABLE_NETCDF_4=ON \
+          -DENABLE_DAP=ON \
+          -DBUILD_UTILITIES=ON \
+          -DBUILD_SHARED_LIBS=ON \
+          -DENABLE_TESTS=ON \
+          -DENABLE_DAP=TRUE \
+          -DENABLE_HDF5=TRUE \
+          -DENABLE_NCZARR=TRUE \
+          -DENABLE_DAP_LONG_TESTS=TRUE \
+          -DENABLE_PLUGINS=ON
+        if: ${{ success() }}
+
+      - name: (CMake) Look at CMakeCache.txt if error
+        run: cat build/CMakeCache.txt
+        if: ${{ failure() }}
+
+      - name: (CMake) Print Summary
+        run: cat build/libnetcdf.settings
+
+      - name: (CMake) Build All
+        run: cmake --build build
+        if: ${{ success() }}
+
+      - name: (CMake) Run Tests
+        run: ctest --test-dir build
+        if: ${{ success() }}
+
+      - name: (CMake) Verbose output of CTest failures
+        run: >-
+          ctest --test-dir build --output-on-failure -j$(nproc) --rerun-failed -VV
+        if: ${{ failure() }}
