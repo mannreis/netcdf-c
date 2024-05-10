@@ -10,7 +10,7 @@ env:
   REMOTETESTDOWN: ${{ vars.REMOTETESTDOWN }}
 #  CPPFLAGS: "-D_BSD_SOURCE"
 
-on: [push,pull_request,workflow_dispatch]
+on: [pull_request,workflow_dispatch]
 
 concurrency:  
   group: ${{ github.workflow}}-${{ github.head_ref }}  
