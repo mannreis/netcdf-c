@@ -654,6 +654,7 @@ include(CMakeDependentOption)
 cmake_dependent_option(NETCDF_ENABLE_PLUGINS "Enable dynamically loaded plugins (default on)."
   ON "BUILD_SHARED_LIBS" OFF)
 MESSAGE(STATUS "NETCDF_ENABLE_PLUGINS: ${NETCDF_ENABLE_PLUGINS}")
+
 if(NOT WIN32)
   if(HAVE_DLFCN_H)
     include_directories("dlfcn.h")
@@ -1541,6 +1542,9 @@ configure_file(
 ###
 # Create pkgconfig files.
 ###
+if(NOT DEFINED CMAKE_INSTALL_MANDIR)
+  set(CMAKE_INSTALL_MANDIR "${CMAKE_INSTALL_PREFIX}/share/man/")
+endif()
 
 if(NOT DEFINED CMAKE_INSTALL_LIBDIR)
   set(CMAKE_INSTALL_LIBDIR lib)
