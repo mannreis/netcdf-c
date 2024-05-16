@@ -1180,7 +1180,7 @@ read_grp_contents(NC_FILE_INFO_T* file, NC_GRP_INFO_T* grp)
     
     purezarr = (zfile->flags & FLAG_PUREZARR);
 
-    /* Download the grp meta-data; might not exist for virtual groups */
+    /* Download the grp meta-data; must exist */
 
     /* build Z3GROUP path */
     /* Construct grp path */
@@ -1192,7 +1192,10 @@ read_grp_contents(NC_FILE_INFO_T* file, NC_GRP_INFO_T* grp)
     stat=NCZ_downloadjson(map,key,&jgroup);
     nullfree(key); key = NULL;
     if(stat) goto done;
-   
+    
+    /* Verify that group zarr.json exists */
+    if(jgroup == NULL) {stat = NC_ENOTZARR; goto done;}
+    
     /* Get attributes */
     NCJcheck(NCJdictget(jgroup,"attributes",&jatts));
 
@@ -2244,9 +2247,8 @@ descendant information.
 The procedure is as follows:
 1. Let X be the set of names and objects just below the parent grp kkey.
 2. assert zarr.json is in X representing the parent grp.
-3. For each name N in X see if N/zarr.json exists.
-   If so, then read zarr.json and see if it is a group vs array zarr.json
-4. For all M in X s.t. M/zarr.json does not exist, assume M is a virtual group.
+3. For each name N in X read zarr.json and see if it is a group vs array zarr.json
+4. If zarr.json does not exist, then malformed zarr file
 
 @param
 @return
@@ -2279,7 +2281,7 @@ getnextlevel(NCZ_FILE_INFO_T* zfile, NC_GRP_INFO_T* parent, NClist* varnames, NC
         if((stat = nczm_concat(subkey,Z3OBJECT,&zobject))) goto done;
         switch(stat = nczmap_len(zfile->map,zobject,&zjlen)) {
 	case NC_NOERR: break;
-	case NC_ENOOBJECT: nclistpush(subgrpnames,name); continue; /* assume a virtual group */
+	case NC_ENOOBJECT: /*fall thru*/ /* No zarr.json */
 	default: goto done;
 	}
 	nullfree(content); content = NULL;
