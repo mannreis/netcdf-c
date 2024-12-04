@@ -271,6 +271,10 @@ applycontrols(NCZ_FILE_INFO_T* zinfo)
     }
     /* Process the modelist first */
     zinfo->controls.mapimpl = NCZM_DEFAULT;
+    if( strncmp("http://",zinfo->common.file->hdr.name,7) == 0 ||
+        strncmp("https://",zinfo->common.file->hdr.name,8) == 0 ){
+        zinfo->controls.mapimpl = NCZM_HTTP;
+    }
     zinfo->controls.flags |= FLAG_XARRAYDIMS; /* Always support XArray convention where possible */
     for(i=0;i<nclistlength(modelist);i++) {
         const char* p = nclistget(modelist,i);
