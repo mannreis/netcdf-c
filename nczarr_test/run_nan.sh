@@ -47,8 +47,6 @@ for t in tst_nans ; do
 export NCTRACING=10
    ${NCGEN} -4 -lb -o ${fileurl} ${cdl}/${ref}.cdl
    ${NCDUMP} ${headflag} ${specflag} -n ${ref} ${fileurl} > tmp_${t}.dmp
-unset NCTRACING
-${ZMD} -t float ${fileurl}
    # compare against expected
    diff -b -w ${expected}/${ref}.dmp ./tmp_${t}.dmp
    echo "*** SUCCEED: ${t}"
