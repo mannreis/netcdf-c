@@ -51,11 +51,11 @@ struct ZarrObjects {
     int zarr_version;
     int haszmetadata;
 } zarrobjects[] = {
-{"zarr.json",	ZARRFORMAT3,	0},
-{".zgroup",	ZARRFORMAT2,	0},
-{".zarray",	ZARRFORMAT2,	0},
-{".zattrs",	ZARRFORMAT2,	0},
-{".zmetadata",	ZARRFORMAT2,	1},
+{"/zarr.json",	ZARRFORMAT3,	0},
+{"/.zgroup",	ZARRFORMAT2,	0},
+{"/.zarray",	ZARRFORMAT2,	0},
+{"/.zattrs",	ZARRFORMAT2,	0},
+{"/.zmetadata",	ZARRFORMAT2,	1},
 {NULL,		0,		0},	
 };
 
@@ -187,7 +187,6 @@ done:
     return THROW(stat);
 }
 
-int
 NCZ_infer_open_zarr_format(NC_FILE_INFO_T* file)
 {
     int stat = NC_NOERR;
@@ -198,8 +197,19 @@ NCZ_infer_open_zarr_format(NC_FILE_INFO_T* file)
     NC_UNUSED(file);
 
     /* Probe the map for tell-tale objects and dict keys */
-
     if(zarrformat == 0) {
+	size_t seglen = 0;
+	struct ZarrObjects *zo = NULL;
+	stat = NC_ENOTZARR; // Until proven otherwise we aren't sure it's a zarr dataset
+	/* We search on the root path for V2 or V3 tags */
+	for (zo = zarrobjects; zo->name; zo++) {
+		if ((stat = nczmap_exists(zfile->map,zo->name)) == NC_NOERR) {
+			zarrformat = zo->zarr_version;
+			break; /* No need to look for more keys */
+		}
+	}
+    }
+    if(zarrformat == 0 || stat != NC_NOERR) {
         /* We need to search subtree for a V2 or V3 tag */
         switch(stat = nczmap_walk(zfile->map,"/",tagsearch, &param)) {
         case NC_ENOOBJECT:
@@ -308,7 +318,7 @@ tagsearch(NCZMAP* map, const char* prefix, const char* key, void* param)
     if(seglen == 0) return NC_NOERR;
     
     for(zo=zarrobjects;zo->name;zo++) {
-	if(strcasecmp(segment,zo->name)==0) {
+	if(strcasecmp(segment,zo->name+1)==0) {
             formats->zarrformat = zo->zarr_version;
 	    return NC_NOERR; /* tell walker to stop */
 	}
