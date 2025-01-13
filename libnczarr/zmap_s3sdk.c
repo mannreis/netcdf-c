@@ -329,12 +329,12 @@ zs3keyexists(NCZMAP* map, const char* key)
     ZTRACE(6,"map=%s key=%s",map->url,key);
 
     if((stat = maketruekey(z3map->s3.rootkey,key,&truekey))) goto done;
-
-    switch (stat = NC_s3sdkinfo(z3map->s3client,z3map->s3.bucket,truekey,lenp,&z3map->errmsg)) {
+    size64_t _lenp = 0;
+    switch (stat = NC_s3sdkinfo(z3map->s3client,z3map->s3.bucket,truekey,&_lenp,&z3map->errmsg)) {
     case NC_NOERR: break;
     case NC_EEMPTY: stat = NC_ENOOBJECT; /* fall thru */
     case NC_ENOOBJECT:
-	if(lenp) *lenp = 0;
+	if(_lenp) _lenp = 0;
 	goto done;
     default:
         goto done;
