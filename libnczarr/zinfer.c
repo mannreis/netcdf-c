@@ -388,6 +388,8 @@ NCZ_infer_storage_type(NC_FILE_INFO_T* file, NCURI* url, NCZM_IMPL* implp)
 		}		
 	    }
 #endif
+	} else if(impl == NCZM_UNDEF && (strcasecmp(url->protocol,"http") == 0 || strcasecmp(url->protocol,"https") == 0)) {
+		impl = NCZM_HTTP;
 	}
     }
 
@@ -434,6 +436,10 @@ NCZ_get_map(NC_FILE_INFO_T* file, NCURI* url, mode_t mode, size64_t constraints,
 	    {if((stat = nczmap_create(impl,path,mode,constraints,params,&map))) goto done;}
 	else
     	    {if((stat = nczmap_open(impl,path,mode,constraints,params,&map))) goto done;}
+	break;
+    case NCZM_HTTP:
+	if (create) { stat = NC_ECANTWRITE; goto done;}
+	if((stat = nczmap_open(impl,path,mode,constraints,NC_TRUE,&map))) goto done;
 	break;
     case NCZM_UNDEF:
 	stat = NC_EURL;

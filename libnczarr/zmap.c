@@ -102,7 +102,8 @@ nczmap_open(NCZM_IMPL impl, const char *path, mode_t mode, size64_t flags, void*
 #ifdef NETCDF_ENABLE_S3
     case NCZM_S3:
     case NCZM_GS3:
-        stat = zmap_s3sdk.open(path, mode, flags, parameters, &map);
+    case NCZM_HTTP:
+        stat = zmap_s3sdk.open(path, mode, flags, NCZM_HTTP==impl, &map);
 	if(stat) goto done;
 	break;
 #endif

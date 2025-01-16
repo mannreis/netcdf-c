@@ -98,6 +98,7 @@
 
 #include "ncs3sdk.h"
 #include "nch5s3comms.h" /* S3 Communications */
+#include "ncrc.h"
 
 /****************/
 /* Local Macros */
@@ -714,6 +715,42 @@ hrb_node_free(hrb_node_t *node)
     }
 }
 
+CURLcode ncrc_curl_setopts(CURL *curlh);
+
+CURLcode ncrc_curl_setopts(CURL *curlh) {
+    	int ret_value = SUCCEED;
+	CURLcode ret_val = CURLE_OK;
+	char *value = NULL;
+	value = NC_rclookup("HTTP.SSL.CAINFO", NULL, NULL);
+	if (value != NULL){
+		if((CURLE_OK != curl_easy_setopt(curlh, CURLOPT_CAINFO, value))){
+			HGOTO_ERROR(H5E_ARGS, NC_EINVAL, NULL, "error while setting CURL option (CURLOPT_CAINFO).");
+		}
+	}
+	value = NC_rclookup("HTTP.KEEPALIVE",NULL,NULL);
+	if(value != NULL && strlen(value) != 0) {
+		if((CURLE_OK != curl_easy_setopt(curlh, CURLOPT_TCP_KEEPALIVE, 1L)))
+			HGOTO_ERROR(H5E_ARGS, NC_EINVAL, NULL, "error while setting CURL option (CURLOPT_TCP_KEEPALIVE).");
+		/* The keepalive value is of the form 0 or n/m,
+		where n is the idle time and m is the interval time;
+		setting either to zero will prevent that field being set.*/
+		if(strcasecmp(value,"on")!=0) {
+		unsigned long idle=0;
+		unsigned long interval=0;
+		if(sscanf(value,"%lu/%lu",&idle,&interval) != 2) {
+			fprintf(stderr,"Illegal KEEPALIVE VALUE: %s\n",value);
+		}
+		if((CURLE_OK != curl_easy_setopt(curlh, CURLOPT_TCP_KEEPIDLE, (long)idle)))
+			HGOTO_ERROR(H5E_ARGS, NC_EINVAL, NULL, "error while setting CURL option (CURLOPT_TCP_KEEPIDLE).");
+		if((CURLE_OK != curl_easy_setopt(curlh, CURLOPT_TCP_KEEPINTVL, (long)interval)))
+			HGOTO_ERROR(H5E_ARGS, NC_EINVAL, NULL, "error while setting CURL option (CURLOPT_TCP_KEEPINTVL).");
+		
+		}
+	}
+done:
+	return ret_value;
+}
+
 /****************************************************************************
  * S3R FUNCTIONS
  ****************************************************************************/
@@ -1166,6 +1203,9 @@ NCH5_s3comms_s3r_open(const char* root, NCS3SVC svc, const char *region, const c
 
     if (CURLE_OK != curl_easy_setopt(curlh, CURLOPT_FAILONERROR, 1L))
         HGOTO_ERROR(H5E_ARGS, NC_EINVAL, NULL, "error while setting CURL option (CURLOPT_FAILONERROR).");
+
+    if (CURLE_OK !=  ncrc_curl_setopts(curlh))
+        HGOTO_ERROR(H5E_ARGS, NC_EINVAL, NULL, "error while setting CURL option (CURLOPT_VERBOSE).");
 
     handle->curlhandle = curlh;
 
@@ -2616,6 +2656,11 @@ perform_request(s3r_t* handle, long* httpcodep)
     (void)trace(curlh,1);
 #endif
 
+    const char *ca_cert_file = getenv("SSL_CERT_FILE");
+    if (ca_cert_file != NULL) {
+        // Set the CA certificate file path retrieved from the environment
+        curl_easy_setopt(curlh, CURLOPT_CAINFO, ca_cert_file);
+    }
     if (CURLE_OK != curl_easy_setopt(curlh, CURLOPT_ERRORBUFFER, curlerrbuf))
         HGOTO_ERROR(H5E_ARGS, NC_EINVAL, FAIL, "problem setting error buffer");
 

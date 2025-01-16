@@ -266,10 +266,13 @@ applycontrols(NCZ_FILE_INFO_T* zinfo)
     if((value = controllookup(zinfo->urlcontrols,"mode")) != NULL) {
 	if((stat = NCZ_comma_parse(value,modelist))) goto done;
     }
-
-    /* Process the modelist */
-    zinfo->mapimpl = NCZM_DEFAULT;
+    /* Process the modelist first */
     zinfo->flags |= FLAG_XARRAYDIMS; /* Always support XArray convention where possible */
+    zinfo->mapimpl = NCZM_DEFAULT;
+    if( strncmp("http://",zinfo->common.file->hdr.name,7) == 0 ||
+        strncmp("https://",zinfo->common.file->hdr.name,8) == 0 ){
+        zinfo->mapimpl = NCZM_HTTP;
+    }
     for(i=0;i<nclistlength(modelist);i++) {
         const char* p = nclistget(modelist,i);
 	if(strcasecmp(p,PUREZARRCONTROL)==0)

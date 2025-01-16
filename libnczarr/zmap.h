@@ -161,6 +161,7 @@ NCZM_FILE=1,	/* File system directory-based implementation */
 NCZM_ZIP=2,	/* Zip-file based implementation */
 NCZM_S3=3,	/* Amazon S3 implementation */
 NCZM_GS3=4,	/* Google S3 implementation */
+NCZM_HTTP=5,	/* Low effort HTTP implementation based on S3's */
 } NCZM_IMPL;
 
 /* Define the default map implementation */

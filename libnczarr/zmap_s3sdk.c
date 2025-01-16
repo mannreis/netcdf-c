@@ -185,7 +185,7 @@ no obvious way to test for existence.
 So, we assume that the dataset must have
 some content. We look for that */
 static int
-zs3open(const char *path, mode_t mode, size64_t flags, void* parameters, NCZMAP** mapp)
+zs3open(const char *path, mode_t mode, size64_t flags, void* skips3list, NCZMAP** mapp)
 {
     int stat = NC_NOERR;
     ZS3MAP* z3map = NULL;
@@ -194,7 +194,6 @@ zs3open(const char *path, mode_t mode, size64_t flags, void* parameters, NCZMAP*
     size_t nkeys = 0;
 
     NC_UNUSED(flags);
-    NC_UNUSED(parameters);
 
     ZTRACE(6,"path=%s mode=%d flags=%llu",path,mode,flags);
 
@@ -224,14 +223,17 @@ zs3open(const char *path, mode_t mode, size64_t flags, void* parameters, NCZMAP*
     z3map->s3client = NC_s3sdkcreateclient(&z3map->s3);
 
     /* Search the root for content */
-    content = nclistnew();
-    if((stat = NC_s3sdklist(z3map->s3client,z3map->s3.bucket,z3map->s3.rootkey,&nkeys,NULL,&z3map->errmsg)))
-	goto done;
-    if(nkeys == 0) {
-	/* dataset does not actually exist; we choose to return ENOOBJECT instead of EEMPTY */
-	stat = NC_ENOOBJECT;
-	goto done;
+    if (!skips3list) {
+        content = nclistnew();
+        if((stat = NC_s3sdklist(z3map->s3client,z3map->s3.bucket,z3map->s3.rootkey,&nkeys,NULL,&z3map->errmsg)))
+	        goto done;
+        if(nkeys == 0) {
+            /* dataset does not actually exist; we choose to return ENOOBJECT instead of EEMPTY */
+            stat = NC_ENOOBJECT;
+            goto done;
+        }
     }
+    
     if(mapp) *mapp = (NCZMAP*)z3map;    
 
 done:
@@ -329,12 +331,12 @@ zs3keyexists(NCZMAP* map, const char* key)
     ZTRACE(6,"map=%s key=%s",map->url,key);
 
     if((stat = maketruekey(z3map->s3.rootkey,key,&truekey))) goto done;
-
-    switch (stat = NC_s3sdkinfo(z3map->s3client,z3map->s3.bucket,truekey,lenp,&z3map->errmsg)) {
+    size64_t _lenp = 0;
+    switch (stat = NC_s3sdkinfo(z3map->s3client,z3map->s3.bucket,truekey,&_lenp,&z3map->errmsg)) {
     case NC_NOERR: break;
     case NC_EEMPTY: stat = NC_ENOOBJECT; /* fall thru */
     case NC_ENOOBJECT:
-	if(lenp) *lenp = 0;
+	if(_lenp) _lenp = 0;
 	goto done;
     default:
         goto done;
@@ -679,3 +681,5 @@ nczs3sdkapi = {
     zs3list,
     zs3listall
 };
+
+
