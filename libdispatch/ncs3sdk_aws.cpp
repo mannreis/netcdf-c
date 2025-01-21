@@ -490,6 +490,73 @@ NC_s3sdkread(void* s3client0, const char* bucket, const char* pathkey, size64_t 
     }
 #endif
     return NCUNTRACE(stat);
+}/*
+@return NC_NOERR if success
+@return NC_EXXX if fail
+*/
+EXTERNL int
+NC_s3sdkreadall(void* s3client0, const char* bucket, const char* pathkey, void** content, unsigned long long *len,char** errmsgp)
+{
+    int stat = NC_NOERR;
+    const char* key = NULL;
+
+    NCTRACE(11,"bucket=%s pathkey=%s size unknown beforehand",bucket,pathkey);
+
+    AWSS3CLIENT s3client = (AWSS3CLIENT)s3client0;
+
+    if(errmsgp) *errmsgp = NULL;
+    if(*pathkey != '/') return NC_EINTERNAL;
+    if((stat = makes3key(pathkey,&key))) return NCUNTRACE(stat);
+    
+#ifdef TRANSFER
+    auto executor = Aws::MakeShared<Aws::Utils::Threading::PooledThreadExecutor>("executor", 25);
+    Aws::Transfer::TransferManagerConfiguration transfer_config(executor.get());
+    transfer_config.s3Client = *s3client;
+    // The local variable downloadBuffer' is captured by reference in a lambda.
+    // It must persist until all downloading by the 'transfer_manager' is complete.
+    Aws::Utils::Stream::PreallocatedStreamBuf downloadBuffer((unsigned char*)content, count - start);
+    auto transfer_manager = Aws::Transfer::TransferManager::Create(transfer_config); 
+    auto creationFunction = [&downloadBuffer]() { //Define a lambda expression for the callback method parameter to stream back the data.
+		                    return Aws::New<DownLoadStream>("downloadHandle", &downloadBuffer);};
+    auto downloadHandle = transfer_manager->DownloadFile(bucket, key, start, count, creationFunction);
+    downloadHandle->WaitUntilFinished();
+    bool success = downloadHandle->GetStatus() == Aws::Transfer::TransferStatus::COMPLETED; 
+    if (!success) {
+        auto err = downloadHandle->GetLastError();           
+	if(errmsgp) *errmsgp = makeerrmsg(err,key);
+	stat = NC_ES3;
+    } else {
+	size64_t transferred = downloadHandle->GetBytesTransferred();
+	size64_t totalsize = downloadHandle->GetBytesTotalSize();
+        assert(count == totalsize && transferred == totalsize);
+    }
+#else
+    char range[1024];
+    size64_t rangeend;
+    Aws::S3::Model::GetObjectRequest object_request;
+    object_request.SetBucket(bucket);
+    object_request.SetKey(key);
+    object_request.SetRange(range);
+    auto get_object_result = AWSS3GET(s3client)->GetObject(object_request);
+    if(!get_object_result.IsSuccess()) {
+	if(errmsgp) *errmsgp = makeerrmsg(get_object_result.GetError(),key);
+	stat = NC_ES3;
+    } else {
+	/* Get the whole result */
+	Aws::IOStream &result = get_object_result.GetResultWithOwnership().GetBody();
+	std::string str((std::istreambuf_iterator<char>(result)),std::istreambuf_iterator<char>());
+	/* Verify actual result size */
+	*len = (size64_t)str.size();
+	const char* s = str.c_str();
+	if(content != NULL){
+	    *content = realloc(content, *len);
+	    memcpy(*content,s,*len);
+	} else {
+	    *content = strndup(s, *len);
+	}
+    }
+#endif
+    return NCUNTRACE(stat);
 }
 
 /*

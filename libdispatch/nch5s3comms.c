@@ -1062,7 +1062,7 @@ done:
     /* clean any malloc'd resources */
     curl_reset(handle);
     return (ret_value);;
-} /* NCH5_s3comms_s3r_read */
+} /* NCH5_s3comms_s3r_execute */
 
 /*----------------------------------------------------------------------------
  * Function: NCH5_s3comms_s3r_open()
@@ -1204,6 +1204,9 @@ NCH5_s3comms_s3r_open(const char* root, NCS3SVC svc, const char *region, const c
     if (CURLE_OK != curl_easy_setopt(curlh, CURLOPT_FAILONERROR, 1L))
         HGOTO_ERROR(H5E_ARGS, NC_EINVAL, NULL, "error while setting CURL option (CURLOPT_FAILONERROR).");
 
+    if (CURLE_OK != curl_easy_setopt(curlh, CURLOPT_VERBOSE, 1L))
+        HGOTO_ERROR(H5E_ARGS, NC_EINVAL, NULL, "error while setting CURL option (CURLOPT_VERBOSE).");
+    
     if (CURLE_OK !=  ncrc_curl_setopts(curlh))
         HGOTO_ERROR(H5E_ARGS, NC_EINVAL, NULL, "error while setting CURL option (CURLOPT_VERBOSE).");
 
@@ -1293,6 +1296,131 @@ done:
     curl_reset(handle);
     return UNTRACE(ret_value);;
 } /* NCH5_s3comms_s3r_read */
+int
+NCH5_s3comms_s3r_readall(s3r_t *handle, const char* url, s3r_buf_t* dest, long* httpcodep)
+{
+    char              *rangebytesstr = NULL;
+    int                ret_value = SUCCEED;
+    long               httpcode;
+    VString           *wrap = vsnew();
+
+    TRACE(0,"handle=%p url=%s offset=%ld len=%ld, dest=%p",handle,url,(long)offset,(long)len,dest);
+
+#if S3COMMS_DEBUG_TRACE
+    fprintf(stdout, "called NCH5_s3comms_s3r_read.\n");
+#endif
+    /*********************
+     * Execute           *
+     *********************/
+
+    if((ret_value = NCH5_s3comms_s3r_execute(handle, url, HTTPGET, rangebytesstr, NULL, NULL, &httpcode, wrap)))
+        HGOTO_ERROR(H5E_ARGS, ret_value, FAIL, "execute failed.");
+
+    dest->count = vslength(wrap);
+    dest->content = vsextract(wrap);
+    vsfree(wrap); wrap=NULL;
+done:
+    if(httpcodep) *httpcodep = httpcode;
+    (void)vsextract(wrap);
+    vsfree(wrap);
+    /* clean any malloc'd resources */
+    nullfree(rangebytesstr);
+    curl_reset(handle);
+    return UNTRACE(ret_value);;
+} /* NCH5_s3comms_s3r_readall */
+
+int
+NCH5_s3comms_s3r_read_multi(s3r_t *handle, VList * urls) //const char* url, size_t offset, size_t len, s3r_buf_t* dest, long* httpcodep)
+{
+    int                ret_value = SUCCEED;
+    long               httpcode;
+    VString           *wrap = vsnew();
+
+    TRACE(0,"handle=%p url=%s offset=%ld len=%ld, dest=%p",handle,url,(long)offset,(long)len,dest);
+
+    NCURI* purl= NULL;
+    struct s3r_cbstruct sds = {S3COMMS_CALLBACK_STRUCT_MAGIC, NULL, NULL, 0};
+    const CURL * original = handle->curlhandle;
+    VList * handle_list = vlistnew();
+    VList * outputs = vlistnew();
+
+    CURLM* multi = curl_multi_init();
+    for (int i=0; i< vlistlength(urls); i++ ) {
+        const char* url = vlistget(urls,i); 
+        ncuriparse(url,&purl);
+        if((ret_value = validate_url(purl)))
+            HGOTO_ERRORVA(H5E_ARGS, NC_EINVAL, FAIL, "unparseable url: %s", url);
+        
+        CURL * chandle = curl_easy_duphandle(handle->curlhandle);
+        vlistpush(handle_list,chandle);
+        handle->curlhandle = chandle;
+
+        if((ret_value = validate_handle(handle, url)))
+            HGOTO_ERROR(H5E_ARGS, NC_EINVAL, FAIL, "invalid handle.");
+        
+        sds.data = vsnew();
+        vlistpush(outputs,sds.data);
+	    // sds.key = searchheader;
+
+        if((ret_value = build_request(handle,purl,NULL,NULL,sds.data,HTTPGET)))
+            HGOTO_ERROR(H5E_ARGS, ret_value, FAIL, "unable to build request.");
+
+        if (CURLE_OK != curl_easy_setopt(chandle, CURLOPT_URL, url))
+            HGOTO_ERROR(H5E_ARGS, NC_EINVAL, NULL, "error while setting CURL option (CURLOPT_URL).");
+
+        if (CURLE_OK != curl_easy_setopt(chandle, CURLOPT_HTTPGET, 1L))
+            HGOTO_ERROR(H5E_ARGS, NC_EINVAL, NULL, "error while setting CURL option (CURLOPT_HTTPGET).");
+        if (CURLE_OK != curl_easy_setopt(chandle, CURLOPT_WRITEDATA, sds))
+            HGOTO_ERROR(H5E_ARGS, NC_EINVAL, FAIL, "error while setting CURL option (CURLOPT_WRITEDATA).");
+        if (CURLE_OK != curl_easy_setopt(chandle, CURLOPT_WRITEFUNCTION, curlwritecallback))
+            HGOTO_ERROR(H5E_ARGS, NC_EINVAL, NULL, "error while setting CURL option (CURLOPT_WRITEFUNCTION).");
+
+        // Register as multi request
+        curl_multi_add_handle(multi, chandle);
+    }
+
+    // reset original handle 
+    handle->curlhandle = original;
+
+    int running = 1; 
+    while (running) {
+        CURLMsg *msg;
+        int queued;
+        CURLMcode mc = curl_multi_perform(multi, &running);
+ 
+        if(running)
+            /* wait for activity, timeout or "nothing" */
+            mc = curl_multi_poll(multi, NULL, 0, 1000, NULL);
+            
+        if(mc)
+            break;
+
+        do {
+            msg = curl_multi_info_read(multi, &queued);
+            if(msg) {
+                if(msg->msg == CURLMSG_DONE) {
+                /* a transfer ended */
+                fprintf(stderr, "Transfer completed\n");
+                }
+            }
+        } while(msg);
+    }
+
+    for (int i = 0; i < vlistlength(handle_list); i++){
+        CURL * handle = vlistget(handle_list,i);
+        curl_multi_remove_handle(multi, handle);
+        curl_easy_cleanup(handle);
+    }
+    curl_multi_cleanup(multi);
+
+done:
+    (void)vsextract(wrap);
+    vsfree(wrap);
+    vlistfreeall(handle_list);
+    /* clean any malloc'd resources */
+    curl_reset(handle);
+    return UNTRACE(ret_value);;
+} /* NCH5_s3comms_s3r_readmulti */
 
 /*----------------------------------------------------------------------------
  * Function: NCH5_s3comms_s3r_write()

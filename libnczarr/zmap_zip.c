@@ -867,7 +867,8 @@ static NCZMAP_API zapi = {
     zipread,
     zipwrite,
     ziplist,
-    ziplistall
+    ziplistall,
+    NULL,
 };
 
 static int

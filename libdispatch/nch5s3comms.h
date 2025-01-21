@@ -518,6 +518,7 @@ EXTERNL int NCH5_s3comms_s3r_deletekey(s3r_t *handle, const char* url, long* htt
 
 EXTERNL int NCH5_s3comms_s3r_head(s3r_t *handle, const char* url, const char* header, const char* query, long* httpcodep, char** valuep);
 
+EXTERNL int NCH5_s3comms_s3r_readall(s3r_t *handle, const char* url, s3r_buf_t* data, long* httpcodep);
 /*********************************
  * DECLARATION OF OTHER ROUTINES *
  *********************************/

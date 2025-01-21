@@ -57,6 +57,8 @@ EXTERNL int NC_s3sdkbucketcreate(void* s3client, const char* region, const char*
 EXTERNL int NC_s3sdkbucketdelete(void* s3client, NCS3INFO* info, char** errmsgp);
 EXTERNL int NC_s3sdkinfo(void* client0, const char* bucket, const char* pathkey, unsigned long long* lenp, char** errmsgp);
 EXTERNL int NC_s3sdkread(void* client0, const char* bucket, const char* pathkey, unsigned long long start, unsigned long long count, void* content, char** errmsgp);
+EXTERNL int NC_s3sdkreadall(void* client0, const char* bucket, const char* pathkey, void** content, unsigned long long *lenp, char** errmsgp);
+EXTERNL int NC_s3sdkread_multi(void* client0, const char* bucket, const char* pathkey, void* content, char** errmsgp);
 EXTERNL int NC_s3sdkwriteobject(void* client0, const char* bucket, const char* pathkey, unsigned long long count, const void* content, char** errmsgp);
 EXTERNL int NC_s3sdkclose(void* s3client0, char** errmsgp);
 EXTERNL int NC_s3sdktruncate(void* s3client0, const char* bucket, const char* prefix, char** errmsgp);
