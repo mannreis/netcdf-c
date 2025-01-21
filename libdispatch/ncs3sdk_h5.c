@@ -310,34 +310,6 @@ done:
 }
 
 /*
-@return NC_NOERR if success
-@return NC_EXXX if fail
-*/
-EXTERNL int
-NC_s3sdkreadall(void* s3client0, const char* bucket, const char* pathkey, void** content, size64_t * len, char** errmsgp)
-{
-    int stat = NC_NOERR;
-    NCS3CLIENT* s3client = (NCS3CLIENT*)s3client0;
-    NCbytes* url = ncbytesnew();
-    struct s3r_buf_t data = {0,NULL};
-    long httpcode = 0;
-
-    NCTRACE(11,"bucket=%s pathkey=%s size unknown beforehand",bucket,pathkey);
-
-    if((stat = makes3fullpath(s3client->rooturl,bucket,pathkey,NULL,url))) goto done;
-
-    /* Read the data */
-    if((stat = NCH5_s3comms_s3r_readall(s3client->h5s3client,ncbytescontents(url),&data,&httpcode))) goto done;
-    *content = data.content;
-    *len = data.count;
-
-    stat = httptonc(httpcode);    
-done:
-    ncbytesfree(url);
-    return NCUNTRACE(stat);
-}
-
-/*
 For S3, I can see no way to do a byterange write;
 so we are effectively writing the whole object
 */

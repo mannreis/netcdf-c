@@ -217,9 +217,6 @@ struct NCZMAP_API {
     /* List Operations */
         int (*list)(NCZMAP* map, const char* prefix, struct NClist* matches);    /* shallow listing */
         int (*listall)(NCZMAP* map, const char* prefix, struct NClist* matches); /* deep listing */
-  
-  /* IO reducing operations  */
-  int (*readall)(NCZMAP*map, const char* key, size64_t count, const void* content);      
 };
 
 /* Define the Dataset level API */
@@ -292,7 +289,6 @@ Read the content of a specified content-bearing object.
 @return NC_EXXX if the operation failed for one of several possible reasons
 */
 EXTERNL int nczmap_read(NCZMAP* map, const char* key, size64_t start, size64_t count, void* content);
-EXTERNL int nczmap_readall(NCZMAP* map, const char* key, void** content, size64_t * len);
 
 /**
 Write the content of a specified content-bearing object.
@@ -301,8 +297,7 @@ Any such partial writes must be handled at a higher level by
 reading the object, modifying it, and then writing the whole object.
 @param map -- the containing map
 @param key -- the key specifying the content-bearing object
-@param count -- number of bytes 
-to write
+@param count -- number of bytes to write
 @param content -- write the data from this memory
 @return NC_NOERR if the operation succeeded
 @return NC_EXXX if the operation failed for one of several possible reasons

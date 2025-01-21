@@ -655,23 +655,25 @@ get_chunk(NCZChunkCache* cache, NCZCacheEntry* entry)
     tid = xtype->hdr.id;
 
     /* get size of the "raw" data on "disk" */
-    // path = NCZ_chunkpath(entry->key);
-    // stat = nczmap_len(map,path,&size);
-    // nullfree(path); path = NULL;
-    // switch(stat) {
-    // case NC_NOERR: entry->size = size; empty = (size == 0); break;
-    // case NC_ENOOBJECT: empty = 1; stat = NC_NOERR; break; /* "create" the object */
-    // default: goto done;
-    // }
+    path = NCZ_chunkpath(entry->key);
+    stat = nczmap_len(map,path,&size);
+    nullfree(path); path = NULL;
+    switch(stat) {
+    case NC_NOERR: entry->size = size; empty = (size == 0); break;
+    case NC_ENOOBJECT: empty = 1; stat = NC_NOERR; break; /* "create" the object */
+    default: goto done;
+    }
 
+    /* make room in the cache */
+    if((stat = constraincache(cache,size))) goto done;    
 
     if(!empty) {
         /* Make sure we have a place to read it */
-        // if((entry->data = (void*)calloc(1,entry->size)) == NULL)
-	    // {stat = NC_ENOMEM; goto done;}
+        if((entry->data = (void*)calloc(1,entry->size)) == NULL)
+	    {stat = NC_ENOMEM; goto done;}
 	/* Read the raw data */
         path = NCZ_chunkpath(entry->key);
-        stat = nczmap_readall(map,path,&entry->data, (size64_t*) &(entry->size));
+        stat = nczmap_read(map,path,0,entry->size,(char*)entry->data);
         nullfree(path); path = NULL;
         switch (stat) {
         case NC_NOERR: break;
@@ -682,9 +684,6 @@ get_chunk(NCZChunkCache* cache, NCZCacheEntry* entry)
 	if(tid == NC_STRING)
 	    entry->isfixedstring = 1; /* fill cache is in char[maxstrlen] format */
     }
-    /* make room in the cache */
-    if((stat = constraincache(cache,entry->size))) goto done;    
-
     if(empty) {
 	/* fake the chunk */
         setmodified(entry,(file->no_write?0:1));

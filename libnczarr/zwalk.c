@@ -2,7 +2,6 @@
  *   Copyright 2018, UCAR/Unidata
  *   See netcdf/COPYRIGHT file for copying and redistribution conditions.
  *********************************************************************/
-#include <pthread.h>
 #include "zincludes.h"
 
 #define WDEBUG
@@ -171,60 +170,6 @@ done:
     return stat;
 }
 
-typedef struct {
-    struct Common* common;
-    NCZOdometer* chunkodom;
-    void* chunkdata;
-    pthread_mutex_t* lock; // To protect shared resources
-} ThreadData;
-
-void * prefetch_chunk(void *arg) {
-    ThreadData* tdata = (ThreadData*)arg;
-    void* chunkdata = tdata->chunkdata;
-    NCZOdometer* chunkodom = tdata->chunkodom;
-    struct Common* common = tdata->common;
-    pthread_mutex_t* lock = tdata->lock;
-    int stat = NC_NOERR;
-    /* iterate over the odometer: all combination of chunk
-       indices in the projections */
-    while(nczodom_more(chunkodom)) {
-	size_t r;
-	size64_t* chunkindices = NULL;
-    //     NCZSlice slpslices[NC_MAX_VAR_DIMS];
-    //     NCZSlice memslices[NC_MAX_VAR_DIMS];
-    //     NCZProjection* proj[NC_MAX_VAR_DIMS];
-	// size64_t shape[NC_MAX_VAR_DIMS];
-
-	chunkindices = nczodom_indices(chunkodom);
-	if(wdebug >= 1)
-	    fprintf(stderr,"chunkindices: %s\n",nczprint_vector(common->rank,chunkindices));
-
-        /* Read chunk from cache */
-        stat = common->reader.read(common->reader.source, chunkindices, &chunkdata);
-	switch (stat) {
-        case NC_ENOOBJECT: /* cache created the chunk */
-	    break;
-        case NC_NOERR: break;
-        default: goto done;
-        }
-
-
-	{ /* walk with odometer */
-	    if(wdebug >= 1)
-	        fprintf(stderr,"case: odometer:\n");
-  	    /* This is the key action: walk this set of slices and transfer data */
-  	//     if((stat = NCZ_walk(proj,NULL,slpodom,memodom,common,chunkdata))) goto done;
-	    if(!common->reading) {
-	        if((stat=NCZ_chunk_cache_modify(common->cache, chunkindices))) goto done;
-	    }
-	}
-next:
-        nczodom_next(chunkodom);
-    }
-done:
-    return NULL;
-}
-
 /*
 Walk the possible projections.
 Broken out so we can use it for unit testing
@@ -307,21 +252,7 @@ NCZ_transfer(struct Common* common, NCZSlice* slices)
 #endif
 	goto done;
     }
-    
-    for(;nczodom_more(chunkodom);) {
-	size64_t* chunkindices = NULL;
-	chunkindices = nczodom_indices(chunkodom);
-	stat = common->reader.read(common->reader.source, chunkindices, &chunkdata);
-	switch (stat) {
-        case NC_ENOOBJECT: /* cache created the chunk */
-	    break;
-        case NC_NOERR: break;
-        default: goto done;
-        }
-	nczodom_next(chunkodom);
-    }
 
-    nczodom_reset(chunkodom);
     /* iterate over the odometer: all combination of chunk
        indices in the projections */
     for(;nczodom_more(chunkodom);) {

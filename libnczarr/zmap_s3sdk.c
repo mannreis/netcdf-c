@@ -589,35 +589,6 @@ done:
     return ZUNTRACEX(stat,"|matches|=%d",(int)nclistlength(matches));
 }
 
-/*
-@return NC_NOERR if object at key was read
-@return NC_ENOOBJECT if object at key does not exist
-@return NC_EXXX return true error
-*/
-static int
-zs3readall(NCZMAP* map, const char* key, void** content, unsigned long long * len)
-{
-    int stat = NC_NOERR;
-    ZS3MAP* z3map = (ZS3MAP*)map; /* cast to true type */
-    size64_t size = 0;
-    char* truekey = NULL;
-    
-    ZTRACE(6,"map=%s key=%s size unknown beforehand",map->url,key);
-
-    if((stat = maketruekey(z3map->s3.rootkey,key,&truekey))) goto done;
-    
-    switch(stat = NC_s3sdkreadall(z3map->s3client, z3map->s3.bucket, truekey, content, len, &z3map->errmsg)) {
-    case NC_NOERR: break;
-    case NC_EEMPTY: stat = NC_ENOOBJECT;
-    case NC_ENOOBJECT: goto done;
-    default: goto done;
-    }
-done:
-    nullfree(truekey);
-    reporterr(z3map);
-    return ZUNTRACE(stat);
-}
-
 /**************************************************/
 /* S3 Utilities */
 
@@ -708,8 +679,7 @@ nczs3sdkapi = {
     zs3read,
     zs3write,
     zs3list,
-    zs3listall,
-    zs3readall,
+    zs3listall
 };
 
 

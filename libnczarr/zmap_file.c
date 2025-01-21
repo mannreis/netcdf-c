@@ -717,7 +717,6 @@ static NCZMAP_API zapi = {
     zfilewrite,
     zfilelist,
     zfilelistall,
-    NULL,
 };
 
 static int

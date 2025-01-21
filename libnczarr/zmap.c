@@ -175,10 +175,6 @@ nczmap_read(NCZMAP* map, const char* key, size64_t start, size64_t count, void* 
     return map->api->read(map, key, start, count, content);
 }
 
-int nczmap_readall(NCZMAP* map, const char* key, void** content, size64_t * len) {
-    return map->api->readall(map, key, content, len);
-}
-
 int
 nczmap_write(NCZMAP* map, const char* key, size64_t count, const void* content)
 {
