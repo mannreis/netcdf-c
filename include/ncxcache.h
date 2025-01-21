@@ -8,7 +8,7 @@ See COPYRIGHT for license information.
 
 #include "nclist.h"
 #include "ncexhash.h" /* Also includes name map and id map */
-
+#include <pthread.h>
 /* Define the implementation.
    if defined, then the user's object
    is assumed to hold the double linked list node,
@@ -31,10 +31,14 @@ typedef struct NCxnode {
 typedef struct NCxcache {
    NCxnode lru;
    NCexhashmap* map;
+   pthread_rwlock_t rwlock; // Reader-writer lock for thread safety
 } NCxcache;
 
 /* Locate object by hashkey */
 EXTERNL int ncxcachelookup(NCxcache* cache, ncexhashkey_t hkey, void** objp);
+
+/* set modify*/
+EXTERNL int ncxcachemodify(NCxcache* cache, ncexhashkey_t hkey, void(*modify_fn)(void*,void*),void* args);
 
 /* Insert object into the cache >*/
 EXTERNL int ncxcacheinsert(NCxcache* cache, ncexhashkey_t hkey, void* obj);

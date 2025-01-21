@@ -86,20 +86,46 @@ verifylru(NCxcache* cache)
 
 /* Locate object by hashkey in an NCxcache */
 int
-ncxcachelookup(NCxcache* NCxcache, ncexhashkey_t hkey, void** op)
+ncxcachelookup(NCxcache* cache, ncexhashkey_t hkey, void** op)
 {
     int stat = NC_NOERR;
     uintptr_t inode = 0;
     NCxnode* node = NULL;
 
-    if(NCxcache == NULL) return THROW(NC_EINVAL);
-    assert(NCxcache->map != NULL);
-    if((stat=ncexhashget(NCxcache->map,hkey,&inode)))
+    pthread_rwlock_rdlock(&cache->rwlock);
+
+    if(cache == NULL) return THROW(NC_EINVAL);
+    assert(cache->map != NULL);
+    if((stat=ncexhashget(cache->map,hkey,&inode)))
         {stat = THROW(NC_ENOOBJECT); goto done;} /* not present */
     node = (void*)inode;
     if(op) *op = node->content;
 
 done:
+    pthread_rwlock_unlock(&cache->rwlock);
+    return stat;
+}
+
+int
+ncxcachemodify(NCxcache* cache, ncexhashkey_t hkey, void(*modify_fn)(void*,void*),void* args)
+{
+    int stat = NC_NOERR;
+    uintptr_t inode = 0;
+    NCxnode* node = NULL;
+
+    pthread_rwlock_rdlock(&cache->rwlock);
+
+    if(cache == NULL) return THROW(NC_EINVAL);
+    assert(cache->map != NULL);
+    if((stat=ncexhashget(cache->map,hkey,&inode)))
+        {stat = THROW(NC_ENOOBJECT); goto done;} /* not present */
+    node = (void*)inode;
+    pthread_rwlock_unlock(&cache->rwlock);
+    pthread_rwlock_wrlock(&cache->rwlock);
+    modify_fn((void*)node,args);
+
+done:
+    pthread_rwlock_unlock(&cache->rwlock);
     return stat;
 }
 
@@ -111,6 +137,7 @@ ncxcachetouch(NCxcache* cache, ncexhashkey_t hkey)
     uintptr_t inode = 0;
     NCxnode* node = NULL;
 
+    pthread_rwlock_wrlock(&cache->rwlock);
     if(cache == NULL) return THROW(NC_EINVAL);
     if((stat=ncexhashget(cache->map,hkey,&inode)))
         {stat = THROW(NC_ENOOBJECT); goto done;} /* not present */
@@ -124,6 +151,7 @@ verifylru(cache);
 #endif
 
 done:
+    pthread_rwlock_unlock(&cache->rwlock);
     return stat;
 }
 
@@ -144,6 +172,7 @@ ncxcacheinsert(NCxcache* cache, const ncexhashkey_t hkey, void* o)
 #endif
     node->content = o; /* Cheat and make content point to the node part*/
     inode = (uintptr_t)node;
+pthread_rwlock_wrlock(&cache->rwlock);
     stat = ncexhashput(cache->map,hkey,inode);
     if(stat)
 	goto done;
@@ -154,6 +183,7 @@ verifylru(cache);
 #endif
     node = NULL;
 done:
+pthread_rwlock_unlock(&cache->rwlock);
 #ifndef NCXUSER
     if(node) nullfree(node);
 #endif
@@ -170,6 +200,7 @@ ncxcacheremove(NCxcache* cache, ncexhashkey_t hkey, void** op)
 
     if(cache == NULL) return THROW(NC_EINVAL);
 
+pthread_rwlock_wrlock(&cache->rwlock);
     /* Remove from the hash map */
     if((stat=ncexhashremove(cache->map,hkey,&inode)))
         {stat = NC_ENOOBJECT; goto done;} /* not present */
@@ -187,6 +218,7 @@ verifylru(cache);
 #endif
 
 done:
+pthread_rwlock_unlock(&cache->rwlock);
     return THROW(stat);
 }
 
@@ -198,6 +230,7 @@ ncxcachefree(NCxcache* cache)
 
     if(cache == NULL) return;
     lru = &cache->lru;
+    pthread_rwlock_destroy(&cache->rwlock);
 
 #ifndef NCXUSER
     {
@@ -235,6 +268,11 @@ ncxcachenew(size_t leaflen, NCxcache** cachep)
         {stat = NC_ENOMEM; goto done;}
     cache->lru.next = &cache->lru;
     cache->lru.prev = &cache->lru;
+    
+    if (pthread_rwlock_init(&cache->rwlock, NULL) != 0) {
+        stat = NC_ENOMEM; goto done;
+    }
+
     if(cachep) {*cachep = cache; cache = NULL;}
 
 done:
@@ -250,30 +288,34 @@ ncxcacheprint(NCxcache* cache)
 
     fprintf(stderr,"NCxcache: lru=");
     fprintf(stderr,"{");
+pthread_rwlock_rdlock(&cache->rwlock);
     for(i=0,p=cache->lru.next;p != &cache->lru;p=p->next,i++) {
 	if(i>0) fprintf(stderr,",");
 	fprintf(stderr,"%p:%p",p,p->content);
     }
     fprintf(stderr,"}\n");
     ncexhashprint(cache->map);
+pthread_rwlock_unlock(&cache->rwlock);
 }
 
 void*
 ncxcachefirst(NCxcache* cache)
 {
     if(cache == NULL) return NULL;
-    if(ncexhashcount(cache->map) == 0)
-        return NULL;
-    return cache->lru.next->content;
+pthread_rwlock_unlock(&cache->rwlock);
+    void * ret = (ncexhashcount(cache->map) == 0)? NULL:cache->lru.next->content;
+pthread_rwlock_unlock(&cache->rwlock);
+    return ret;
 }
 
 void*
 ncxcachelast(NCxcache* cache)
 {
     if(cache == NULL) return NULL;
-    if(ncexhashcount(cache->map) == 0)
-        return NULL;
-    return cache->lru.prev->content;
+    pthread_rwlock_unlock(&cache->rwlock);
+    void * ret = (ncexhashcount(cache->map) == 0)? NULL:cache->lru.prev->content;
+    pthread_rwlock_unlock(&cache->rwlock);
+    return ret;
 }
 
 /* Insert node after current */
