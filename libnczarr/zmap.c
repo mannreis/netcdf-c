@@ -24,8 +24,12 @@ nczmap_features(NCZM_IMPL impl)
 #endif
 
 #ifdef NETCDF_ENABLE_S3
-    case NCZM_S3: case NCZM_GS3 case NCZM_ZOH:
+    case NCZM_S3: case NCZM_GS3:
         return zmap_s3sdk.features;
+#endif
+#ifdef NETCDF_ENABLE_ZOH
+    case NCZM_ZOH:
+        return zmap_zoh.features;
 #endif
     default: break;
     }
@@ -106,6 +110,8 @@ nczmap_open(NCZM_IMPL impl, const char *path, mode_t mode, size64_t flags, void*
         stat = zmap_s3sdk.open(path, mode, flags, parameters, &map);
 	if(stat) goto done;
 	break;
+#endif
+#ifdef NETCDF_ENABLE_ZOH
     case NCZM_ZOH:
         stat = zmap_zoh.open(path, mode, flags, parameters, &map);
 	if(stat) goto done;
@@ -141,8 +147,10 @@ nczmap_truncate(NCZM_IMPL impl, const char *path)
     case NCZM_GS3:
         if((stat = zmap_s3sdk.truncate(path))) goto done;
 	break;
+#endif
+#ifdef NETCDF_ENABLE_ZOH
     case NCZM_ZOH:
-	{stat = REPORT(NC_EZAR,"nczmap_truncate not supported for Zarr-Over-HTTP"); goto done;}
+	{stat = REPORT(NC_EZARRMETA,"nczmap_truncate not supported for Zarr-Over-HTTP"); goto done;}
 #endif
     default:
 	{stat = REPORT(NC_ENOTBUILT,"nczmap_truncate"); goto done;}

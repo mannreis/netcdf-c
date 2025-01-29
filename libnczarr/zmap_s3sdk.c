@@ -40,6 +40,9 @@ Notes:
 
 #define ZS3_PROPERTIES (0)
 
+#define NCZM_S3SDK_V1 1
+
+#define ZS3_PROPERTIES (0)
 /* Define the "subclass" of NCZMAP */
 typedef struct ZS3MAP {
     NCZMAP map;
@@ -118,8 +121,6 @@ zs3create(const char *path, mode_t mode, size64_t flags, void* parameters, NCZMA
     ZTRACE(6,"path=%s mode=%d flag=%llu",path,mode,flags);
 
     if(!zs3initialized) zs3initialize();
-
-    if(flags & FLAG_ZOH) {stat = NC_EZARR; goto done;}
 
     /* Parse the URL */
     ncuriparse(path,&url);
@@ -216,7 +217,7 @@ zs3open(const char *path, mode_t mode, size64_t flags, void* parameters, NCZMAP*
     if((z3map = (ZS3MAP*)calloc(1,sizeof(ZS3MAP))) == NULL)
 	{stat = NC_ENOMEM; goto done;}
 
-    z3map->map.format = ((flags & FLAG_ZOH)?NCZM_ZOH:NCZM_S3);
+    z3map->map.format = NCZM_S3;
     z3map->map.url = strdup(path);
     z3map->map.mode = mode;
     z3map->map.flags = flags;
@@ -339,11 +340,10 @@ zs3keyexists(NCZMAP* map, const char* key)
 
     if((stat = maketruekey(z3map->s3.rootkey,key,&truekey))) goto done;
 
-    switch (stat = NC_s3sdkinfo(z3map->s3client,z3map->s3.bucket,truekey,lenp,&z3map->errmsg)) {
+    switch (stat = NC_s3sdkinfo(z3map->s3client,z3map->s3.bucket,truekey,NULL,&z3map->errmsg)) {
     case NC_NOERR: break;
     case NC_EEMPTY: stat = NC_ENOOBJECT; /* fall thru */
     case NC_ENOOBJECT:
-	if(lenp) *lenp = 0;
 	goto done;
     default:
         goto done;
@@ -665,36 +665,7 @@ freevector(size_t nkeys, char** list)
     }
 }
 
-/**************************************************/
-/* no-op functions for ZOH
-
-
-static int
-zs3create(const char *path, mode_t mode, size64_t flags, void* parameters, NCZMAP** mapp)
-{
-    return NC_EZARR;
-}
-
-static int
-zohtruncate(const char *s3url)
-{
-    return NC_EZARR;
-}
-
-static int
-zohlist(NCZMAP* map, const char* prefix, NClist* matches)
-{
-    return NC_EZARR;
-}
-
-static int
-zohlistall(NCZMAP* map, const char* prefix, NClist* matches)
-{
-    return NC_EZARR;
-}
-
-/**************************************************/
-
+/********
 /* External API objects */
 
 /* Dispatcher for S3/GS3 */
@@ -717,26 +688,4 @@ nczs3sdkapi = {
     zs3write,
     zs3list,
     zs3listall
-};
-
-/* Dispatcher for ZOH */
-NCZMAP_DS_API zmap_zoh;
-NCZMAP_DS_API zmap_zoh = {
-    NCZM_ZOH_V1,
-    ZOH_PROPERTIES,
-    zohcreate,
-    zs3open,
-    zohtruncate,
-};
-
-static NCZMAP_API
-nczzohapi = {
-    NCZM_ZOH_V1,
-    zs3close,
-    zs3exists,
-    zs3len,
-    zs3read,
-    zohwrite,
-    zohlist,
-    zohlistall,
 };

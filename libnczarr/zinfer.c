@@ -366,6 +366,8 @@ NCZ_infer_storage_type(NC_FILE_INFO_T* file, NCURI* url, NCZM_IMPL* implp)
 #ifdef NETCDF_ENABLE_S3
     else if(NC_testmode(url, "s3")) impl = NCZM_S3;
     else if(NC_testmode(url, "gs3")) impl = NCZM_GS3;
+#endif
+#ifdef NETCDF_ENABLE_ZOH
     else if(NC_testmode(url, "zoh")) impl = NCZM_ZOH;
 #endif
 #ifdef NETCDF_ENABLE_NCZARR_ZIP

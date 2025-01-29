@@ -68,6 +68,10 @@ if(NETCDF_ENABLE_S3)
     SET(libnczarr_SOURCES ${libnczarr_SOURCES} zmap_s3sdk.c)
 endif()
 
+if(NETCDF_ENABLE_ZOH) 
+    SET(libnczarr_SOURCES ${libnczarr_SOURCES} zmap_zoh.c)
+endif()
+
 if(NETCDF_ENABLE_NCZARR_FILTERS)
     SET(libnczarr_SOURCES ${libnczarr_SOURCES} zfilter.c)
 endif()
