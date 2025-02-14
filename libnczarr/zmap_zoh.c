@@ -37,7 +37,7 @@ typedef struct ZOHMAP
 /* Forward */
 static NCZMAP_API nczohapi;
 
-void* NC_zohcreateclient(const NCZOH_RESOURCE_INFO context);
+void* NC_zohcreateclient(const NCZOH_RESOURCE_INFO * context);
 
 typedef enum HTTPVerb {
 	HTTPNONE=0,
@@ -49,20 +49,6 @@ typedef enum HTTPVerb {
 } HTTPVerb;
 
 
-struct request {
-	CURL * curlhandle;
-	char   httpverb[16];
-	struct curl_slist *curlheaders;
-	struct MemoryChunk *mem;
-};
-
-typedef struct zoh_client_internal {
-	struct request req[NUM_REQUESTS];
-	struct CURL_M *curlmhandle;
-	int still_running;
-	int num_concurrent_requests;
-} zoh_client;
-
 struct MemoryChunk {
 	char *memory;
     size_t size; // Common for both GET and PUT
@@ -72,14 +58,32 @@ struct MemoryChunk {
     } u;
 };
 
+struct request {
+	CURL * curlhandle;
+	char   httpverb[16];
+	struct curl_slist *curlheaders;
+	struct MemoryChunk mem;
+};
+
+typedef struct zoh_client_internal {
+	struct request req[NUM_REQUESTS];
+	struct CURL_M *curlmhandle;
+	int still_running;
+	int num_concurrent_requests;
+} zoh_client;
+
+CURLcode ncrc_curl_setopts(CURL *curlh);
+
 //HTTP related forward declarations
 static int request_setup(struct request *req, const char *url, HTTPVerb verb);
 
 static int zohclose(NCZMAP *map, int deleteit);
 
+static int validate_handle(struct request *req, const char *url);
+
 static void
 errclear(ZOHMAP *zoh)
-		{
+{
 	if (zoh)
 	{
 		if (zoh->errmsg)
@@ -133,6 +137,7 @@ void zohfinalize(void)
 	curl_global_cleanup();
 }
 
+
 static int
 zohcreate(const char *path, mode_t mode, size64_t flags, void *parameters, NCZMAP **mapp)
 {
@@ -166,6 +171,7 @@ zohopen(const char *path, mode_t mode, size64_t flags, void *parameters, NCZMAP 
 		goto done;
 	}
 
+	zoh->resource.protocol = url->protocol?strdup(url->protocol):"http";
 	zoh->resource.host = strdup(url->host);
 	zoh->resource.port = url->port?strdup(url->port):NULL;
 	zoh->resource.key = strdup(url->path); 
@@ -176,7 +182,7 @@ zohopen(const char *path, mode_t mode, size64_t flags, void *parameters, NCZMAP 
 	zoh->map.api = &nczohapi;
     zoh->map.flags = flags;
 	
-	zoh->client = NC_zohcreateclient(zoh->resource);// No request is performed
+	zoh->client = NC_zohcreateclient(&zoh->resource);// No request is performed
 
 	if(mapp) *mapp = (NCZMAP*)zoh;
 done:
@@ -196,8 +202,13 @@ static int
 zohclose(NCZMAP *map, int deleteit)
 {
 	int stat = NC_NOERR;
+	ZOHMAP *zoh = (ZOHMAP*)map;
+	zoh_client *client = zoh->client;
+
+	zohdestroyclient(client);
+
 	ZTRACE(6, "map=%s deleteit=%d", map->url, deleteit);
-	return NC_EZARRMETA;
+	return NC_NOERR;
 }
 
 int request_perform(struct request * req) {
@@ -206,8 +217,7 @@ int request_perform(struct request * req) {
 
 /* Prefix key with path to root to make true key */
 static int
-maketruekey(const char* rootpath, const char* key, char** truekeyp)
-	{
+maketruekey(const char* rootpath, const char* key, char** truekeyp) {
 	int  stat = NC_NOERR;
 	NCbytes* truekey = NULL;
 	size_t rootlen,keylen;
@@ -241,7 +251,7 @@ maketruekey(const char* rootpath, const char* key, char** truekeyp)
 	done:
 	ncbytesfree(truekey);
 	return stat;
-	}
+}
 
 static int
 zohexists(NCZMAP *map, const char *key)
@@ -250,44 +260,143 @@ zohexists(NCZMAP *map, const char *key)
 	ZOHMAP *zoh = (ZOHMAP*)map;
 	zoh_client *client = zoh->client;
 	char *fullkey = NULL;
-	NCURI url = {0};
-		
-	ZTRACE(6,"map=%s key=%s",map->url,key);
 	
-	if ((stat = maketruekey(zoh->resource.key, key, &fullkey))){
+	ZTRACE(6,"map=%s key=%s"map->url,key);
+
+	NCURI url = {
+		.protocol = zoh->resource.protocol,
+		.host = zoh->resource.host,
+		.port = zoh->resource.port,
+		.path = NULL,
+	};
+
+	if ((stat = maketruekey(zoh->resource.key, key, &url.path))){
 		goto done;
 	}
 
-	CURL *curlh = client->req[0].curlhandle;
-
-	url.host = zoh->resource.host;
-	if (zoh->resource.port != NULL) {
-		url.port = zoh->resource.port;
+	if ((stat = validate_handle(&client->req[0], url.path))){
+		goto done;
 	}
-	url.path = fullkey;
 
-	char * url_s = ncuribuild(&url,NULL,NULL,0);
+	char * url_s = ncuribuild(&url,NULL,NULL,NCURIPATH);
 	request_setup(&client->req[0], url_s, HTTPHEAD);
 	stat = request_perform(&client->req[0]);
 done:
 	nullfree(fullkey);
 	nullfree(url_s);
-	return NC_EZARRMETA;
+	return stat;
+}
+
+static int request_reset(struct request * req) {
+	if (req == NULL)
+		return NC_NOERR;
+
+	if (req->curlheaders)
+	{
+		curl_slist_free_all(req->curlheaders);
+		req->curlheaders = NULL;
+	}
+	
+	nullfree(req->mem.memory);
+	req->mem.memory = NULL;
+	req->mem.size = 0;
+	req->mem.u.allocated_size = 0;
+
+	return NC_NOERR;
+}
+
+static int request_cleanup(struct request * req) {
+	if (req == NULL)
+		return NC_NOERR;
+	curl_easy_cleanup(req->curlhandle);
+	req->curlhandle = NULL;
+
+	return request_reset(req);
 }
 
 static int
 zohlen(NCZMAP *map, const char *key, size64_t *lenp)
 {
+	int stat = NC_NOERR;
+	ZOHMAP *zoh = (ZOHMAP *)map;
+	zoh_client *client = zoh->client;
+	struct request *req = &(client->req[0]);
+	char *fullkey = NULL;
+	
+	ZTRACE(6,"map=%s key=%s"map->url,key);
+
+	NCURI url = {
+		.protocol = zoh->resource.protocol,
+		.host = zoh->resource.host,
+		.port = zoh->resource.port,
+		.path = NULL,
+	};
+
+	if ((stat = maketruekey(zoh->resource.key, key, &url.path))){
+		goto done;
+	}
+
+	if ((stat = validate_handle(req, url.path))){
+		goto done;
+	}
+
+	char * url_s = ncuribuild(&url,NULL,NULL,NCURIPATH);
+
+	request_setup(req, url_s, HTTPHEAD);
+	if ((stat = request_perform(req)) != NC_NOERR) {
+		goto done;
+	}
+
+	*lenp = req->mem.u.allocated_size;
+
 done:
-	return NC_EZARRMETA;
+	nullfree(fullkey);
+	request_reset(req);
+	nullfree(url_s);
+	return stat;
 }
 
 
 static int
 zohread(NCZMAP *map, const char *key, size64_t start, size64_t count, void *content)
 {
+	int stat = NC_NOERR;
+	ZOHMAP *zoh = (ZOHMAP*)map;
+	zoh_client *client = zoh->client;
+	struct request *req = &(client->req[0]);
+	char *fullkey = NULL;
+	
+	ZTRACE(6,"map=%s key=%s"map->url,key);
+
+	NCURI url = {
+		.protocol = zoh->resource.protocol,
+		.host = zoh->resource.host,
+		.port = zoh->resource.port,
+		.path = NULL,
+	};
+
+	if ((stat = maketruekey(zoh->resource.key, key, &url.path))){
+		goto done;
+	}
+
+	if ((stat = validate_handle(req, url.path))){
+		goto done;
+	}
+
+	char * url_s = ncuribuild(&url,NULL,NULL,NCURIPATH);
+	request_setup(req, url_s, HTTPGET);
+	if ((stat = request_perform(req)) != NC_NOERR || req->mem.memory == NULL) {
+		printf("Problem when reading: %d", stat);
+		goto done;
+	}
+
+	memcpy(content, req->mem.memory, req->mem.size);
+
 done:
-	return NC_EZARRMETA;
+	request_reset(req);
+	nullfree(fullkey);
+	nullfree(url_s);
+	return stat;
 }
 
 static int
@@ -335,9 +444,22 @@ static NCZMAP_API
 };
 
 
+void zohdestroyclient(void * client) {
+	zoh_client * zohclient = (zoh_client *)client;
+	struct request *req = NULL;
+
+	if (zohclient != NULL) {
+		for (int i = 0 ;  i < NUM_REQUESTS; i++) {
+			request_cleanup(&zohclient->req[i]);
+		}
+		curl_multi_cleanup(zohclient->curlmhandle);
+		free(zohclient);
+	}
+	return;
+}
 
 void *
-NC_zohcreateclient(const NCZOH_RESOURCE_INFO context)
+NC_zohcreateclient(const NCZOH_RESOURCE_INFO* context)
 {
 	int stat = NC_NOERR;
 	zoh_client *client = (zoh_client *)calloc(1, sizeof(zoh_client));
@@ -366,7 +488,7 @@ NC_zohcreateclient(const NCZOH_RESOURCE_INFO context)
 
 		client->req[i].curlhandle = curlh;
 		client->req[i].curlheaders = NULL;
-
+		request_reset(&client->req[i]);
 		// Track easy handles;
 		curl_multi_add_handle(&client->curlmhandle, client->req[i].curlhandle);
 	}
@@ -438,8 +560,7 @@ verbtext(HTTPVerb verb)
 
 
 
-static int
-validate_handle(struct request * req, const char* url) {
+static int validate_handle(struct request * req, const char* url) {
     int stat = NC_NOERR;
 	if (req == NULL || req->curlhandle == NULL){
 		stat = NC_EINVAL;
@@ -450,21 +571,30 @@ done:
 	return (stat);
 }
 
-// Callback to extract Content-Length
-size_t HeaderGetCallback(char *buffer, size_t size, size_t nitems, void *userdata) {
-    size_t totalSize = size * nitems;
-    struct MemoryChunk *mem = (struct MemoryChunk *)userdata;
 
-    if (strncasecmp(buffer, "Content-Length:", 15) == 0) {
+
+// Callback to extract Content-Length
+size_t curl_callback_allocate_content_length (char *buffer, size_t size, size_t nitems, void *userdata) {
+    size_t totalSize = size * nitems;
+	struct MemoryChunk * mem = (struct MemoryChunk *)userdata;
+
+	if (strncasecmp(buffer, "Content-Length:", 15) == 0)
+	{
+		if (mem == NULL) {
+			nclog(NCLOGERR, "MemoryChunk is NULL");
+		}
         mem->u.allocated_size = (size_t)atol(buffer + 15);
         printf("Content-Length: %zu bytes\n", mem->u.allocated_size);
-        mem->memory = malloc(mem->u.allocated_size + 1);  // Allocate once
-        if (!mem->memory) {
-            fprintf(stderr, "Failed to allocate memory\n");
-            return 0;  // Abort
-        }
-    }
-    return totalSize;
+		nullfree(mem->memory);
+		mem->memory = calloc(1,mem->u.allocated_size + 1);  // Allocate once
+		if (!mem->memory)
+		{
+			free(mem);
+			fprintf(stderr, "Failed to allocate memory\n");
+			return 0; // Abort
+		}
+	}
+	return totalSize;
 }
 
 // Callback for reading data during PUT request
@@ -490,18 +620,21 @@ size_t curl_callback_writetomemory(void *contents, size_t size, size_t nmemb, vo
     size_t totalSize = size * nmemb;
     struct MemoryChunk *mem = (struct MemoryChunk *)userp;
 
-    // Reallocate memory if needed
-    char *new_memory = realloc(mem->memory, mem->size + totalSize + 1);
-    if (new_memory == NULL) {
-        fprintf(stderr, "Failed to allocate memory for GET response.\n");
-        return 0;
-    }
-    mem->memory = new_memory;
+    // Reallocate memory if needed - Callback header already pre-allocated memory
+	if (mem->u.allocated_size < mem->size + totalSize) { 
+    	char *new_memory = realloc(mem->memory, mem->size + totalSize + 1);
+    	if (new_memory == NULL) {
+     	   fprintf(stderr, "Failed to allocate memory for GET response.\n");
+      	  return 0;
+    	}
+    	mem->memory = new_memory;
+		printf("REALLOCATION ON WRITE: %zu\n", totalSize);
+		mem->u.allocated_size = mem->size + totalSize + 1;
+	}
 
-    memcpy(&(mem->memory[mem->size]), contents, totalSize);
+	memcpy(&(mem->memory[mem->size]), contents, totalSize);
     mem->size += totalSize;
     mem->memory[mem->size] = 0;  // Null-terminate the string
-    mem->u.allocated_size = mem->size;  // Track the allocated size
 
     return totalSize;
 }
@@ -514,6 +647,14 @@ static int request_setup(struct request * req, const char* url, HTTPVerb verb) {
 		stat = NC_EINVAL;
 		goto done;
 	}
+	if (CURLE_OK != curl_easy_setopt(curlh, CURLOPT_FOLLOWLOCATION, 1L)){
+		stat = NC_EINVAL;
+		goto done;
+	}
+	if (CURLE_OK != ncrc_curl_setopts(curlh)){
+		stat = NC_EINVAL;
+		goto done;
+	}
 
 	switch (verb) {
 		case HTTPGET:
@@ -521,11 +662,11 @@ static int request_setup(struct request * req, const char* url, HTTPVerb verb) {
 				stat = NC_EINVAL;
 				goto done;
 			}
-			if (CURLE_OK != curl_easy_setopt(curlh, CURLOPT_HEADERFUNCTION, HeaderGetCallback)){
+			if (CURLE_OK != curl_easy_setopt(curlh, CURLOPT_HEADERFUNCTION, curl_callback_allocate_content_length)){
 				stat = NC_EINVAL;
 				goto done;
 			}
-        	if (CURLE_OK != curl_easy_setopt(curlh, CURLOPT_HEADERDATA, (void *)req->mem)){
+        	if (CURLE_OK != curl_easy_setopt(curlh, CURLOPT_HEADERDATA, (void *)&req->mem)){
 				stat = NC_EINVAL;
 				goto done;
 			}
@@ -533,7 +674,7 @@ static int request_setup(struct request * req, const char* url, HTTPVerb verb) {
 				stat = NC_EINVAL;
 				goto done;
 			}
-        	if (CURLE_OK != curl_easy_setopt(curlh, CURLOPT_WRITEDATA, (void *)req->mem)){
+        	if (CURLE_OK != curl_easy_setopt(curlh, CURLOPT_WRITEDATA, (void *)&req->mem)){
 				stat = NC_EINVAL;
 				goto done;
 			}
@@ -543,7 +684,7 @@ static int request_setup(struct request * req, const char* url, HTTPVerb verb) {
 				stat = NC_EINVAL;
 				goto done;
 			}
-			if (CURLE_OK != curl_easy_setopt(curlh, CURLOPT_READDATA, (void*)req->mem)){
+			if (CURLE_OK != curl_easy_setopt(curlh, CURLOPT_READDATA, (void*)&req->mem)){
 				stat = NC_EINVAL;
 				goto done;
 			}
@@ -557,11 +698,11 @@ static int request_setup(struct request * req, const char* url, HTTPVerb verb) {
 				stat = NC_EINVAL;
 				goto done;
 			}
-			if (CURLE_OK != curl_easy_setopt(curlh, CURLOPT_HEADERDATA, req->mem)){
+			if (CURLE_OK != curl_easy_setopt(curlh, CURLOPT_HEADERDATA, (void*)&req->mem)){
 				stat = NC_EINVAL;
 				goto done;
 			}
-			if (CURLE_OK != curl_easy_setopt(curlh, CURLOPT_HEADERFUNCTION, HeaderGetCallback)){
+			if (CURLE_OK != curl_easy_setopt(curlh, CURLOPT_HEADERFUNCTION, curl_callback_allocate_content_length)){
 				stat = NC_EINVAL;
 				goto done;
 			}
@@ -571,11 +712,11 @@ static int request_setup(struct request * req, const char* url, HTTPVerb verb) {
 				stat = NC_EINVAL;
 				goto done;
 			}
-			if (CURLE_OK != curl_easy_setopt(curlh, CURLOPT_HEADERDATA, req->mem)){
+			if (CURLE_OK != curl_easy_setopt(curlh, CURLOPT_HEADERDATA, (void*)&req->mem)){
 				stat = NC_EINVAL;
 				goto done;
 			}
-			if (CURLE_OK != curl_easy_setopt(curlh, CURLOPT_HEADERFUNCTION, HeaderGetCallback)){
+			if (CURLE_OK != curl_easy_setopt(curlh, CURLOPT_HEADERFUNCTION, curl_callback_allocate_content_length)){
 				stat = NC_EINVAL;
 				goto done;
 			}
@@ -587,10 +728,53 @@ static int request_setup(struct request * req, const char* url, HTTPVerb verb) {
 			break;
 	}
 
+	const char * verb_s = verbtext(verb);
+	memset(req->httpverb, 0, sizeof(req->httpverb));
+	assert(strlen(verb_s) < sizeof(req->httpverb));
+	memcpy(req->httpverb, verb_s, strlen(verb_s));
+
 done:
 	return (stat);
 }
 
-http_head(struct request *req, const char * url) {
-
+CURLcode ncrc_curl_setopts(CURL *curlh) {
+	CURLcode stat = CURLE_OK;
+	char *value = NULL;
+	value = NC_rclookup("HTTP.SSL.CAINFO", NULL, NULL);
+	if (value != NULL){
+		if((CURLE_OK != (stat = curl_easy_setopt(curlh, CURLOPT_CAINFO, value)))){
+			goto done;
+		}
+	}
+	value = NC_rclookup("HTTP.VERBOSE", NULL, NULL);
+	if (value != NULL && CURLE_OK != (stat = curl_easy_setopt(curlh, CURLOPT_VERBOSE, value?1L:NULL))){
+		nclog(NCLOGERR,"Unable to set HTTP.VERBOSE: %s\n",value);
+		goto done;
+	}
+	value = NC_rclookup("HTTP.KEEPALIVE",NULL,NULL);
+	if(value != NULL && strlen(value) != 0) {
+		if((CURLE_OK != (stat = curl_easy_setopt(curlh, CURLOPT_TCP_KEEPALIVE, 1L)))){
+			nclog(NCLOGERR,"Unable to set HTTP.KEEPALIVE: %s\n",value);
+			goto done;
+		}
+		
+		/* The keepalive value is of the form 0 or n/m,
+		where n is the idle time and m is the interval time;
+		setting either to zero will prevent that field being set.*/
+		if(strcasecmp(value,"on")!=0) {
+			unsigned long idle=0;
+			unsigned long interval=0;
+			if(sscanf(value,"%lu/%lu",&idle,&interval) != 2) {
+				nclog(NCLOGERR,"Illegal KEEPALIVE VALUE: %s\n",value);
+			}
+			if((CURLE_OK != (stat = curl_easy_setopt(curlh, CURLOPT_TCP_KEEPIDLE, (long)idle)))){
+				goto done;
+			}
+			if ((CURLE_OK != (stat = curl_easy_setopt(curlh, CURLOPT_TCP_KEEPINTVL, (long)interval)))){
+				goto done;
+			}
+		}
+	}
+done:
+	return stat;
 }

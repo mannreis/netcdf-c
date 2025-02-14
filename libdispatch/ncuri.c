@@ -700,7 +700,7 @@ ncuribuild(NCURI* duri, const char* prefix, const char* suffix, int flags)
     if(prefix != NULL)
 	ncbytescat(buf,prefix);
 
-    ncbytescat(buf,duri->protocol);
+    ncbytescat(buf,duri->protocol?duri->protocol:"http");
     ncbytescat(buf,"://"); /* this will produce file:///... */
 
     if((flags & NCURIPWD) && duri->user != NULL && duri->password != NULL) {

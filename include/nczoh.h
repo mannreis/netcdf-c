@@ -10,7 +10,8 @@
 struct NClist;
 
 typedef struct NCZOH_RESOURCE_INFO {
-    char* host; /* non-null if other*/
+    char *protocol; /* http or https */
+    char *host; /* non-null if other*/
     char* port;
     char* key; /* resource*/
 } NCZOH_RESOURCE_INFO;
@@ -26,7 +27,7 @@ extern "C" {
 /* API for ncs3sdk_XXX.[c|cpp] */
 EXTERNL int NC_zohinitialize(void);
 EXTERNL int NC_zohfinalize(void);
-EXTERNL void* NC_zohcreateclient(NCZOH_RESOURCE_INFO* context);
+EXTERNL void* NC_zohcreateclient(const NCZOH_RESOURCE_INFO* context);
 EXTERNL int NC_zohinfo(void* client, const char* pathkey, unsigned long long* lenp, char** errmsgp);
 EXTERNL int NC_zohread(void* client, const char* pathkey, unsigned long long start, unsigned long long count, void* content, char** errmsgp);
 EXTERNL int NC_zohwriteobject(void* client0, const char* bucket, const char* pathkey, unsigned long long count, const void* content, char** errmsgp);
