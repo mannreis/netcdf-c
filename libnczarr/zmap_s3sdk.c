@@ -214,12 +214,24 @@ zs3open(const char *path, mode_t mode, size64_t flags, void* skips3list, NCZMAP*
     if(url == NULL)
         {stat = NC_EURL; goto done;}
 
-    /* Convert to canonical path-style */
-    if((stat = NC_s3urlprocess(url,&z3map->s3,NULL))) goto done;
-    /* Verify root path */
-    if(z3map->s3.rootkey == NULL)
-        {stat = NC_EURL; goto done;}
-
+    if (skips3list){ // Lift url restrictions for bucket and region
+        z3map->s3.bucket = strndup(url->path,strchr(url->path,'/') - url->path);
+        z3map->s3.rootkey = strdup(url->path + strlen(z3map->s3.bucket)+1);
+        z3map->s3.region = NULL;
+        if(url->port){
+            z3map->s3.host = strndup(url->host,strlen(url->host) + 1 + strlen(url->port) +1);
+            z3map->s3.host = strcat(z3map->s3.host, ":");
+            z3map->s3.host = strcat(z3map->s3.host, url->port);
+        }else{
+            z3map->s3.host = strdup(url->host);
+        }
+    }else{
+        /* Convert to canonical path-style */
+        if((stat = NC_s3urlprocess(url,&z3map->s3,NULL))) goto done;
+        /* Verify root path */
+        if(z3map->s3.rootkey == NULL)
+            {stat = NC_EURL; goto done;}
+    }
     z3map->s3client = NC_s3sdkcreateclient(&z3map->s3);
 
     /* Search the root for content */
