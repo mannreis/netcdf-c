@@ -99,6 +99,7 @@
 #include "ncs3sdk.h"
 #include "nch5s3comms.h" /* S3 Communications */
 #include "ncrc.h"
+#include "ncauth.h"
 
 /****************/
 /* Local Macros */
@@ -715,40 +716,82 @@ hrb_node_free(hrb_node_t *node)
     }
 }
 
-CURLcode ncrc_curl_setopts(CURL *curlh);
+CURLcode set_curl_opts(CURL *handle, NCauth *auth);
 
-CURLcode ncrc_curl_setopts(CURL *curlh) {
-    	int ret_value = SUCCEED;
-	CURLcode ret_val = CURLE_OK;
-	char *value = NULL;
-	value = NC_rclookup("HTTP.SSL.CAINFO", NULL, NULL);
-	if (value != NULL){
-		if((CURLE_OK != curl_easy_setopt(curlh, CURLOPT_CAINFO, value))){
-			HGOTO_ERROR(H5E_ARGS, NC_EINVAL, NULL, "error while setting CURL option (CURLOPT_CAINFO).");
-		}
+CURLcode set_curl_opts(CURL *handle, NCauth *auth)
+{
+	CURLcode stat = CURLE_OK;
+	if(auth->creds.user != NULL && auth->creds.pwd != NULL) {
+		stat |= curl_easy_setopt(handle, CURLOPT_USERNAME, auth->creds.user);
+		stat |= curl_easy_setopt(handle, CURLOPT_PASSWORD, auth->creds.pwd);
+		stat |= curl_easy_setopt(handle, CURLOPT_HTTPAUTH, CURLAUTH_ANY);
 	}
-	value = NC_rclookup("HTTP.KEEPALIVE",NULL,NULL);
-	if(value != NULL && strlen(value) != 0) {
-		if((CURLE_OK != curl_easy_setopt(curlh, CURLOPT_TCP_KEEPALIVE, 1L)))
-			HGOTO_ERROR(H5E_ARGS, NC_EINVAL, NULL, "error while setting CURL option (CURLOPT_TCP_KEEPALIVE).");
-		/* The keepalive value is of the form 0 or n/m,
-		where n is the idle time and m is the interval time;
-		setting either to zero will prevent that field being set.*/
-		if(strcasecmp(value,"on")!=0) {
-		unsigned long idle=0;
-		unsigned long interval=0;
-		if(sscanf(value,"%lu/%lu",&idle,&interval) != 2) {
-			fprintf(stderr,"Illegal KEEPALIVE VALUE: %s\n",value);
-		}
-		if((CURLE_OK != curl_easy_setopt(curlh, CURLOPT_TCP_KEEPIDLE, (long)idle)))
-			HGOTO_ERROR(H5E_ARGS, NC_EINVAL, NULL, "error while setting CURL option (CURLOPT_TCP_KEEPIDLE).");
-		if((CURLE_OK != curl_easy_setopt(curlh, CURLOPT_TCP_KEEPINTVL, (long)interval)))
-			HGOTO_ERROR(H5E_ARGS, NC_EINVAL, NULL, "error while setting CURL option (CURLOPT_TCP_KEEPINTVL).");
-		
-		}
+        if(auth->curlflags.cookiejar) {
+	    /* Assume we will read and write cookies to same place */
+	    stat |= curl_easy_setopt(handle, CURLOPT_COOKIEJAR, auth->curlflags.cookiejar);
+	    stat |= curl_easy_setopt(handle, CURLOPT_COOKIEFILE, auth->curlflags.cookiejar);
+        }
+	if(auth->curlflags.netrc) {
+	    stat |= curl_easy_setopt(handle, CURLOPT_NETRC, CURL_NETRC_OPTIONAL);
+	    /* IF HTTP.NETRC is set with "", then assume the default .netrc file (which is apparently CWD) */
+	    if(strlen(auth->curlflags.netrc)>0)
+	        stat |= curl_easy_setopt(handle, CURLOPT_NETRC_FILE, auth->curlflags.netrc);
+        }
+	if(auth->curlflags.verbose)
+	    stat |= curl_easy_setopt(handle, CURLOPT_VERBOSE, 1L);
+	if(auth->curlflags.timeout)
+	    stat |= curl_easy_setopt(handle, CURLOPT_TIMEOUT, ((long)auth->curlflags.timeout));
+	if(auth->curlflags.connecttimeout)
+	    stat |= curl_easy_setopt(handle, CURLOPT_CONNECTTIMEOUT, (long)auth->curlflags.connecttimeout);
+        if(auth->curlflags.useragent)
+	    stat |= curl_easy_setopt(handle, CURLOPT_USERAGENT, auth->curlflags.useragent);
+    
+        stat |= curl_easy_setopt(handle, CURLOPT_FOLLOWLOCATION, 1L);
+    	if (auth->curlflags.maxredirs)
+		stat |= curl_easy_setopt(handle, CURLOPT_MAXREDIRS, auth->curlflags.maxredirs);
+
+	if(auth->curlflags.encode) {
+	    stat |= curl_easy_setopt(handle, CURLOPT_ACCEPT_ENCODING, "" ); /* Accept all available encodings */
+	} else {
+    	    stat |= curl_easy_setopt(handle, CURLOPT_ACCEPT_ENCODING, NULL);
+        }
+	if(auth->proxy.host != NULL) {
+	    stat |= curl_easy_setopt(handle, CURLOPT_PROXY, auth->proxy.host);
+	    stat |= curl_easy_setopt(handle, CURLOPT_PROXYPORT, (long)auth->proxy.port);
+	    if(auth->proxy.user != NULL && auth->proxy.pwd != NULL) {
+                stat |= curl_easy_setopt(handle, CURLOPT_PROXYUSERNAME, auth->proxy.user);
+                stat |= curl_easy_setopt(handle, CURLOPT_PROXYPASSWORD, auth->proxy.pwd);
+#ifdef CURLOPT_PROXYAUTH
+	        stat |= curl_easy_setopt(handle, CURLOPT_PROXYAUTH, (long)CURLAUTH_ANY);
+#endif
+	    }
 	}
+	/* VERIFYPEER == 0 => VERIFYHOST == 0 */
+	/* We need to have 2 states: default and a set value */
+	/* So -1 => default >= 0 => use value */
+	if(auth->ssl.verifypeer >= 0) {
+            stat |= curl_easy_setopt(handle, CURLOPT_SSL_VERIFYPEER, auth->ssl.verifypeer);
+	    if(auth->ssl.verifypeer == 0) auth->ssl.verifyhost = 0;
+        }
+#ifdef HAVE_LIBCURL_766
+	if(auth->ssl.verifyhost >= 0) {
+            stat |= curl_easy_setopt(handle, CURLOPT_SSL_VERIFYHOST, auth->ssl.verifyhost);
+	}
+#endif
+	if(auth->ssl.certificate)
+		stat |= curl_easy_setopt(handle, CURLOPT_SSLCERT, auth->ssl.certificate);
+	if(auth->ssl.key)
+		stat |= curl_easy_setopt(handle, CURLOPT_SSLKEY, auth->ssl.key);
+	if(auth->ssl.keypasswd)
+		stat |= curl_easy_setopt(handle, CURLOPT_SSLKEYPASSWD, auth->ssl.keypasswd);
+	/* libcurl prior to 7.16.4 used 'CURLOPT_SSLKEYPASSWD' */
+	if(auth->ssl.cainfo)
+		stat |= curl_easy_setopt(handle, CURLOPT_CAINFO, auth->ssl.cainfo);
+	if(auth->ssl.capath)
+		stat |= curl_easy_setopt(handle, CURLOPT_CAPATH, auth->ssl.capath);
+
 done:
-	return ret_value;
+    return stat;
 }
 
 /****************************************************************************
@@ -1204,8 +1247,18 @@ NCH5_s3comms_s3r_open(const char* root, NCS3SVC svc, const char *region, const c
     if (CURLE_OK != curl_easy_setopt(curlh, CURLOPT_FAILONERROR, 1L))
         HGOTO_ERROR(H5E_ARGS, NC_EINVAL, NULL, "error while setting CURL option (CURLOPT_FAILONERROR).");
 
-    if (CURLE_OK !=  ncrc_curl_setopts(curlh))
-        HGOTO_ERROR(H5E_ARGS, NC_EINVAL, NULL, "error while setting CURL option (CURLOPT_VERBOSE).");
+    /* Load auth info from rc file*/
+    NCURI* uri = NULL;
+    NCauth* auth = NULL;
+    if(ncuriparse(handle->rootpath,&uri))
+        HGOTO_ERROR(H5E_ARGS, NC_EINVAL, NULL, "problem parsing handle root path!");
+    if (uri) {
+        if(NC_authsetup(&auth, uri))
+            HGOTO_ERROR(H5E_ARGS, NC_EINVAL, NULL, "problem setting up authentication!");
+    }
+    if (CURLE_OK != set_curl_opts(curlh, auth))
+        //    if (CURLE_OK !=  ncrc_curl_setopts(curlh))
+        HGOTO_ERROR(H5E_ARGS, NC_EINVAL, NULL, "error while setting CURL Auth options");
 
     handle->curlhandle = curlh;
 
@@ -1217,6 +1270,8 @@ NCH5_s3comms_s3r_open(const char* root, NCS3SVC svc, const char *region, const c
     strcpy(handle->httpverb, "GET");
 
 done:
+	ncurifree(uri);
+	NC_authfree(auth);
     nullfree(signing_key);
     if (ret_value != SUCCEED) {
         if (curlh != NULL)
