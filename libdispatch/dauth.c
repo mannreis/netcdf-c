@@ -298,9 +298,15 @@ setauthfield(NCauth* auth, const char* flag, const char* value)
 	}
     }
     if(strcmp(flag,"HTTP.SSL.VALIDATE")==0) {
-        if(atoi(value)) {
-	    auth->ssl.verifypeer = 1;
-	    auth->ssl.verifyhost = 2;
+	switch (atoi(value)) {
+	case 0:
+		auth->ssl.verifypeer = 0;
+		auth->ssl.verifyhost = 0;
+		break;
+	default:
+		auth->ssl.verifypeer = 1;
+		auth->ssl.verifyhost = 2;
+		break;
 	}
     }
 
