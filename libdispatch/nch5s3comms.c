@@ -2711,11 +2711,6 @@ perform_request(s3r_t* handle, long* httpcodep)
     (void)trace(curlh,1);
 #endif
 
-    const char *ca_cert_file = getenv("SSL_CERT_FILE");
-    if (ca_cert_file != NULL) {
-        // Set the CA certificate file path retrieved from the environment
-        curl_easy_setopt(curlh, CURLOPT_CAINFO, ca_cert_file);
-    }
     if (CURLE_OK != curl_easy_setopt(curlh, CURLOPT_ERRORBUFFER, curlerrbuf))
         HGOTO_ERROR(H5E_ARGS, NC_EINVAL, FAIL, "problem setting error buffer");
 
