@@ -638,14 +638,16 @@ maketruekey(const char* rootpath, const char* key, char** truekeyp)
 
     truekey = ncbytesnew();
     if(truekey == NULL) {stat = NC_ENOMEM; goto done;}
-    if(rootpath[0] != '/')    
-        ncbytescat(truekey,"/"); /* force leading '/' */
     rootlen = strlen(rootpath);
+    if ( rootlen>0 ){
+        if(rootpath[0] != '/')    
+            ncbytescat(truekey,"/"); /* force leading '/' */
 
-    /* Force no trailing '/' */
-    if(rootpath[rootlen-1] == '/') rootlen--;
-    ncbytesappendn(truekey,rootpath,rootlen);
-    ncbytesnull(truekey);
+        /* Force no trailing '/' */
+        if(rootpath[rootlen-1] == '/') rootlen--;
+        ncbytesappendn(truekey,rootpath,rootlen);
+        ncbytesnull(truekey);
+    }
 
     keylen = nulllen(key);    
     if(keylen > 0) {
