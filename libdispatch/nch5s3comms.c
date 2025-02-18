@@ -1426,7 +1426,7 @@ NCH5_s3comms_s3r_getkeys(s3r_t *handle, const char* url, s3r_buf_t* response, lo
      * Execute           *
      *********************/
 
-    if((SUCCEED != NCH5_s3comms_s3r_execute(handle, url, HTTPGET, NULL, NULL, otherheaders, &httpcode, content)))
+    if(( ret_value = NCH5_s3comms_s3r_execute(handle, url, HTTPGET, NULL, NULL, otherheaders, &httpcode, content)))
         HGOTO_ERROR(H5E_ARGS, ret_value, FAIL, "execute failed.");
     if(response) {
 	response->count = vslength(content);
