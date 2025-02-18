@@ -29,6 +29,7 @@ typedef struct NCauth {
 	char* netrc; /*CURLOPT_NETRC,CURLOPT_NETRC_FILE*/
     } curlflags;
     struct ssl {
+	int disabled; /*CURLOPT_USE_SSL*/
 	int   verifypeer; /* CURLOPT_SSL_VERIFYPEER;
                              do not do this when cert might be self-signed
                              or temporarily incorrect */

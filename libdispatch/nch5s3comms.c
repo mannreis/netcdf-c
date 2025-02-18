@@ -766,6 +766,12 @@ CURLcode set_curl_opts(CURL *handle, NCauth *auth)
 #endif
 	    }
 	}
+
+	if(auth->ssl.disabled) {
+		stat |= curl_easy_setopt(handle, CURLOPT_USE_SSL, CURLUSESSL_NONE);
+	}else{
+		stat |= curl_easy_setopt(handle, CURLOPT_USE_SSL, CURLUSESSL_ALL);
+	
 	/* VERIFYPEER == 0 => VERIFYHOST == 0 */
 	/* We need to have 2 states: default and a set value */
 	/* So -1 => default >= 0 => use value */
@@ -789,7 +795,7 @@ CURLcode set_curl_opts(CURL *handle, NCauth *auth)
 		stat |= curl_easy_setopt(handle, CURLOPT_CAINFO, auth->ssl.cainfo);
 	if(auth->ssl.capath)
 		stat |= curl_easy_setopt(handle, CURLOPT_CAPATH, auth->ssl.capath);
-
+	}
 done:
     return stat;
 }

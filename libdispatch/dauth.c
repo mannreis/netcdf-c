@@ -40,6 +40,7 @@ static const char* AUTHDEFAULTS[] = {
 "HTTP.TIMEOUT","1800", /*seconds */ /* Long but not infinite */
 "HTTP.CONNECTTIMEOUT","50", /*seconds */ /* Long but not infinite */
 "HTTP.ENCODE","1", /* Use default */
+"HTTP.SSL.DISABLE","0", /* Use SSL */
 NULL,
 };
 
@@ -148,6 +149,9 @@ NC_authsetup(NCauth** authp, NCURI* uri)
     /* Alias for VERIFYHOST + VERIFYPEER */
     setauthfield(auth,"HTTP.SSL.VALIDATE",
 			NC_rclookup("HTTP.SSL.VALIDATE",uri_hostport,uri->path));
+    /* Alias for CURLOPT_USE_SSL*/
+    setauthfield(auth,"HTTP.SSL.DISABLE",
+			NC_rclookup("HTTP.SSL.DISABLE",uri_hostport,uri->path));
     setauthfield(auth,"HTTP.NETRC",
 			NC_rclookup("HTTP.NETRC",uri_hostport,uri->path));
 
@@ -353,6 +357,9 @@ setauthfield(NCauth* auth, const char* flag, const char* value)
 #ifdef DEBUG
             nclog(NCLOGNOTE,"HTTP.SSL.CAPATH: %s", auth->ssl.capath);
 #endif
+    }
+    if(strcmp(flag,"HTTP.SSL.DISABLE")==0) {
+	auth->ssl.disabled = atoi(value);
     }
     if(strcmp(flag,"HTTP.NETRC")==0) {
         nullfree(auth->curlflags.netrc);
