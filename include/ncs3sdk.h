@@ -27,6 +27,7 @@ typedef struct NCS3INFO {
     char* bucket; /* bucket name */
     char* rootkey;
     char* profile;
+    int secure; /* true if https */
     NCS3SVC svc;
 } NCS3INFO;
 

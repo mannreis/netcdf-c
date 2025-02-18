@@ -187,7 +187,7 @@ s3sdkcreateconfig(NCS3INFO* info)
 
     if(info->profile)
         config.profileName = info->profile;
-    config.scheme = Aws::Http::Scheme::HTTPS;
+    config.scheme = info->secure? Aws::Http::Scheme::HTTPS: Aws::Http::Scheme::HTTP;
     //config.connectTimeoutMs = 1000;
     //config.requestTimeoutMs = 0;
     config.connectTimeoutMs = 300000;

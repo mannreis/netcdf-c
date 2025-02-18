@@ -225,6 +225,11 @@ zs3open(const char *path, mode_t mode, size64_t flags, void* skips3list, NCZMAP*
         }else{
             z3map->s3.host = strdup(url->host);
         }
+        if(strcmp(url->protocol,"https")==0){
+            z3map->s3.secure = 1;
+        }else {
+            z3map->s3.secure = 0;
+        }
     }else{
         /* Convert to canonical path-style */
         if((stat = NC_s3urlprocess(url,&z3map->s3,NULL))) goto done;
