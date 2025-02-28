@@ -385,14 +385,20 @@ NCZ_inferattrtype(const char* aname, nc_type typehint, const NCjson* values, nc_
     const NCjson* value = NULL;
 
     NC_UNUSED(aname);
-
+    
+    if (values == NULL) {
+        typeid = NC_NAT;
+        goto done;
+    }
+    if(NCJsort(values) == NCJ_DICT && NCJdictlength(values) == 0)
+        {typeid = NC_NAT; goto done;}
     if(NCJsort(values) == NCJ_ARRAY && NCJarraylength(values) == 0)
         {typeid = NC_NAT; goto done;} /* Empty array is illegal */
 
     if(NCJsort(values) == NCJ_NULL)
         {typeid = NC_NAT; goto done;} /* NULL is also illegal */
 
-    assert(NCJisatomic(values) || (NCJsort(values) == NCJ_ARRAY /*&& all i: NCJisatomic(NCJith(values)) == NCJ_ARRAY*/));
+    //assert(NCJisatomic(values) || (NCJsort(values) == NCJ_ARRAY /*&& all i: NCJisatomic(NCJith(values)) == NCJ_ARRAY*/));
 
     /* Get the first element */
     if(NCJsort(values) == NCJ_ARRAY) {
