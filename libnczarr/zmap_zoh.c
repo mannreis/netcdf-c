@@ -65,7 +65,12 @@ struct request {
 	struct MemoryChunk mem;
 };
 
-typedef struct zoh_client_internal {
+typedef struct result {
+	long http_code;
+} result;
+
+typedef struct zoh_client_internal
+{
 	struct request req[NUM_REQUESTS];
 	struct CURL_M *curlmhandle;
 	int still_running;
@@ -211,8 +216,13 @@ zohclose(NCZMAP *map, int deleteit)
 	return NC_NOERR;
 }
 
-int request_perform(struct request * req) {
-	return curl_easy_perform(req->curlhandle);
+int request_perform(struct request * req, struct result *res) {
+	CURLcode code = curl_easy_perform(req->curlhandle);
+	if (CURLE_OK != code) {
+		// extract HTTP code if available
+		curl_easy_getinfo(req->curlhandle, CURLINFO_RESPONSE_CODE, res->http_code);
+	}
+	return code;
 }
 
 /* Prefix key with path to root to make true key */
@@ -280,7 +290,12 @@ zohexists(NCZMAP *map, const char *key)
 
 	char * url_s = ncuribuild(&url,NULL,NULL,NCURIPATH);
 	request_setup(&client->req[0], url_s, HTTPHEAD);
-	stat = request_perform(&client->req[0]);
+	struct result res = {0};
+	stat = request_perform(&client->req[0], &res);
+	if(stat){
+		nclog(NCLOGERR, "Failed on checking %s [%ld]", key, res.http_code );
+	}
+
 done:
 	nullfree(fullkey);
 	nullfree(url_s);
@@ -343,7 +358,10 @@ zohlen(NCZMAP *map, const char *key, size64_t *lenp)
 	char * url_s = ncuribuild(&url,NULL,NULL,NCURIPATH);
 
 	request_setup(req, url_s, HTTPHEAD);
-	if ((stat = request_perform(req)) != NC_NOERR) {
+	struct result res = {0};
+	stat = request_perform(req, &res);
+	if(stat){
+		nclog(NCLOGERR, "Failed getting length of %s [%ld]", key, res.http_code);
 		goto done;
 	}
 
@@ -385,8 +403,10 @@ zohread(NCZMAP *map, const char *key, size64_t start, size64_t count, void *cont
 
 	char * url_s = ncuribuild(&url,NULL,NULL,NCURIPATH);
 	request_setup(req, url_s, HTTPGET);
-	if ((stat = request_perform(req)) != NC_NOERR || req->mem.memory == NULL) {
-		printf("Problem when reading: %d", stat);
+	struct result res = {0};
+	stat = request_perform(req, &res);
+	if(stat || req->mem.memory == NULL){
+		nclog(NCLOGERR, "Failed reading %s [%ld]", key, res.http_code);
 		goto done;
 	}
 
@@ -584,7 +604,6 @@ size_t curl_callback_allocate_content_length (char *buffer, size_t size, size_t 
 			nclog(NCLOGERR, "MemoryChunk is NULL");
 		}
         mem->u.allocated_size = (size_t)atol(buffer + 15);
-        printf("Content-Length: %zu bytes\n", mem->u.allocated_size);
 		nullfree(mem->memory);
 		mem->memory = calloc(1,mem->u.allocated_size + 1);  // Allocate once
 		if (!mem->memory)
@@ -670,6 +689,10 @@ static int request_setup(struct request * req, const char* url, HTTPVerb verb) {
 				stat = NC_EINVAL;
 				goto done;
 			}
+        	if (CURLE_OK != curl_easy_setopt(curlh, CURLOPT_HTTPHEADER, (void *) req->curlheaders)){
+				stat = NC_EINVAL;
+				goto done;
+			}
         	if (CURLE_OK != curl_easy_setopt(curlh, CURLOPT_WRITEFUNCTION, curl_callback_writetomemory)){
 				stat = NC_EINVAL;
 				goto done;
@@ -747,7 +770,7 @@ CURLcode ncrc_curl_setopts(CURL *curlh) {
 		}
 	}
 	value = NC_rclookup("HTTP.VERBOSE", NULL, NULL);
-	if (value != NULL && CURLE_OK != (stat = curl_easy_setopt(curlh, CURLOPT_VERBOSE, value?1L:NULL))){
+	if (value != NULL && CURLE_OK != (stat = curl_easy_setopt(curlh, CURLOPT_VERBOSE, value[0]!='0'?1L:0L))){
 		nclog(NCLOGERR,"Unable to set HTTP.VERBOSE: %s\n",value);
 		goto done;
 	}
@@ -775,6 +798,19 @@ CURLcode ncrc_curl_setopts(CURL *curlh) {
 			}
 		}
 	}
+
+	char *token = NULL;
+	if (NULL != (token = getenv("NETCDF_ZOH_TOKEN"))){
+		if(CURLE_OK != (stat = curl_easy_setopt(curlh, CURLOPT_HTTPAUTH, (long)CURLAUTH_BEARER))){
+			nclog(NCLOGERR, "Failed to set Authentication for cURL\n");
+			goto done;
+		}
+		if(CURLE_OK != (stat = curl_easy_setopt(curlh, CURLOPT_XOAUTH2_BEARER, token))){
+			nclog(NCLOGERR, "Failed to set token in cURL\n");
+			goto done;
+		}
+	}
+
 done:
 	return stat;
 }
