@@ -339,7 +339,7 @@ NCZ_blosc_modify_parameters(const NCproplist* env, unsigned* idp, size_t* vnpara
     /* Get variable info */
     if((stat = nc_inq_var((int)ncid,(int)varid,vname,&vtype,&ndims,NULL,NULL))) goto done;
 
-    if(ndims == 0) {stat = NC_EFILTER; goto done;}
+//    if(ndims == 0) {stat = NC_EFILTER; goto done;}
 
     /* Get the typesize */
     if((stat = nc_inq_type((int)ncid,vtype,NULL,&typesize))) goto done;
