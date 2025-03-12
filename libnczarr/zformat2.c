@@ -385,7 +385,7 @@ ZF2_decode_var(NC_FILE_INFO_T* file, NC_VAR_INFO_T* var, struct ZOBJ* zobj, NCli
     jvar = zobj->jobj;
     assert(jvar != NULL);
     jatts = zobj->jatts;
-
+    ZTRACE(3,"file=%s var=%s",file->controller->path,var->hdr.name);
     /* Verify the format */
     {
 	int format;
@@ -415,10 +415,10 @@ ZF2_decode_var(NC_FILE_INFO_T* file, NC_VAR_INFO_T* var, struct ZOBJ* zobj, NCli
     { /* Extract the shape */
 	NCJcheck(NCJdictget(jvar,"shape",(NCjson**)&jvalue));
 	if(NCJsort(jvalue) != NCJ_ARRAY) {stat = THROW(NC_ENOTZARR); goto done;}
-	zarr_rank = NCJarraylength(jvalue);
-	if(zarr_rank == 0)  {stat = THROW(NC_ENOTZARR); goto done;}
-	if((shapes = (size64_t*)calloc(zarr_rank,sizeof(size64_t)))==NULL) {stat = NC_ENOMEM; goto done;}
-	if((stat=NCZ_decodesizet64vec(jvalue, &zarr_rank, shapes))) goto done;	
+	if ( 0 < (zarr_rank = NCJarraylength(jvalue))) {
+        if((shapes = (size64_t*)calloc(zarr_rank,sizeof(size64_t)))==NULL) {stat = NC_ENOMEM; goto done;}
+        if((stat=NCZ_decodesizet64vec(jvalue, &zarr_rank, shapes))) goto done;	
+    }
     }
 
     /*
@@ -464,10 +464,17 @@ ZF2_decode_var(NC_FILE_INFO_T* file, NC_VAR_INFO_T* var, struct ZOBJ* zobj, NCli
     /* Rank processing */
     {
 	if(zarr_rank == 0) {
+	    // No shape, no chunks, no (xarray) dimensions => scalar
+	    if(NC_NOERR == (stat = NCJdictget(jvar,"chunks",&jvalue)) && \
+			jvalue && NCJsort(jvalue) == NCJ_ARRAY && NCJarraylength(jvalue) == 0 && \
+			NCJarraylength(jxarray) == 0) {
+			zvar->scalar = 1;
+	    }else{
 	    /* suppress variable */
 	    ZLOG(NCLOGWARN,"Empty shape for variable %s suppressed",var->hdr.name);
 	    suppress = 1;
 	    goto suppressvar;
+	    }
 	}
 	if(zvar->scalar)
 	    netcdf_rank = 0;
@@ -521,7 +528,7 @@ ZF2_decode_var(NC_FILE_INFO_T* file, NC_VAR_INFO_T* var, struct ZOBJ* zobj, NCli
 	NCJcheck(NCJdictget(jvar,"chunks",(NCjson**)&jvalue));
 	if(jvalue != NULL && NCJsort(jvalue) != NCJ_ARRAY)
 	    {stat = (THROW(NC_ENCZARR)); goto done;}
-        if(zarr_rank == 0) {stat = NC_ENCZARR; goto done;}
+        if(zarr_rank == 0 && !zvar->scalar) {stat = NC_ENCZARR; goto done;}
 	if(var->ndims != netcdf_rank) {stat = (THROW(NC_ENCZARR)); goto done;}
         var->storage = NC_CHUNKED;
 	if((chunks = malloc(sizeof(size64_t)*zarr_rank)) == NULL) {stat = NC_ENOMEM; goto done;}
