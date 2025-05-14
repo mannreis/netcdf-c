@@ -416,9 +416,10 @@ ZF2_decode_var(NC_FILE_INFO_T* file, NC_VAR_INFO_T* var, struct ZOBJ* zobj, NCli
 	NCJcheck(NCJdictget(jvar,"shape",(NCjson**)&jvalue));
 	if(NCJsort(jvalue) != NCJ_ARRAY) {stat = THROW(NC_ENOTZARR); goto done;}
 	zarr_rank = NCJarraylength(jvalue);
-	if(zarr_rank == 0)  {stat = THROW(NC_ENOTZARR); goto done;}
-	if((shapes = (size64_t*)calloc(zarr_rank,sizeof(size64_t)))==NULL) {stat = NC_ENOMEM; goto done;}
-	if((stat=NCZ_decodesizet64vec(jvalue, &zarr_rank, shapes))) goto done;	
+	if(zarr_rank != 0)  {
+        if((shapes = (size64_t*)calloc(zarr_rank,sizeof(size64_t)))==NULL) {stat = NC_ENOMEM; goto done;}
+        if((stat=NCZ_decodesizet64vec(jvalue, &zarr_rank, shapes))) goto done;
+        }
     }
 
     /*
@@ -463,13 +464,8 @@ ZF2_decode_var(NC_FILE_INFO_T* file, NC_VAR_INFO_T* var, struct ZOBJ* zobj, NCli
 
     /* Rank processing */
     {
-	if(zarr_rank == 0) {
-	    /* suppress variable */
-	    ZLOG(NCLOGWARN,"Empty shape for variable %s suppressed",var->hdr.name);
-	    suppress = 1;
-	    goto suppressvar;
-	}
-	if(zvar->scalar)
+
+	if(zvar->scalar || zarr_rank == 0)
 	    netcdf_rank = 0;
 	else
 	    netcdf_rank = nclistlength(dimrefs);
@@ -521,12 +517,15 @@ ZF2_decode_var(NC_FILE_INFO_T* file, NC_VAR_INFO_T* var, struct ZOBJ* zobj, NCli
 	NCJcheck(NCJdictget(jvar,"chunks",(NCjson**)&jvalue));
 	if(jvalue != NULL && NCJsort(jvalue) != NCJ_ARRAY)
 	    {stat = (THROW(NC_ENCZARR)); goto done;}
-        if(zarr_rank == 0) {stat = NC_ENCZARR; goto done;}
+        if(zarr_rank != 0) {
 	if(var->ndims != netcdf_rank) {stat = (THROW(NC_ENCZARR)); goto done;}
         var->storage = NC_CHUNKED;
 	if((chunks = malloc(sizeof(size64_t)*zarr_rank)) == NULL) {stat = NC_ENOMEM; goto done;}
 	if((stat = NCZ_decodesizet64vec(jvalue, &zarr_rank, chunks)))
 		{stat = NC_ENOMEM; goto done;}
+        }else{
+            zvar->scalar = 1;
+        }
     }
 
     /* Capture row vs column major; currently, column major not used*/
