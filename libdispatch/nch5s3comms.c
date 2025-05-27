@@ -436,8 +436,8 @@ curlheadercallback(char *ptr, size_t size, size_t nmemb, void *userdata)
 
     if (sds->magic != S3COMMS_CALLBACK_STRUCT_MAGIC)
         return 0;
-    if(vslength(sds->data) > 0)
-        goto done; /* already found */
+    //if(vslength(sds->data) > 0)
+    //    goto done; /* already found */
 
     /* skip leading white space */
     for(j=0,i=0;i<len;i++) {if(!isspace(line[i])) {j = i; break;}}
