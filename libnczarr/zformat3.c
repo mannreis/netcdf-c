@@ -138,6 +138,8 @@ done:
 int
 NCZF3_finalize(void)
 {
+    NCJreclaim(NCZ_Bytes_Little_Json);
+    NCJreclaim(NCZ_Bytes_Big_Json);
     return NC_NOERR;
 }
 

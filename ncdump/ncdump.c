@@ -2276,6 +2276,7 @@ main(int argc, char *argv[])
     int Xp_flag = 0;    /* indicate that -Xp flag was set */
     int XF_flag = 0;    /* indicate that -XF flag was set */
     char* path = NULL;
+	char *name = NULL;
     char errmsg[4096];
 
     errmsg[0] = '\0';
@@ -2458,8 +2459,10 @@ main(int argc, char *argv[])
 	goto fail;
     }
 
-    if (!nameopt)
-        formatting_specs.name = name_path(path);
+    if (!nameopt) {
+		name = name_path(path);
+        formatting_specs.name = name;
+	}
     if (argc > 0) {
         int ncid;
 	/* If path is a URL, do some fixups */
@@ -2521,7 +2524,7 @@ main(int argc, char *argv[])
 	    }
 	    NC_CHECK( nc_close(ncid) );
     }
-    nullfree(path) path = NULL;
+	nullfree(path) path = NULL;
     nc_finalize();
     exit(EXIT_SUCCESS);
 
@@ -2530,6 +2533,7 @@ fail: /* ncstat failures */
     if(ncstat && strlen(errmsg) == 0)
 	snprintf(errmsg,sizeof(errmsg),"%s: %s", path, nc_strerror(ncstat));
     nullfree(path); path = NULL;
+	nullfree(name); name = NULL;
     if(strlen(errmsg) > 0)
 	error("%s", errmsg);
     nc_finalize();
