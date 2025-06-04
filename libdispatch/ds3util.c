@@ -661,19 +661,18 @@ void NC_s3getcredentials(const char *profile, const char **region, const char** 
         NC_s3profilelookup(profile, "aws_secret_access_key", accesskey);
         NC_s3profilelookup(profile, "region", region);
     }
-    else
-    { // We load from env if not in profile
-        NCglobalstate* gstate = NC_getglobalstate();
-        if(gstate->aws.access_key_id != NULL && accessid){
-            *accessid = gstate->aws.access_key_id;
-        }
-        if (gstate->aws.secret_access_key != NULL && accesskey){
-            *accesskey = gstate->aws.secret_access_key;
-        }
-        if(gstate->aws.default_region != NULL && region){
-            *region = gstate->aws.default_region;
-        }
+   // We load from env possibly overwritting profile
+    NCglobalstate* gstate = NC_getglobalstate();
+    if(gstate->aws.access_key_id != NULL && accessid){
+        *accessid = gstate->aws.access_key_id;
     }
+    if (gstate->aws.secret_access_key != NULL && accesskey){
+        *accesskey = gstate->aws.secret_access_key;
+    }
+    if(gstate->aws.default_region != NULL && region){
+        *region = gstate->aws.default_region;
+    }
+   
 }
 
 
