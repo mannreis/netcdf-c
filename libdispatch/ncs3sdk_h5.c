@@ -225,13 +225,20 @@ NC_s3sdkbucketcreate(void* s3client0, const char* region, const char* bucket, ch
 {
     int stat = NC_NOERR;
     NCS3CLIENT* s3client = (NCS3CLIENT*)s3client0;
+    NCbytes* url = ncbytesnew();
+    long httpcode = 0;
     
-    NC_UNUSED(s3client);
-
     NCTRACE(11,"region=%s bucket=%s",region,bucket);
     if(errmsgp) *errmsgp = NULL;
-    fprintf(stderr,"create bucket: %s\n",bucket); fflush(stderr);
-    return NCUNTRACE(stat);    
+
+    if((stat = makes3fullpath(s3client->rooturl,bucket,NULL,NULL,url))) goto done;
+    const s3r_buf_t emptybuf = {0,""};
+    if((stat = NCH5_s3comms_s3r_write(s3client->h5s3client, ncbytescontents(url), &emptybuf, &httpcode))) goto done;
+    stat = httptonc(httpcode);
+
+done:
+    ncbytesfree(url);
+    return NCUNTRACEX(stat,"created=%d",(stat == NC_NOERR || stat == NC_EEXIST));
 }
 
 EXTERNL int
@@ -1118,6 +1125,7 @@ httptonc(long httpcode)
         case 401: case 402: case 403:
             stat = NC_EAUTH; break;
         case 404: stat = NC_ENOOBJECT; break;
+        case 409: stat = NC_EEXIST; break; /* conflict */
         default: stat = NC_EINVAL; break;
         }
     } else

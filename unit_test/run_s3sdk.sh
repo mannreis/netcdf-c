@@ -27,6 +27,9 @@ THISDIR=`pwd`
 cd $ISOPATH
 
 echo -e "Running S3 AWSSDK Unit Tests."
+echo -e "\to Checking ${URL} create"
+${CMD} ${execdir}/test_s3sdk -u "${URL}"                                  create
+
 echo -e "\to Checking ${URL} exists"
 ${CMD} ${execdir}/test_s3sdk -u "${URL}"                                  exists
 

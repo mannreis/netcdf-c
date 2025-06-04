@@ -30,7 +30,7 @@
 
 #define LONGCOUNT 1010
 
-enum Actions {ERROR_ACTION, EXISTS_ACTION, SIZE_ACTION, READ_ACTION, WRITE_ACTION, DELETE_ACTION, LIST_ACTION, LONGLIST_ACTION, LISTALL_ACTION};
+enum Actions {ERROR_ACTION, CREATE_ACTION, EXISTS_ACTION, SIZE_ACTION, READ_ACTION, WRITE_ACTION, DELETE_ACTION, LIST_ACTION, LONGLIST_ACTION, LISTALL_ACTION};
 
 struct Options {
     int debug;
@@ -72,7 +72,8 @@ check(int code, const char* fcn, int line)
 static enum Actions
 actionfor(const char* s)
 {
-    if(strcasecmp(s,"exists")==0) return EXISTS_ACTION;
+    if(strcasecmp(s,"create")==0) return CREATE_ACTION;
+    else if(strcasecmp(s,"exists")==0) return EXISTS_ACTION;
     else if(strcasecmp(s,"size")==0) return SIZE_ACTION;
     else if(strcasecmp(s,"read")==0) return READ_ACTION;
     else if(strcasecmp(s,"write")==0) return WRITE_ACTION;
@@ -158,6 +159,28 @@ done:
     return stat;
 }
 #endif
+
+static int
+testbucketcreate(void)
+{
+    int stat = NC_NOERR;
+    seturl("https://s3.us-east-1.amazonaws.com/${S3TESTBUCKET}",NULL,!FORCE);
+
+    CHECK(profilesetup(dumpoptions.url));
+    newurl = ncuribuild(purl,NULL,NULL,NCURIALL);
+#ifdef DEBUG
+    printf("url=%s {url=%s bucket=%s region=%s profile=%s}\n",
+               dumpoptions.url,newurl,s3info.bucket,s3info.region,activeprofile);
+#endif
+    if((s3client = NC_s3sdkcreateclient(&s3info))==NULL) {CHECK(NC_ES3);}
+    stat = NC_s3sdkbucketcreate(s3client, s3info.region, s3info.bucket, NULL);
+    printf("testbucketcreate: %s\n", (stat==NC_NOERR) ?  "created": (stat==NC_EEXIST)?"already exists":nc_strerror(stat) );
+    stat = (stat==NC_NOERR || stat==NC_EEXIST) ? NC_NOERR : stat;
+
+done:
+    cleanup();
+    return stat;
+}
 
 static int
 testbucketexists(void)
@@ -520,13 +543,14 @@ main(int argc, char** argv)
 
         dumpoptions.action = actionfor(argv[0]);
 
-        if(dumpoptions.action != EXISTS_ACTION && dumpoptions.key == NULL) {
+        if(dumpoptions.action != CREATE_ACTION && dumpoptions.action != EXISTS_ACTION && dumpoptions.key == NULL) {
             fprintf(stderr,"no -k argument\n");
             stat = NC_EINVAL;
             goto done;
         }
 
         switch (dumpoptions.action) {
+        case CREATE_ACTION: stat = testbucketcreate(); break;
         case EXISTS_ACTION: stat = testbucketexists(); break;
         case SIZE_ACTION: stat = testinfo(); break;
         case READ_ACTION: stat = testread(); break;
