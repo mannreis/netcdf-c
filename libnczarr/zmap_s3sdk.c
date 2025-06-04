@@ -142,6 +142,9 @@ zs3create(const char *path, mode_t mode, size64_t flags, void* parameters, NCZMA
         {stat = NC_EURL; goto done;}
 
     z3map->s3client = NC_s3sdkcreateclient(&z3map->s3);
+    if(z3map->s3client == NULL) {
+        stat = NC_ES3; goto done;
+    }
 
     {
 	int exists = 0;
