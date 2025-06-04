@@ -9,6 +9,19 @@ set -e
 
 URL="https://${S3ENDPOINT}/${S3TESTBUCKET}"
 
+clean_environment() {
+    unset AWS_REGION
+    unset AWS_ACCESS_KEY_ID
+    unset AWS_SECRET_ACCESS_KEY
+}
+
+if test ${S3ENDPOINT} = "play.min.io" ; then
+    export AWS_REGION=${S3_AWS_REGION}
+    export AWS_ACCESS_KEY_ID="${S3_AWS_ACCESS_KEY_ID}"
+    export AWS_SECRET_ACCESS_KEY="${S3_AWS_SECRET_ACCESS_KEY}"
+    trap clean_environment EXIT
+fi
+
 isolate "testdir_uts3sdk"
 
 # Create an isolation path for S3; build on the isolation directory
