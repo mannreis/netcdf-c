@@ -392,11 +392,12 @@ NCZ_inferattrtype(const char* aname, nc_type typehint, const NCjson* values, nc_
     if(NCJsort(values) == NCJ_NULL)
         {typeid = NC_NAT; goto done;} /* NULL is also illegal */
 
-    assert(NCJisatomic(values) || (NCJsort(values) == NCJ_ARRAY /*&& all i: NCJisatomic(NCJith(values)) == NCJ_ARRAY*/));
-
     /* Get the first element */
     if(NCJsort(values) == NCJ_ARRAY) {
 	value = NCJith(values,0);
+    } else if (NCJsort(values) == NCJ_DICT) {
+        /* Get the only value */
+        value = NCJdictvalue(values, 0);
     } else if(NCJisatomic(values)) {
         value = values; /*singleton*/
 	singleton = 1;
