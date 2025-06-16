@@ -357,6 +357,51 @@ done:
     return ZUNTRACE(THROW(stat));
 }
 
+static int decode_endianess(const NCjson* jcodecs, int* endiannessp){
+    const NCjson* jvalue = NULL;
+    const NCjson* jcodec = NULL;
+    
+    assert(jcodecs != NULL && NCJsort(jcodecs) == NCJ_ARRAY && endiannessp != NULL);
+    
+    for (size_t i = 0; i < NCJarraylength(jcodecs); i++) {
+        jcodec = NCJith(jcodecs, i);
+        if(NCJsort(jcodec) != NCJ_DICT 
+        || NCJ_OK != NCJdictget(jcodec,"name",(NCjson**)&jvalue)
+        || jvalue == NULL) {
+            nclog(NCLOGWARN, "Ignoring invalid codec configuration in zarr array: %s", NCJstring(jcodec));
+            continue;
+        }
+        if (strcmp("sharding_indexed", NCJstring(jvalue)) == 0) {
+            if ((NC_NOERR == extract_named_config(jcodec, "configuration", &jvalue))) {
+                NCJdictget(jvalue, "codecs", (NCjson**)&jvalue);
+                if (jvalue == NULL || NCJsort(jvalue) != NCJ_ARRAY || NCJarraylength(jvalue) == 0) {
+                    nclog(NCLOGERR, "Ignoring invalid sharding_indexed codec configuration in zarr array: %s", NCJstring(jcodec));
+                    continue;
+                }
+                // Recursively find endianness in the codecs if shareded
+                decode_endianess(jvalue, endiannessp);
+                if(endiannessp != NULL) { return NC_NOERR; }
+            }
+        }
+        if(strcmp("bytes", NCJstring(jvalue)) == 0) {
+            if((NC_NOERR == extract_named_config(jcodec,"configuration",&jvalue))){
+                /* Get the endianness */
+                if(NC_NOERR == NCJdictget(jvalue,"endian",(NCjson**)&jvalue) && jvalue != NULL) {
+                    if(strcmp("big",NCJstring(jvalue))==0) { 
+                        *endiannessp = NC_ENDIAN_BIG;
+                        return NC_NOERR;
+                    }else if(strcmp("little",NCJstring(jvalue))==0){
+                        *endiannessp = NC_ENDIAN_LITTLE; 
+                        return NC_NOERR;
+                    }
+                    nclog(NCLOGWARN, "Invalid endianness in zarr array: %s", NCJstring(jvalue));
+                }
+            }
+        }
+    }
+    return NC_EZARRENCODING;
+}
+
 int
 ZF3_decode_var(NC_FILE_INFO_T* file, NC_VAR_INFO_T* var, struct ZOBJ* zobj, NClist* filtersj, size64_t** shapesp, size64_t** chunksp, NClist* dimrefs)
 {
@@ -366,7 +411,6 @@ ZF3_decode_var(NC_FILE_INFO_T* file, NC_VAR_INFO_T* var, struct ZOBJ* zobj, NCli
     NCZ_VAR_INFO_T* zvar = (NCZ_VAR_INFO_T*)var->format_var_info;
     const NCjson* jvar = NULL;
     const NCjson* jvalue = NULL;
-    const NCjson* jendian = NULL;
     const NCjson* jcodecs = NULL;
     const NCjson* jchunkgrid = NULL;
     const NCjson* jchunkkey = NULL;
@@ -517,18 +561,7 @@ ZF3_decode_var(NC_FILE_INFO_T* file, NC_VAR_INFO_T* var, struct ZOBJ* zobj, NCli
     NCJcheck(NCJdictget(jvar,"codecs",(NCjson**)&jcodecs));
     if(jcodecs == NULL || NCJarraylength(jcodecs) == 0) {stat = NC_ENOTZARR; goto done;}
     {	/* Get endianess from the first codec */
-	jendian = NCJith(jcodecs,0);
-	NCJcheck(NCJdictget(jendian,"name",(NCjson**)&jvalue));
-	if(strcmp("bytes",NCJstring(jvalue))!=0) {stat = NC_ENOTZARR; goto done;}
-	/* Get the configuration */
-	NCJcheck(NCJdictget(jendian,"configuration",(NCjson**)&jvalue));
-	if(NCJsort(jvalue) != NCJ_DICT) {stat = NC_ENOTZARR; goto done;}
-	/* Get the endianness */
-	NCJcheck(NCJdictget(jvalue,"endian",(NCjson**)&jvalue));
-	if(jvalue == NULL)  {stat = NC_ENOTZARR; goto done;}
-	if(strcmp("big",NCJstring(jvalue))==0) endianness = NC_ENDIAN_BIG;
-	else if(strcmp("little",NCJstring(jvalue))==0) endianness = NC_ENDIAN_LITTLE;
-	else  {stat = NC_ENOTZARR; goto done;}
+        if ((stat = decode_endianess(jcodecs, &endianness))) goto done;
 	if(endianness != NC_ENDIAN_NATIVE) {
 	    var->endianness = endianness;
 	    var->type_info->endianness = var->endianness; /* Propagate */
@@ -1751,7 +1784,7 @@ extract_named_config(const NCjson* jpair, const char* field, const NCjson** jval
     if(jname == NULL || jcfg == NULL || NCJsort(jcfg)!=NCJ_DICT) {stat = NC_ENOTZARR; goto done;}
     /* Allow getting name or configuration */
     if(strcmp("name",field)==0) {jvalue = jname;}
-    else if(strcmp("configuratio",field)==0) {jvalue = jcfg;}
+    else if(strcmp("configuration",field)==0) {jvalue = jcfg;}
     else { /* get a field from the configuration */
 	NCJcheck(NCJdictget(jcfg,field,(NCjson**)&jvalue));
     }

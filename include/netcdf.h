@@ -542,8 +542,9 @@ by the desired type. */
 #define NC_EPLUGIN       (-142)    /**< Unclassified failure in accessing a dynamically loaded plugin> */
 #define NC_ENOTZARR      (-143)    /**< Malformed (NC)Zarr file */
 #define NC_EZARRMETA     (-144)    /**< Malformed (NC)Zarr file consolidated metadata */
+#define NC_EZARRENCODING (-145)    /**< Zarr encoding error */
 
-#define NC4_LAST_ERROR   (-144)    /**< @internal All netCDF errors > this. */
+#define NC4_LAST_ERROR   (-145)    /**< @internal All netCDF errors > this. */
 
 /*
  * Don't forget to update docs/all-error-codes.md if adding new error codes here!
