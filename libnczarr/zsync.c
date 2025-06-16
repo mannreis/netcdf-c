@@ -412,7 +412,7 @@ ncz_decode_subgrps(NC_FILE_INFO_T* file, NC_GRP_INFO_T* parent, NClist* subgrpna
 	/* Create the group object */
 	if((stat=ncz4_create_grp(file,parent,subgrpname,&subgrp))) goto done;
 	/* Download the group's metadata */
-	if((stat = NCZF_download_grp(file,subgrp,&zobj))) goto done;
+	if((stat = NCZF_download_grp(file,file->root_grp,&zobj))) goto done;
 	/* Fill in the group object */
         if((stat = ncz_decode_grp(file,subgrp,&zobj))) goto done;
         NCZ_clear_zobj(&zobj);

@@ -70,16 +70,20 @@ list_nodes_csl_v3(NC_FILE_INFO_T* file, const char* prefix, NClist* matches)
     NClist* segments = nclistnew();
 
     assert(zmd->jmeta != NULL && NCJsort(zmd->jmeta)==NCJ_DICT);
+    NCjson *jzmd = NULL;
+    NCJdictget(zmd->jmeta, "metadata",&jzmd);
+    assert(jzmd != NULL && NCJsort(jzmd)==NCJ_DICT);
+
     if(prefix[0] == '/') prefix++; /* drop leading '/' for search purposes */
     plen = strlen(prefix);
     /* Walk the metadata nodes and collect the matches */
-    for(i=0;i<NCJdictlength(zmd->jmeta);i++) {
-	const NCjson* jkey = NCJdictkey(zmd->jmeta,i);
+    for(i=0;i<NCJdictlength(jzmd);i++) {
+	const NCjson* jkey = NCJdictkey(jzmd,i);
 	const char* skey = NCJstring(jkey);
 	size_t slen = strlen(skey);
 	size_t j, found;
 	/* Check for prefix taking root key into acct. */
-	if((plen == 0 && slen > 0) || strncmp(skey,prefix,plen) > 0) {
+	if((plen == 0 && slen > 0) || ((plen < slen) &&  strncmp(skey,prefix,plen) == 0 )){
 	    const char* suffix = NULL;
 	    /* This is a match and is not just the prefix*/
 	    /* truncate any segments beyond the first */
@@ -111,15 +115,18 @@ listall_nodes_csl_v3(NC_FILE_INFO_T* file, const char* prefix, NClist* matches)
     NCZ_FILE_INFO_T* zfile = (NCZ_FILE_INFO_T*)file->format_file_info;
     size_t i,plen;
     NCZ_Metadata* zmd = &zfile->metadata_handler;
+    NCjson *jzmd = NULL;
     NCbytes* key = ncbytesnew();
 
     assert(zmd->jmeta != NULL && NCJsort(zmd->jmeta)==NCJ_DICT);
+    NCJdictget(zmd->jmeta, "metadata",&jzmd);
+    assert(jzmd != NULL && NCJsort(jzmd)==NCJ_DICT);
     if(prefix[0] == '/') prefix++; /* drop leading '/' for search purposes */
     plen = strlen(prefix);
     ncbytescat(key,"/");
     /* Walk the metadata nodes and collect the matches (with leading '/') */
-    for(i=0;i<NCJdictlength(zmd->jmeta);i++) {
-	NCjson* jkey = NCJdictkey(zmd->jmeta,i);
+    for(i=0;i<NCJdictlength(jzmd);i++) {
+	NCjson* jkey = NCJdictkey(jzmd,i);
 	const char* skey = NCJstring(jkey);
 	if(strncmp(skey,prefix,plen) > 0) {
 	    /* This is a match and is not just the prefix*/
@@ -142,14 +149,15 @@ fetch_csl_json_content_v3(NC_FILE_INFO_T* file, NCZMD_MetadataType zobj_t, const
 
     NC_UNUSED(zobj_t);
     assert(zmd->jmeta != NULL);
-    /* If asking for /zarr.json, then short circuit to read from metadata handler */
-    if(strcmp(key,Z2METAROOT)==0) {
-	jobj = zmd->jcsl;
+    /* If asking for / then short circuit to read from metadata handler */
+    if(key == NULL || strcmp("/",key)==0 || strcmp("",key) == 0  ) {
+	NCJcheck(NCJclone(zmd->jcsl, &jobj));
         goto retval;
     }
-    if(key[0] == '/') key++; /* remove any leading key */
     /* Meta-data is stored a mostly flat format using the whole key (with leading / removed) */
-    if ((stat = NCJdictget(zmd->jmeta, key, (NCjson**)&jkey))) goto done;
+    /* Get the key from the consolidated metadata */
+    NCJdictget(zmd->jmeta, "metadata", (NCjson**)&jobj);
+    if ((stat = NCJdictget(jobj, key, (NCjson**)&jkey))) goto done;
     NCJcheck(NCJclone(jkey, &jobj));
 retval:
     if(jobj !=  NULL)
@@ -238,7 +246,7 @@ open_csl_v3(NC_FILE_INFO_T* file)
     }
     if(zmd->jcsl == NULL || NCJsort(zmd->jcsl) != NCJ_DICT) {stat = NC_EZARRMETA; goto done;}
     /* Pull out the "metadata" key and save it */
-    NCJcheck(NCJdictget(zmd->jcsl,"metadata",(NCjson**)&zmd->jmeta));
+    NCJcheck(NCJdictget(zmd->jcsl,"consolidated_metadata",(NCjson**)&zmd->jmeta));
     if(zmd->jmeta == NULL || NCJsort(zmd->jmeta) != NCJ_DICT) {stat = NC_EZARRMETA; goto done;}
 done:
     return stat;

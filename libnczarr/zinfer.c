@@ -265,7 +265,7 @@ NCZ_infer_open_nczarr_format(NC_FILE_INFO_T* file)
     if(zarrformat == ZARRFORMAT3 && nczarrformat == 0) {
 	const NCjson* jrootatts = NULL;
         /* Look for "/zarr.json" */
-        if((stat = NCZMD_fetch_json_content(file, NCZMD_GROUP, Z3METAROOT, &jrootgrp))) goto done;
+        if((stat = NCZMD_fetch_json_content(file, NCZMD_GROUP, NULL, &jrootgrp))) goto done;
 	if(jrootgrp == NULL || NCJsort(jrootgrp) != NCJ_DICT) {
 	    nczarrformat = NCZARRFORMAT0;
 	} else {

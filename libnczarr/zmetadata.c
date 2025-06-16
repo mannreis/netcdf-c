@@ -378,7 +378,7 @@ NCZMD_set_metadata_handler(NC_FILE_INFO_T *file)
 	case 3: /* For V3, we need to look inside the root group's zarr.json */
 	    if((stat = NCZ_downloadjson(zfile->map,Z3METADATA,&jcsl))) goto done;
 	    if(jcsl != NULL)
-		NCJcheck(NCJdictget(jcsl,"metadata",(NCjson**)&jmeta));
+		NCJcheck(NCJdictget(jcsl,"consolidated_metadata",(NCjson**)&jmeta));
 	    break;
 #endif
 	default:

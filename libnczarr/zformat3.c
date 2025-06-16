@@ -202,8 +202,7 @@ ZF3_download_grp(NC_FILE_INFO_T* file, NC_GRP_INFO_T* grp, struct ZOBJ* zobj)
     char* key = NULL;
 
     /* Download zarr.json */
-    if((stat = NCZ_grpkey(grp,&fullpath))) goto done;
-    if((stat = nczm_concat(fullpath,Z3GROUP,&key))) goto done;
+    if((stat = NCZ_grpkey(grp,&key))) goto done;
     if((stat = NCZMD_fetch_json_content(file,NCZMD_GROUP,key,&zobj->jobj))) goto done;
     nullfree(key); key = NULL;
     /* Verify that group zarr.json exists */
@@ -226,9 +225,9 @@ ZF3_download_var(NC_FILE_INFO_T* file, NC_VAR_INFO_T* var, struct ZOBJ* zobj)
     char* key = NULL;
 
     /* Download zarr.json */
-    if((stat = NCZ_varkey(var,&fullpath))) goto done;
-    if((stat = nczm_concat(fullpath,Z3ARRAY,&key))) goto done;
-    if((stat = NCZMD_fetch_json_content(file,NCZMD_ARRAY,key,&zobj->jobj))) goto done;
+    if((stat = NCZ_varkey(var,&key))) goto done;
+    const char* keyp = key[0] == '/' ? key + 1 : key;
+    if((stat = NCZMD_fetch_json_content(file,NCZMD_ARRAY,keyp,&zobj->jobj))) goto done;
     nullfree(key); key = NULL;
     /* Verify that var zarr.json exists */
     if(zobj->jobj == NULL) {stat = NC_ENOTZARR; goto done;}
@@ -1222,10 +1221,9 @@ ZF3_searchobjects(NC_FILE_INFO_T* file, NC_GRP_INFO_T* grp, NClist* varnames, NC
 	const char* ndtype = NULL;
 	if(strcmp(name,Z3OBJECT) == 0) continue; /* current group metadata */
 	/* Look for a zarr.json */
-	if((stat = nczm_concat(grpkey,name,&subkey))) goto done;
-	if((stat = nczm_concat(subkey,Z3OBJECT,&objkey))) goto done;
-	/* Read the zarr.json object */
-	switch (stat = NCZMD_fetch_json_content(file,NCZMD_GROUP,objkey,&jcontents)) {
+	if((stat = nczm_concat(grpkey,name,&objkey)) && objkey == NULL) goto done;
+    const char *objkeyp = (objkey[0] == '/' ? objkey + 1: objkey);
+    switch (stat = NCZMD_fetch_json_content(file,NCZMD_GROUP,objkeyp,&jcontents)) {
 	case NC_NOERR: { /* We found a zarr.json object */
 	    if(jcontents == NULL || NCJsort(jcontents) != NCJ_DICT) break;
 	    NCJcheck(NCJdictget(jcontents,"node_type",(NCjson**)&jnodetype));
