@@ -123,7 +123,7 @@ set(h5stringn_SOURCES H5Zstringn.c)
 buildplugin(h5stringn "h5stringn")
 
 # Installation
-if(NETCDF_ENABLE_PLUGIN_INSTALL)
+if(NETCDF_PLUGIN_INSTALL)
 
 macro(installplugin PLUG)
   set(INSTALLED_PLUGIN_LIB "${PLUGINPRE}${PLUG}.${PLUGINEXT}")
@@ -159,5 +159,5 @@ if(MSVC)
   file(COPY ${COPY_FILES} DESTINATION ${RUNTIME_OUTPUT_DIRECTORY}/)
 endif()
 
-endif(NETCDF_ENABLE_PLUGIN_INSTALL)
+endif(NETCDF_PLUGIN_INSTALL)
 endif(NETCDF_ENABLE_PLUGINS)
