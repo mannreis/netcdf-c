@@ -1057,7 +1057,6 @@ else
    if test "x$enable_nczarr_zip" = xyes ; then
    AC_DEFINE([NETCDF_ENABLE_NCZARR_ZIP], [1], [If true, then libzip found])
    fi
-
 fi
 
 # Check whether we want to enable strict null byte header padding.
