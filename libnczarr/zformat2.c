@@ -1624,9 +1624,11 @@ dtype2nctype(const char* dtype, nc_type* nctypep, int* endianp, size_t* maxstrle
         nctype = NC_CHAR;
         typelen = 1;
         goto exit;
-    } else if(memcmp(dtype,"|S",2)==0) {
+    } else if(memcmp(dtype,"|S",2)==0
+        || memcmp(dtype,"<S",2)==0 
+        || memcmp(dtype,"<U",2)==0) {
         nctype = NC_STRING;
-        sscanf(dtype,"|S%zu",&maxstrlen);
+        sscanf(dtype,"%2s%zu",dtype,&maxstrlen);
         goto exit;
     }
 
