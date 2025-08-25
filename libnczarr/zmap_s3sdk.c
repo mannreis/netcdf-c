@@ -214,11 +214,11 @@ zs3open(const char *path, mode_t mode, size64_t flags, void* skips3list, NCZMAP*
 
     /* Parse the URL */
     if((stat = ncuriparse(path,&url))) goto done;
-    if(url == NULL)
+    if(url == NULL || url->path == NULL)
         {stat = NC_EURL; goto done;}
 
     if (skips3list){ // Lift url restrictions for bucket and region
-        z3map->s3.bucket = strndup(url->path,strchr(url->path,'/') - url->path);
+        z3map->s3.bucket = strndup(url->path, (size_t) (strchr(url->path,'/') - url->path));
         z3map->s3.rootkey = strdup(url->path + strlen(z3map->s3.bucket)+1);
         z3map->s3.region = NULL;
         if(url->port){

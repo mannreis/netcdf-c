@@ -439,7 +439,7 @@ NCZ_get_map(NC_FILE_INFO_T* file, NCURI* url, mode_t mode, size64_t constraints,
 	break;
     case NCZM_HTTP:
 	if (create) { stat = NC_ECANTWRITE; goto done;}
-	if((stat = nczmap_open(impl,path,mode,constraints,NC_TRUE,&map))) goto done;
+	if((stat = nczmap_open(impl,path,mode,constraints,(void*)NC_TRUE,&map))) goto done;
 	break;
     case NCZM_UNDEF:
 	stat = NC_EURL;

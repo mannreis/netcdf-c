@@ -103,7 +103,7 @@ nczmap_open(NCZM_IMPL impl, const char *path, mode_t mode, size64_t flags, void*
     case NCZM_S3:
     case NCZM_GS3:
     case NCZM_HTTP:
-        stat = zmap_s3sdk.open(path, mode, flags, NCZM_HTTP==impl, &map);
+        stat = zmap_s3sdk.open(path, mode, flags, (void*)(uintptr_t)(NCZM_HTTP==impl), &map);
 	if(stat) goto done;
 	break;
 #endif
