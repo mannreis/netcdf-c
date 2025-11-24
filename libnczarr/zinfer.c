@@ -106,7 +106,6 @@ NCZ_infer_open_zarr_format(NC_FILE_INFO_T* file)
 {
     int stat = NC_NOERR;
     int zarrformat = 0;
-    struct TagParam param = {0,0,0};
     NCZ_FILE_INFO_T* zfile = (NCZ_FILE_INFO_T*)file->format_file_info;
 
     NC_UNUSED(file);
@@ -122,32 +121,9 @@ NCZ_infer_open_zarr_format(NC_FILE_INFO_T* file)
 		break; /* No need to look for more keys */
 	    }
 	}
-        if((stat = NCZMD_fetch_json_content(file, NCZMD_GROUP, Z2GROUPROOT, &jrootgrp))) goto done;
-        if((stat = NCZMD_fetch_json_content(file, NCZMD_ATTRS, Z2ATTRSROOT, &jrootatts))) goto done;
-        /* As a last resort, we need to search subtree for a V2 or V3 tag */
-	if(jrootgrp != NULL) NCJdictget(jrootgrp,NC_NCZARR_SUPERBLOCK,(NCjson**)&jsuperg);
-	if(jrootatts != NULL) NCJdictget(jrootatts,NC_NCZARR_SUPERBLOCK,(NCjson**)&jsupera);
-	    /* No tag was found, so its not a zarr file */
-	    stat = NC_ENOTZARR;
- 	    goto done;
-        case NC_NOERR: /* found and format is in param */
-	    switch(param.zarrformat) {
-	    case ZARRFORMAT2: case ZARRFORMAT3:
-		zarrformat = param.zarrformat;
-		break;
-	    default:
-		stat = NC_ENOTZARR;
-		goto done;
-	    }
-	    break;
-        default:
-	    stat = NC_ENOTZARR;
-	    goto done;
-	}
     }
     if(zarrformat == 0) {stat = NC_ENOTZARR; goto done;}
     zfile->zarr.zarr_format = zarrformat;    
-
 done:
     return THROW(stat);
 }
@@ -210,35 +186,6 @@ done:
     return THROW(stat);
 }
 
-/*
-Figure out the zarr format based on the
-top-level keys of the dataset.
-*/
-static int
-tagsearch(NCZMAP* map, const char* prefix, const char* key, void* param)
-{
-    struct TagParam* formats = (struct TagParam*)param;
-    const char* segment = NULL;
-    size_t seglen = 0;
-    struct ZarrObjects* zo = NULL;
-
-    NC_UNUSED(map);
-    NC_UNUSED(prefix);
-
-    /* Validate */
-    segment = strrchr(key,'/');
-    if(segment == NULL) segment = key; else segment++;
-    seglen = strlen(segment);
-    if(seglen == 0) return NC_NOERR;
-    
-    for(zo=zarrobjects;zo->name;zo++) {
-	if(strcasecmp(segment,zo->name+1)==0) {
-            formats->zarrformat = zo->zarr_version;
-	    return NC_NOERR; /* tell walker to stop */
-	}
-    }
-    return NC_ENOOBJECT; /* Keep looking */
-}
 
 /**************************************************/
 /**
