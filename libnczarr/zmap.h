@@ -202,6 +202,8 @@ struct NCZMAP_API {
 	int (*read)(NCZMAP* map, const char* key, size64_t start, size64_t count, void* content);
 	int (*write)(NCZMAP* map, const char* key, size64_t count, const void* content);
         int (*search)(NCZMAP* map, const char* prefix, struct NClist* matches);
+        int (*listall)(NCZMAP* map, const char* prefix, struct NClist* matches); /* deep listing */
+
 };
 
 /* Define the Dataset level API */
@@ -289,6 +291,18 @@ reading the object, modifying it, and then writing the whole object.
 Note that this makes the key a content-bearing object.
 */
 EXTERNL int nczmap_write(NCZMAP* map, const char* key, size64_t count, const void* content);
+
+/**    
+Return a vector of keys representing the    
+list of all objects whose key is prefixed by the specified prefix arg.    
+In effect it returns the complete subtree below a specified prefix.    
+@param map -- the containing map    
+@param prefix -- the key into the tree whose subtree of keys is to be returned.    
+@param matches -- return the set of keys in this list; might be empty    
+@return NC_NOERR if the operation succeeded    
+@return NC_EXXX if the operation failed for one of several possible reasons
+*/
+EXTERNL int nczmap_listall(NCZMAP* map, const char* prefix, struct NClist* matches);
 
 /**
 Return a vector of names (not keys) representing the

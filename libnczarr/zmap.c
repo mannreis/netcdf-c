@@ -199,6 +199,21 @@ nczmap_search(NCZMAP* map, const char* prefix, NClist* matches)
     return stat;
 }
 
+int    
+nczmap_listall(NCZMAP* map, const char* prefix, NClist* matches)    
+{    
+    int stat = NC_NOERR;    
+    if((stat = map->api->listall(map, prefix, matches)) == NC_NOERR) {
+        /* sort the list */
+        if(nclistlength(matches) > 1) {
+	    void* base = nclistcontents(matches);
+            qsort(base, nclistlength(matches), sizeof(char*), cmp_strings);
+	}
+    }    
+done:    
+    return stat;    
+}  
+
 /**************************************************/
 /* Utilities */
 
