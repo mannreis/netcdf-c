@@ -40,9 +40,9 @@
 
 #define ZMETAROOT "/.zgroup"
 #define ZMETAATTR "/.zattrs"
-#define ZGROUP ".zgroup"
-#define ZATTRS ".zattrs"
-#define ZARRAY ".zarray"
+#define Z2GROUP ".zgroup"
+#define Z2ATTRS ".zattrs"
+#define Z2ARRAY ".zarray"
 
 /* V2 Reserved Attributes */
 /*
