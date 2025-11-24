@@ -51,7 +51,9 @@ struct ZarrObjects {
     int zarr_version;
     int haszmetadata;
 } zarrobjects[] = {
+#ifdef NETCDF_ENABLE_ZARR_V3
 {"/zarr.json",	ZARRFORMAT3,	0},
+#endif
 {"/.zgroup",	ZARRFORMAT2,	0},
 {"/.zarray",	ZARRFORMAT2,	0},
 {"/.zattrs",	ZARRFORMAT2,	0},
@@ -131,10 +133,12 @@ infer_create_format(NC_FILE_INFO_T* file, int* zarrformatp, int* nczarrformatp)
         zarrformat = ZARRFORMAT2;
 	nczarrformat = NCZARRFORMAT2;
 	break;
+#ifdef NETCDF_ENABLE_ZARR_V3
     case ZARRFORMAT3:
         zarrformat = ZARRFORMAT3;
 	nczarrformat = NCZARRFORMAT3;
 	break;
+#endif
     default: stat = NC_ENOTZARR; break;
     }
     if(zarrformatp) *zarrformatp = zarrformat;
