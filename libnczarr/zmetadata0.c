@@ -63,7 +63,7 @@ list_nodes(NC_FILE_INFO_T* file, const char* prefix, NClist* matches)
 {
     int stat = NC_NOERR;
     NCZ_FILE_INFO_T* zfile = (NCZ_FILE_INFO_T*)file->format_file_info;
-    if((stat = nczmap_list(zfile->map,prefix,matches))) goto done;
+    if((stat = nczmap_search(zfile->map,prefix,matches))) goto done;
 done:
     return stat;
 }
