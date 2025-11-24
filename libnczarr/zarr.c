@@ -103,7 +103,7 @@ ncz_open_dataset(NC_FILE_INFO_T* file, NClist* controls)
     NCURI* uri = NULL;
     void* content = NULL;
     NCjson* json = NULL;
-    NCZ_FILE_INFO_T* zinfo = NULL;
+    NCZ_FILE_INFO_T* zfile = NULL;
     int mode;
     NClist* modeargs = NULL;
     char* nczarr_version = NULL;
@@ -121,15 +121,15 @@ ncz_open_dataset(NC_FILE_INFO_T* file, NClist* controls)
     /* Add struct to hold NCZ-specific file metadata. */
     if (!(file->format_file_info = calloc(1, sizeof(NCZ_FILE_INFO_T))))
         {stat = NC_ENOMEM; goto done;}
-    zinfo = file->format_file_info;
+    zfile = file->format_file_info;
 
     /* Fill in NCZ_FILE_INFO_T */
-    zinfo->creating = 0;
-    zinfo->common.file = file;
-    zinfo->native_endianness = (NC_isLittleEndian() ? NC_ENDIAN_LITTLE : NC_ENDIAN_BIG);
-    if((zinfo->controllist=nclistclone(controls,1)) == NULL)
+    zfile->creating = 0;
+    zfile->common.file = file;
+    zfile->native_endianness = (NC_isLittleEndian() ? NC_ENDIAN_LITTLE : NC_ENDIAN_BIG);
+    if((zfile->controllist=nclistclone(controls,1)) == NULL)
 	{stat = NC_ENOMEM; goto done;}
-    zinfo->default_maxstrlen = NCZ_MAXSTR_DEFAULT;
+    zfile->default_maxstrlen = NCZ_MAXSTR_DEFAULT;
 
     /* Add struct to hold NCZ-specific group info. */
     if (!(root->format_grp_info = calloc(1, sizeof(NCZ_GRP_INFO_T))))
@@ -137,10 +137,10 @@ ncz_open_dataset(NC_FILE_INFO_T* file, NClist* controls)
     ((NCZ_GRP_INFO_T*)root->format_grp_info)->common.file = file;
 
     /* Apply client controls */
-    if((stat = applycontrols(zinfo))) goto done;
+    if((stat = applycontrols(zfile))) goto done;
 
     /* initialize map handle*/
-    if((stat = nczmap_open(zinfo->controls.mapimpl,nc->path,mode,zinfo->controls.flags,NULL,&zinfo->map)))
+    if((stat = nczmap_open(zfile->controls.mapimpl,nc->path,mode,zfile->controls.flags,NULL,&zfile->map)))
 	goto done;
 
     /* Ok, try to read superblock */
@@ -151,18 +151,18 @@ ncz_open_dataset(NC_FILE_INFO_T* file, NClist* controls)
     if(zarr_format == NULL) /* default */
        zarr_format = strdup(ZARRVERSION);
     /* Extract the information from it */
-    if(sscanf(zarr_format,"%d",&zinfo->zarr.zarr_version)!=1)
+    if(sscanf(zarr_format,"%d",&zfile->zarr.zarr_version)!=1)
 	{stat = NC_ENCZARR; goto done;}		
     if(sscanf(nczarr_version,"%lu.%lu.%lu",
-		    &zinfo->zarr.nczarr_version.major,
-		    &zinfo->zarr.nczarr_version.minor,
-		    &zinfo->zarr.nczarr_version.release) == 0)
+		    &zfile->zarr.nczarr_version.major,
+		    &zfile->zarr.nczarr_version.minor,
+		    &zfile->zarr.nczarr_version.release) == 0)
 	{stat = NC_ENCZARR; goto done;}
 
     /* Load auth info from rc file */
     if((stat = ncuriparse(nc->path,&uri))) goto done;
     if(uri) {
-	if((stat = NC_authsetup(&zinfo->auth, uri)))
+	if((stat = NC_authsetup(&zfile->auth, uri)))
 	    goto done;
     }
 
