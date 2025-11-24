@@ -15,6 +15,11 @@
 #define ZARRVERSION "2"
 #define ZARRFORMAT2 2
 
+/* Define the possible NCZarr format versions */
+/* These are independent of the Zarr specification version */
+#define NCZARRFORMAT0 0 /* if this is a pure zarr dataset */
+#define NCZARRFORMAT2 2
+
 /* NCZARRVERSION is independent of Zarr version,
    but NCZARRVERSION => ZARRVERSION */
 #define NCZARRVERSION "2.0.0"
@@ -137,6 +142,7 @@ typedef struct NCZ_FILE_INFO {
 	    unsigned long release;
 	} nczarr_version;
         int zarr_format;
+        int nczarr_format
     } zarr;
     int creating; /* 1=> created 0=>open */
     int native_endianness; /* NC_ENDIAN_LITTLE | NC_ENDIAN_BIG */
