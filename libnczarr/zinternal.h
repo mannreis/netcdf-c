@@ -43,8 +43,8 @@
 #endif
 
 #define Z2METADATA "/.zmetadata"
-#define ZMETAROOT "/.zgroup"
-#define ZMETAATTR "/.zattrs"
+#define Z2GROUPROOT "/.zgroup"
+#define Z2ATTRSROOT "/.zattrs"
 #define Z2GROUP ".zgroup"
 #define Z2ATTRS ".zattrs"
 #define Z2ARRAY ".zarray"

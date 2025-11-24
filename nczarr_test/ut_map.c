@@ -95,7 +95,7 @@ simplecreate(void)
     if((stat = nczmap_create(impl,url,0,0,NULL,&map)))
 	goto done;
 
-    if((stat=nczm_concat(NULL,ZMETAROOT,&path)))
+    if((stat=nczm_concat(NULL,Z2GROUPROOT,&path)))
 	goto done;
 
     /* Write empty metadata content */

@@ -212,11 +212,11 @@ NCZ_infer_open_zarr_format(NC_FILE_INFO_T* file)
 		break; /* No need to look for more keys */
 	    }
 	}
-    }
-    if(zarrformat == 0 || stat != NC_NOERR) {
+        if((stat = NCZMD_fetch_json_content(file, NCZMD_GROUP, Z2GROUPROOT, &jrootgrp))) goto done;
+        if((stat = NCZMD_fetch_json_content(file, NCZMD_ATTRS, Z2ATTRSROOT, &jrootatts))) goto done;
         /* As a last resort, we need to search subtree for a V2 or V3 tag */
-        switch(stat = nczmap_walk(zfile->map,"/",tagsearch, &param)) {
-        case NC_ENOOBJECT:
+	if(jrootgrp != NULL) NCJdictget(jrootgrp,NC_NCZARR_SUPERBLOCK,(NCjson**)&jsuperg);
+	if(jrootatts != NULL) NCJdictget(jrootatts,NC_NCZARR_SUPERBLOCK,(NCjson**)&jsupera);
 	    /* No tag was found, so its not a zarr file */
 	    stat = NC_ENOTZARR;
  	    goto done;
@@ -256,11 +256,11 @@ NCZ_infer_open_nczarr_format(NC_FILE_INFO_T* file)
     
     if(zarrformat == ZARRFORMAT2) {
         /* Download /.zgroup  and /.zattrs */
-        if((stat = NCZMD_fetch_json_content(file, NCZMD_GROUP, Z2METAROOT, &jrootgrp))) goto done;
-        if((stat = NCZMD_fetch_json_content(file, NCZMD_ATTRS, Z2ATTSROOT, &jrootatts))) goto done;
+        if((stat = NCZMD_fetch_json_content(file, NCZMD_GROUP, Z2GROUPROOT, &jrootgrp))) goto done;
+        if((stat = NCZMD_fetch_json_content(file, NCZMD_ATTRS, Z2ATTRSROOT, &jrootatts))) goto done;
         /* Look for superblock */
-	if(jrootgrp != NULL) NCJdictget(jrootgrp,NC_NCZARR_SUPERBLOCK_ATTR,(NCjson**)&jsuperg);
-	if(jrootatts != NULL) NCJdictget(jrootatts,NC_NCZARR_SUPERBLOCK_ATTR,(NCjson**)&jsupera);
+	if(jrootgrp != NULL) NCJdictget(jrootgrp,NC_NCZARR_SUPERBLOCK,(NCjson**)&jsuperg);
+	if(jrootatts != NULL) NCJdictget(jrootatts,NC_NCZARR_SUPERBLOCK,(NCjson**)&jsupera);
 	if(jsuperg == NULL && jsupera == NULL) nczarrformat = NCZARRFORMAT0; else nczarrformat = NCZARRFORMAT2;
 	NCZ_reclaim_json(jrootgrp); jrootgrp = NULL;
 	NCZ_reclaim_json(jrootatts); jrootatts = NULL;
