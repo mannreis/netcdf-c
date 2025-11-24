@@ -19,6 +19,9 @@
    but NCZARRVERSION => ZARRVERSION */
 #define NCZARRVERSION "2.0.0"
 
+/* The name of the env var for controlling .zmetadata use*/
+#define NCZARRDEFAULTNOMETA "NCNOZMETADATA"
+
 /* These have to do with creating chunked datasets in ZARR. */
 #define NCZ_CHUNKSIZE_FACTOR (10)
 #define NCZ_MIN_CHUNK_SIZE (2)
@@ -39,6 +42,7 @@
 #  endif
 #endif
 
+#define Z2METADATA "/.zmetadata"
 #define ZMETAROOT "/.zgroup"
 #define ZMETAATTR "/.zattrs"
 #define Z2GROUP ".zgroup"
@@ -143,6 +147,7 @@ typedef struct NCZ_FILE_INFO {
 #		define FLAG_LOGGING     4
 #		define FLAG_XARRAYDIMS  8
 #		define FLAG_NCZARR_KEY  16 /* _nczarr_xxx keys are stored in object and not in _nczarr_attrs */
+#       define FLAG_NOCONSOLIDATED 32 /* Suppress consolidated metadata */
 	NCZM_IMPL mapimpl;
     } controls;
     int default_maxstrlen; /* default max str size for variables of type string */

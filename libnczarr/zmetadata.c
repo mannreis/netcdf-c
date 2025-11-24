@@ -305,7 +305,7 @@ NCZMD_is_metadata_consolidated(NC_FILE_INFO_T* file)
     NCZ_Metadata *zmd = &zfile->metadata_handler;
     if(zmd->jcsl == NULL ||
        NCJsort(zmd->jcsl) != NCJ_DICT ||
-       (zfile->flags & FLAG_NOCONSOLIDATED))
+       (zfile->controls.flags & FLAG_NOCONSOLIDATED))
 	{stat = NC_ENOOBJECT; goto done;}
 done:
     return stat;
@@ -349,7 +349,7 @@ NCZMD_set_metadata_handler(NC_FILE_INFO_T *file)
     const NCjson* jmeta = NULL;
 
     /* Override from env var or mode flag */
-    if((zfile->flags & FLAG_NOCONSOLIDATED) || getenv(NCZARRDEFAULTNOMETA) != NULL) disallowzmetadata = 1;
+    if((zfile->controls.flags & FLAG_NOCONSOLIDATED) || getenv(NCZARRDEFAULTNOMETA) != NULL) disallowzmetadata = 1;
 
    /* First, figure out and set the dispatcher */
     if(disallowzmetadata) {
