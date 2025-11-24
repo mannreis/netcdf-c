@@ -20,6 +20,7 @@ zdim.c
 zdispatch.c
 zfile.c
 zgrp.c
+zinfer.c
 zinternal.c
 zmap.c
 zmap_file.c
