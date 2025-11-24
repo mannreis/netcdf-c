@@ -359,9 +359,6 @@ NCZMD_set_metadata_handler(NC_FILE_INFO_T *file)
 	case 2:
 	    zmd_dispatcher = NCZ_csl_metadata_handler2;
 	    break;
-	case 3:
-	    zmd_dispatcher = NCZ_csl_metadata_handler3;
-	    break;
 	default:
 	    zmd_dispatcher = NCZ_metadata_handler;
 	    break;
@@ -374,22 +371,11 @@ NCZMD_set_metadata_handler(NC_FILE_INFO_T *file)
 	    if(jcsl != NULL)
 		NCJcheck(NCJdictget(jcsl,"metadata",(NCjson**)&jmeta));
 	    break;
-#ifdef NETCDF_ENABLE_NCZARR_V3
-	case 3: /* For V3, we need to look inside the root group's zarr.json */
-	    if((stat = NCZ_downloadjson(zfile->map,Z3METADATA,&jcsl))) goto done;
-	    if(jcsl != NULL)
-		NCJcheck(NCJdictget(jcsl,"metadata",(NCjson**)&jmeta));
-	    break;
-#endif
 	default:
 	    break;
 	}
 	if(jmeta != NULL && zfile->zarr.zarr_format == 2)
 	    zmd_dispatcher = NCZ_csl_metadata_handler2;
-#ifdef NETCDF_ENABLE_NCZARR_V3
-	else if(jmeta && zfile->zarr.zarr_format == 3)
-	    zmd_dispatcher = NCZ_csl_metadata_handler3;
-#endif
 	else
 	    zmd_dispatcher = NCZ_metadata_handler;	    
     }
