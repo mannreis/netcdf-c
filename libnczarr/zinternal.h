@@ -13,6 +13,7 @@
 #define ZINTERNAL_H
 
 #define ZARRVERSION "2"
+#define ZARRFORMAT2 2
 
 /* NCZARRVERSION is independent of Zarr version,
    but NCZARRVERSION => ZARRVERSION */
@@ -130,6 +131,7 @@ typedef struct NCZ_FILE_INFO {
 	    unsigned long minor;
 	    unsigned long release;
 	} nczarr_version;
+        int zarr_format;
     } zarr;
     int creating; /* 1=> created 0=>open */
     int native_endianness; /* NC_ENDIAN_LITTLE | NC_ENDIAN_BIG */
