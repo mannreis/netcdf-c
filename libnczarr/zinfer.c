@@ -101,52 +101,6 @@ infer_create_format(NC_FILE_INFO_T* file, int* zarrformatp, int* nczarrformatp)
     if(nczarrformatp) *nczarrformatp = nczarrformat;
     return THROW(stat);
 }
-
-/**
-Figure out the formatter to use when opening a file
-@param file
-@param formatterp
-@return NC_NOERR | NC_EXXX
-*/
-
-int
-NCZ_get_open_formatter(NC_FILE_INFO_T* file, const NCZ_Formatter** formatterp)
-{
-    int stat = NC_NOERR;
-    const NCZ_Formatter* formatter = NULL;
-    NCZ_FILE_INFO_T* zfile = (NCZ_FILE_INFO_T*)file->format_file_info;
-    int zarr_format = zfile->zarr.zarr_format;
-    int nczarr_format = zfile->zarr.nczarr_format;
-
-    zfile = (NCZ_FILE_INFO_T*)file->format_file_info;
-    assert(zfile != NULL);
-
-    zfile->zarr.zarr_format = zarr_format;
-    zfile->zarr.nczarr_format = nczarr_format;
-    assert(zfile->zarr.zarr_format != 0);
-
-    /* If the nczarr_format is NULL, then that implies pure zarr,
-       so use the zarr format instead. */
-    if(nczarr_format != 0) {
-        switch(nczarr_format) {
-        case 2: formatter = NCZ_formatter2; break;
-        case 3: formatter = NCZ_formatter3; break;
-        default: stat = NC_ENCZARR; goto done;
-        }
-    } else { /* Decide based on zarr format plus the fact that it is pure zarr */
-        switch(zarr_format) {
-        case 2: formatter = NCZ_formatter2; break;
-        case 3: formatter = NCZ_formatter3; break;
-        default: stat = NC_ENCZARR; goto done;
-        }
-    }
-
-    if(formatterp) *formatterp = formatter;
-
-done:
-    return THROW(stat);
-}
-
 int
 NCZ_infer_open_zarr_format(NC_FILE_INFO_T* file)
 {
