@@ -1960,14 +1960,58 @@ parse_group_content_pure(NCZ_FILE_INFO_T*  zinfo, NC_GRP_INFO_T* grp, NClist* va
     ZTRACE(3,"zinfo=%s grp=%s |varnames|=%u |subgrps|=%u",zinfo->common.file->controller->path,grp->hdr.name,(unsigned)nclistlength(varnames),(unsigned)nclistlength(subgrps));
 
     nclistclear(varnames);
-    if((stat = searchvars(zinfo,grp,varnames))) goto done;
     nclistclear(subgrps);
-    if((stat = searchsubgrps(zinfo,grp,subgrps))) goto done;
+    if((stat = searchobjects(zinfo->common.file,grp,varnames, subgrps))) goto done;
 
 done:
     return ZUNTRACE(THROW(stat));
 }
 
+int searchobjects(NC_FILE_INFO_T* file, NC_GRP_INFO_T* grp, NClist* varnames, NClist* subgrpnames) {
+    int stat = NC_NOERR;
+    size_t i;
+    char* grpkey = NULL;
+    char* subgrpkey = NULL;
+    char* varkey = NULL;
+    char* zarray = NULL;
+    char* zgroup = NULL;
+    NClist* matches = nclistnew();
+
+    /* Compute the key for the grp */
+    if((stat = NCZ_grpkey(grp,&grpkey))) goto done;
+    if((stat = NCZMD_list(file,grpkey,matches))) goto done; /* Shallow listing */
+    /* Search grp for group-level .zxxx and for var-level .zxxx*/
+    for(i=0;i<nclistlength(matches);i++) {
+	const char* name = nclistget(matches,i);
+	if(name[0] == NCZM_DOT) continue; /* current group components */
+	/* See if name is an array by testing for name/.zarray exists */
+	if((stat = nczm_concat(grpkey,name,&varkey))) goto done;
+	if((stat = nczm_concat(varkey,Z2ARRAY,&zarray))) goto done;
+	if((stat = NCZMD_exists(file,zarray)) == NC_NOERR) {
+	    nclistpush(varnames,strdup(name));
+	} else {
+	    /* See if name is a group by testing for name/.zgroup exists */
+	    if((stat = nczm_concat(grpkey,name,&subgrpkey))) goto done;
+	    if((stat = nczm_concat(varkey,Z2GROUP,&zgroup))) goto done;
+	    if((stat = NCZMD_exists(file,zgroup)) == NC_NOERR)
+		nclistpush(subgrpnames,strdup(name));
+	}
+	stat = NC_NOERR;
+	nullfree(varkey); varkey = NULL;
+	nullfree(zarray); zarray = NULL;
+	nullfree(subgrpkey); subgrpkey = NULL;
+	nullfree(zgroup); zgroup = NULL;
+    }
+
+done:
+    nullfree(grpkey);
+    nullfree(varkey);
+    nullfree(zarray);
+    nullfree(zgroup);
+    nullfree(subgrpkey);
+    nclistfreeall(matches);
+    return stat;   
+}
 
 static int
 searchvars(NCZ_FILE_INFO_T* zfile, NC_GRP_INFO_T* grp, NClist* varnames)
