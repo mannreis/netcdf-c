@@ -46,6 +46,8 @@ ncz_close_file(NC_FILE_INFO_T* file, int abort)
 	goto done;
 
     zinfo = file->format_file_info;
+    
+    NCZMD_close(file);
 
     if((stat = nczmap_close(zinfo->map,(abort && zinfo->creating)?1:0)))
 	goto done;
