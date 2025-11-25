@@ -140,26 +140,6 @@ ncz_open_dataset(NC_FILE_INFO_T* file, NClist* controls)
     /* Apply client controls */
     if((stat = applycontrols(zfile))) goto done;
 
-    /* initialize map handle*/
-    if((stat = nczmap_open(zfile->controls.mapimpl,nc->path,mode,zfile->controls.flags,NULL,&zfile->map)))
-	goto done;
-
-    /* Ok, try to read superblock */
-    if((stat = ncz_read_superblock(file,&nczarr_version,&zarr_format))) goto done;
-
-    if(nczarr_version == NULL) /* default */
-        nczarr_version = strdup(NCZARRVERSION);
-    if(zarr_format == NULL) /* default */
-       zarr_format = strdup(ZARRVERSION);
-    /* Extract the information from it */
-    if(sscanf(zarr_format,"%d",&zfile->zarr.zarr_version)!=1)
-	{stat = NC_ENCZARR; goto done;}		
-    if(sscanf(nczarr_version,"%lu.%lu.%lu",
-		    &zfile->zarr.nczarr_version.major,
-		    &zfile->zarr.nczarr_version.minor,
-		    &zfile->zarr.nczarr_version.release) == 0)
-	{stat = NC_ENCZARR; goto done;}
-
     /* Load auth info from rc file */
     if((stat = ncuriparse(nc->path,&uri))) goto done;
     if(uri) {
@@ -167,6 +147,21 @@ ncz_open_dataset(NC_FILE_INFO_T* file, NClist* controls)
 	    goto done;
     }
 
+    /* initialize map handle*/
+    if((stat = NCZ_get_map(file,uri,(mode_t)nc->mode,zfile->controls.flags,NULL,&zfile->map))) goto done;
+
+    /* Get the zarr_format */
+    if((stat = NCZ_infer_open_zarr_format(file))) goto done;
+
+    /* And add the consolidated metadata manager to file */
+    /* Must follow NCZ_infer_open_zarr_format because it uses the discovered zarr format */
+    if((stat = NCZMD_set_metadata_handler(file))) goto done;
+
+    /* Set the nczarr format; must follow set_metadata_handler because it needs to read metadata */
+    if((stat = NCZ_infer_open_nczarr_format(file))) goto done;
+
+    /* And get the format dispatcher: uses discovered zarr and nczarr formats and the metadata handler */
+    //if((stat = NCZ_get_open_formatter(file, (const NCZ_Formatter**)&zfile->dispatcher))) goto done;
 done:
     nullfree(zarr_format);
     nullfree(nczarr_version);
