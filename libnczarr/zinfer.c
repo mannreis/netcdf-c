@@ -48,7 +48,7 @@ struct TagParam {
 
 struct ZarrObjects {
     const char* name;
-    int zarr_version;
+    int format;
     int haszmetadata;
 } zarrobjects[] = {
 #ifdef NETCDF_ENABLE_ZARR_V3
@@ -117,7 +117,7 @@ NCZ_infer_open_zarr_format(NC_FILE_INFO_T* file)
 	/* We search on the root path for V2 or V3 tags */
 	for (zo = zarrobjects; zo->name; zo++) {
 	    if ((stat = nczmap_exists(zfile->map,zo->name)) == NC_NOERR) {
-		zarrformat = zo->zarr_version;
+		zarrformat = zo->format;
 		break; /* No need to look for more keys */
 	    }
 	}
