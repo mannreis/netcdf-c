@@ -47,7 +47,6 @@ static int insert_attr(NCjson* jatts, NCjson* jtypes, const char* aname, NCjson*
 static int insert_nczarr_attr(NCjson* jatts, NCjson* jtypes);
 static int upload_attrs(NC_FILE_INFO_T* file, NC_OBJ* container, NCjson* jatts);
 static int getnczarrkey(NC_OBJ* container, const char* name, const NCjson** jncxxxp);
-static int downloadzarrobj(NC_FILE_INFO_T*, struct ZARROBJ* zobj, const char* fullpath, const char* objname);
 static int dictgetalt(const NCjson* jdict, const char* name, const char* alt, const NCjson** jvaluep);
 
 /**************************************************/
@@ -1144,8 +1143,15 @@ define_grp(NC_FILE_INFO_T* file, NC_GRP_INFO_T* grp)
     /* Construct grp path */
     if((stat = NCZ_grpkey(grp,&fullpath))) goto done;
 
-    /* Download .zgroup and .zattrs */
-    if((stat = downloadzarrobj(file,&zgrp->zgroup,fullpath,Z2GROUP))) goto done;
+
+    if((stat = nczm_concat(fullpath,Z2GROUP,&key))) goto done;
+    if((stat = NCZMD_fetch_json_content(file,NCZMD_GROUP,key,&(zgrp->zgroup.obj)))) goto done;
+    nullfree(key); key = NULL;
+
+    if((stat = nczm_concat(fullpath,Z2ATTRS,&key))) goto done;
+    if((stat = NCZMD_fetch_json_content(file,NCZMD_ATTRS,key,&zgrp->zgroup.atts))) goto done;
+    nullfree(key); key = NULL;
+
     jgroup = zgrp->zgroup.obj;
     jattrs = zgrp->zgroup.atts;
 
@@ -1450,8 +1456,14 @@ define_var1(NC_FILE_INFO_T* file, NC_GRP_INFO_T* grp, const char* varname)
     if((stat = NCZ_varkey(var,&varpath)))
 	goto done;
 
-    /* Download */
-    if((stat = downloadzarrobj(file,&zvar->zarray,varpath,Z2ARRAY))) goto done;
+    if((stat = nczm_concat(varpath,Z2ARRAY,&key))) goto done;
+    if((stat = NCZMD_fetch_json_content(file,NCZMD_ARRAY,key,&zvar->zarray.obj))) goto done;
+    nullfree(key); key = NULL;
+
+    if((stat = nczm_concat(varpath,Z2ATTRS,&key))) goto done;
+    if((stat = NCZMD_fetch_json_content(file,NCZMD_ATTRS,key,&zvar->zarray.atts))) goto done;
+    nullfree(key); key = NULL;
+
     jvar = zvar->zarray.obj;
     jatts = zvar->zarray.atts;
     assert(jvar == NULL || NCJsort(jvar) == NCJ_DICT);
@@ -1809,6 +1821,7 @@ ncz_read_superblock(NC_FILE_INFO_T* file, char** nczarrvp, char** zarrfp)
     NC_GRP_INFO_T* root = NULL;
     NCZ_GRP_INFO_T* zroot = NULL;
     char* fullpath = NULL;
+    char* key = NULL;
 
     ZTRACE(3,"file=%s",file->controller->path);
 
@@ -1821,8 +1834,11 @@ ncz_read_superblock(NC_FILE_INFO_T* file, char** nczarrvp, char** zarrfp)
     /* Construct grp key */
     if((stat = NCZ_grpkey(root,&fullpath))) goto done;
 
-    /* Download the root group .zgroup and associated .zattrs */
-    if((stat = downloadzarrobj(file, &zroot->zgroup, fullpath, Z2GROUP))) goto done;
+
+    if((stat = nczm_concat(fullpath,Z2GROUP,&key))) goto done;
+    if((stat = NCZMD_fetch_json_content(file,NCZMD_GROUP,key,&zroot->zgroup.obj))) goto done;
+    nullfree(key); key = NULL;
+
     jzgroup = zroot->zgroup.obj;    
 
     /* Look for superblock; first in .zattrs and then in .zgroup */
@@ -1872,6 +1888,7 @@ ncz_read_superblock(NC_FILE_INFO_T* file, char** nczarrvp, char** zarrfp)
     if(zarrfp) {*zarrfp = zarr_format; zarr_format = NULL;}
 done:
     nullfree(fullpath);
+    nullfree(key);
     nullfree(zarr_format);
     nullfree(nczarr_version);
     return ZUNTRACE(THROW(stat));
@@ -2629,27 +2646,5 @@ getnczarrkey(NC_OBJ* container, const char* name, const NCjson** jncxxxp)
     }
     if(jncxxxp) *jncxxxp = jxxx;
 done:
-    return THROW(stat);
-}
-
-static int
-downloadzarrobj(NC_FILE_INFO_T* file, struct ZARROBJ* zobj, const char* fullpath, const char* objname)
-{
-    int stat = NC_NOERR;
-    char* key = NULL;
-    NCZMAP* map = ((NCZ_FILE_INFO_T*)file->format_file_info)->map;
-
-    /* Download .zXXX and .zattrs */
-    nullfree(zobj->prefix);
-    zobj->prefix = strdup(fullpath);
-    NCJreclaim(zobj->obj); zobj->obj = NULL;
-    NCJreclaim(zobj->atts); zobj->obj = NULL;
-    if((stat = nczm_concat(fullpath,objname,&key))) goto done;
-    if((stat=NCZ_downloadjson(map,key,&zobj->obj))) goto done;
-    nullfree(key); key = NULL;
-    if((stat = nczm_concat(fullpath,Z2ATTRS,&key))) goto done;
-    if((stat=NCZ_downloadjson(map,key,&zobj->atts))) goto done;
-done:
-    nullfree(key);
     return THROW(stat);
 }
