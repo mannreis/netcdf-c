@@ -184,7 +184,7 @@ ncz_sync_grp(NC_FILE_INFO_T* file, NC_GRP_INFO_T* grp, int isclose)
 
     /* build Z2GROUP contents */
     NCJnew(NCJ_DICT,&jgroup);
-    snprintf(version,sizeof(version),"%d",zinfo->zarr.zarr_version);
+    snprintf(version,sizeof(version),"%d",zinfo->zarr.zarr_format);
     if((stat = NCJaddstring(jgroup,NCJ_STRING,"zarr_format"))<0) {stat = NC_EINVAL; goto done;}
     if((stat = NCJaddstring(jgroup,NCJ_INT,version))<0) {stat = NC_EINVAL; goto done;}
     /* build Z2GROUP path */
@@ -352,7 +352,7 @@ ncz_sync_var_meta(NC_FILE_INFO_T* file, NC_VAR_INFO_T* var, int isclose)
     NCJnew(NCJ_DICT,&jvar);
 
     /* zarr_format key */
-    snprintf(number,sizeof(number),"%d",zinfo->zarr.zarr_version);
+    snprintf(number,sizeof(number),"%d",zinfo->zarr.zarr_format);
     if((stat = NCJaddstring(jvar,NCJ_STRING,"zarr_format"))<0) {stat = NC_EINVAL; goto done;}
     if((stat = NCJaddstring(jvar,NCJ_INT,number))<0) {stat = NC_EINVAL; goto done;}
 
@@ -1462,7 +1462,7 @@ define_var1(NC_FILE_INFO_T* file, NC_GRP_INFO_T* grp, const char* varname)
 	int version;
 	if((stat = NCJdictget(jvar,"zarr_format",&jvalue))<0) {stat = NC_EINVAL; goto done;}
 	sscanf(NCJstring(jvalue),"%d",&version);
-	if(version != zinfo->zarr.zarr_version)
+	if(version != zinfo->zarr.zarr_format)
 	    {stat = (THROW(NC_ENCZARR)); goto done;}
     }
 

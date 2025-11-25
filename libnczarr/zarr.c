@@ -57,11 +57,12 @@ ncz_create_dataset(NC_FILE_INFO_T* file, NC_GRP_INFO_T* root, NClist* controls)
 	{stat = NC_ENOMEM; goto done;}
 
     /* fill in some of the zinfo and zroot fields */
-    zinfo->zarr.zarr_version = atoi(ZARRVERSION);
-    sscanf(NCZARRVERSION,"%lu.%lu.%lu",
-	   &zinfo->zarr.nczarr_version.major,
-	   &zinfo->zarr.nczarr_version.minor,
-	   &zinfo->zarr.nczarr_version.release);
+    zinfo->zarr.zarr_format = ZARRFORMAT2;
+    zinfo->zarr.nczarr_format = 2;
+    sscanf(NCZARRVERSION, "%lu.%lu.%lu",
+           &zinfo->zarr.nczarr_version.major,
+           &zinfo->zarr.nczarr_version.minor,
+           &zinfo->zarr.nczarr_version.release);
 
     zinfo->default_maxstrlen = NCZ_MAXSTR_DEFAULT;
 
