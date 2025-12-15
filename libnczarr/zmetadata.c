@@ -384,10 +384,10 @@ NCZMD_set_metadata_handler(NC_FILE_INFO_T *file)
 	default:
 	    break;
 	}
-	if(jmeta != NULL && zfile->zarr.zarr_format == 2)
+	if(jmeta != NULL && NCJsort(jmeta) == NCJ_DICT && zfile->zarr.zarr_format == 2)
 	    zmd_dispatcher = NCZ_csl_metadata_handler2;
 #ifdef NETCDF_ENABLE_NCZARR_V3
-	else if(jmeta && zfile->zarr.zarr_format == 3)
+	else if(jmeta && NCJsort(jmeta) == NCJ_DICT && zfile->zarr.zarr_format == 3)
 	    zmd_dispatcher = NCZ_csl_metadata_handler3;
 #endif
 	else
