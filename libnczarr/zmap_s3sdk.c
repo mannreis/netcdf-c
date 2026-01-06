@@ -141,7 +141,7 @@ zs3create(const char *path, int mode, size64_t flags, void* parameters, NCZMAP**
     if(z3map->s3.rootkey == NULL)
         {stat = NC_EURL; goto done;}
 
-    z3map->s3client = NC_s3sdkcreateclient(&z3map->s3);
+    z3map->s3client = NC_s3sdkcreateclient(&z3map->s3, parameters);
 
     {
 	int exists = 0;
@@ -220,7 +220,7 @@ zs3open(const char *path, int mode, size64_t flags, void* parameters, NCZMAP** m
     if(z3map->s3.rootkey == NULL)
         {stat = NC_EURL; goto done;}
 
-    z3map->s3client = NC_s3sdkcreateclient(&z3map->s3);
+    z3map->s3client = NC_s3sdkcreateclient(&z3map->s3, parameters);
     if(z3map->s3client == NULL) {
         stat = NC_ES3; goto done;
     }
@@ -249,7 +249,7 @@ zs3truncate(const char *s3url)
     ncuriparse(s3url,&url);
     if(url == NULL) {stat = NC_EURL; goto done;}
     if((stat=NC_s3urlprocess(url,&info,&purl))) goto done;
-    if((s3client = NC_s3sdkcreateclient(&info))==NULL) {stat = NC_ES3; goto done;}
+    if((s3client = NC_s3sdkcreateclient(&info,NULL))==NULL) {stat = NC_ES3; goto done;}
     if((stat = s3clear(s3client,info.bucket,info.rootkey))) goto done;
 done:
     if(s3client) {stat=NC_s3sdkclose(s3client,NULL);}
