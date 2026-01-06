@@ -180,7 +180,7 @@ s3io_open(const char* path,
     /* Verify root path */
     if(s3io->s3.rootkey == NULL)
         {status = NC_EURL; goto done;}
-    s3io->s3client = NC_s3sdkcreateclient(&s3io->s3);
+    s3io->s3client = NC_s3sdkcreateclient(&s3io->s3, NULL);
     /* Get the size */
     switch (status = NC_s3sdkinfo(s3io->s3client,s3io->s3.bucket,s3io->s3.rootkey,(long long unsigned*)&s3io->size,&s3io->errmsg)) {
     case NC_NOERR: break;

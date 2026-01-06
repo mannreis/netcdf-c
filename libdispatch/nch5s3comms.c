@@ -1057,7 +1057,7 @@ done:
  *----------------------------------------------------------------------------
  */
 s3r_t *
-NCH5_s3comms_s3r_open(const char* root, NCS3SVC svc, const char *region, const char *access_id, const char* access_key)
+NCH5_s3comms_s3r_open(const char* root, NCS3SVC svc, const char *region, const char *access_id, const char* access_key, void* parameters)
 {
     int ret_value = SUCCEED;
     size_t         tmplen    = 0;
