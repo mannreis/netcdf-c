@@ -93,6 +93,7 @@
 #include "netcdf.h"
 #include "ncuri.h"
 #include "ncutil.h"
+#include "ncauth.h"
 #include "netcdf_vutils.h"
 
 /*****************/
@@ -1167,6 +1168,20 @@ NCH5_s3comms_s3r_open(const char* root, NCS3SVC svc, const char *region, const c
 
     if (CURLE_OK != curl_easy_setopt(curlh, CURLOPT_FAILONERROR, 1L))
         HGOTO_ERROR(H5E_ARGS, NC_EINVAL, NULL, "error while setting CURL option (CURLOPT_FAILONERROR).");
+
+    if (parameters != NULL) {
+        NCauth *auth = parameters;
+
+        if (auth->curlflags.verbose != 0 && CURLE_OK != curl_easy_setopt(curlh, CURLOPT_VERBOSE, 1L)){
+            fprintf(stderr, "Unable set CURLOPT_VERBOSE\n");
+        }
+        if (auth->ssl.verifypeer == 0 && CURLE_OK != curl_easy_setopt(curlh, CURLOPT_SSL_VERIFYPEER, 0L)) {
+            fprintf(stderr, "Couldn't disable ssl_verify_peer\n");
+        }
+        if (auth->ssl.verifyhost == 0 && CURLE_OK != curl_easy_setopt(curlh, CURLOPT_SSL_VERIFYHOST, 0L)) {
+            fprintf(stderr, "Couldn't disable ssl_verify_host\n");
+        }
+    }
 
     handle->curlhandle = curlh;
 
