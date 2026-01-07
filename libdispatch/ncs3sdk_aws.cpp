@@ -21,6 +21,7 @@
 #include "netcdf.h"
 #include "ncrc.h"
 #include "ncutil.h"
+#include "ncauth.h"
 
 #include "ncs3sdk.h"
 #include "nch5s3comms.h"
@@ -181,7 +182,7 @@ makeerrmsg(const Aws::Client::AWSError<Aws::S3::S3Errors> err, const char* key="
 
 
 static Aws::Client::ClientConfiguration
-s3sdkcreateconfig(NCS3INFO* info)
+s3sdkcreateconfig(NCS3INFO* info, const NCauth * auth)
 {
     NCTRACE(11,"info=%s", dumps3info(info));
 
@@ -190,6 +191,9 @@ s3sdkcreateconfig(NCS3INFO* info)
     if(info->profile)
         config.profileName = info->profile;
     config.scheme = Aws::Http::Scheme::HTTPS;
+    if(auth && auth->ssl.verifypeer == 0 && auth->ssl.verifyhost == 0) {
+        config.verifySSL = false;
+    }
     //config.connectTimeoutMs = 1000;
     //config.requestTimeoutMs = 0;
     config.connectTimeoutMs = 300000;
@@ -239,7 +243,8 @@ NC_s3sdkcreateclient(NCS3INFO* info, void * parameters)
 {
     NCTRACE(11,NULL);
 
-    Aws::Client::ClientConfiguration config = s3sdkcreateconfig(info);
+    const NCauth *auth = (NCauth*) parameters;
+    Aws::Client::ClientConfiguration config = s3sdkcreateconfig(info, auth);
     AWSS3CLIENT s3client;
 
     if(info->profile == NULL || strcmp(info->profile,"none")==0) {
