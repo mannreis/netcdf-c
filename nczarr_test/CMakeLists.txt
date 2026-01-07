@@ -137,7 +137,17 @@ IF(NETCDF_ENABLE_TESTS)
   TARGET_INCLUDE_DIRECTORIES(zs3parse PUBLIC ../libnczarr)
   build_bin_test_with_util_lib(zmapio ut_util)
 
-  IF(NETCDF_ENABLE_S3 AND NOT WITH_S3_TESTING STREQUAL "NO")
+  IF(NETCDF_ENABLE_S3)
+    # HTTPS Server for testing consolidated zarr
+    FIND_PACKAGE(OpenSSL)
+    MESSAGE(WARNING, "SSL ${OpenSSL_FOUND}")
+    IF(OpenSSL_FOUND)
+      ADD_EXECUTABLE(httpsserver httpsserver.c)
+      TARGET_LINK_LIBRARIES(httpsserver netcdf ${ALL_TLL_LIBS} ${OPENSSL_SSL_LIBRARY})
+      ADD_SH_TEST(nczarr_test run_consolidated)
+    ENDIF(OpenSSL_FOUND)
+
+  IF (NOT WITH_S3_TESTING STREQUAL "NO")
   # Helper programs for testing
     BUILD_BIN_TEST(s3util ${COMMONSRC})
   # Pure AWS Test
@@ -166,7 +176,8 @@ IF(NETCDF_ENABLE_TESTS)
       SET(CMAKE_CXX_STANDARD ${TMP_CMAKE_CXX_STANDARD})
     ENDIF(NETCDF_ENABLE_S3_AWS)
     TARGET_INCLUDE_DIRECTORIES(s3util PUBLIC ../libnczarr)
-  endif()
+  ENDIF(NOT WITH_S3_TESTING STREQUAL "NO")
+  ENDIF(NETCDF_ENABLE_S3)
   
   if(ENABLE_NCDUMPCHUNKS)
     build_bin_test_with_util_lib(ncdumpchunks ut_util)
