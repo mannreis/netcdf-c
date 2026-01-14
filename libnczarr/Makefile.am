@@ -83,6 +83,10 @@ AM_CXXFLAGS += -std=c++11
 endif
 endif
 
+if NETCDF_ENABLE_HTTP
+libnczarr_la_SOURCES += zmap_http.c
+endif
+
 # For now, ignore these
 IGNORED=ztype.c 
 
