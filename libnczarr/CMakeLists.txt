@@ -61,6 +61,10 @@ if(NETCDF_ENABLE_S3)
     set(libnczarr_SOURCES ${libnczarr_SOURCES} zmap_s3sdk.c)
 endif()
 
+if(NETCDF_ENABLE_HTTP)
+    set(libnczarr_SOURCES ${libnczarr_SOURCES} zmap_http.c)
+endif()
+
 # Build the Zarr dispatch layer as a library that will be included in
 # the netCDF library.
 
