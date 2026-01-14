@@ -26,6 +26,9 @@ nczmap_features(NCZM_IMPL impl)
 #ifdef NETCDF_ENABLE_S3
     case NCZM_S3: return zmap_s3sdk.features;
 #endif
+#ifdef NETCDF_ENABLE_HTTP
+    case NCZM_HTTP: return zmap_http.features;
+#endif
     default: break;
     }
     return NCZM_UNIMPLEMENTED;
@@ -65,6 +68,12 @@ nczmap_create(NCZM_IMPL impl, const char *path, int mode, size64_t flags, void* 
 	if(stat) goto done;
 	break;
 #endif
+#ifdef NETCDF_ENABLE_HTTP
+    case NCZM_HTTP:
+        stat = zmap_http.create(path, mode, flags, parameters, &map);
+        if(stat) goto done;
+        break;
+#endif
     default:
 	{stat = REPORT(NC_ENOTBUILT,"nczmap_create"); goto done;}
     }
@@ -103,6 +112,14 @@ nczmap_open(NCZM_IMPL impl, const char *path, int mode, size64_t flags, void* pa
 	if(stat) goto done;
 	break;
 #endif
+#ifdef NETCDF_ENABLE_HTTP
+    case NCZM_HTTP:
+        stat = zmap_http.open(path, mode, flags, parameters, &map);
+        if(stat){
+            goto done;
+        }
+        break;
+#endif
     default:
 	{stat = REPORT(NC_ENOTBUILT,"nczmap_open"); goto done;}
     }
@@ -132,6 +149,11 @@ nczmap_truncate(NCZM_IMPL impl, const char *path)
     case NCZM_S3:
         if((stat = zmap_s3sdk.truncate(path))) goto done;
 	break;
+#endif
+#ifdef NETCDF_ENABLE_HTTP
+    case NCZM_HTTP:
+        if((stat = zmap_http.truncate(path))) goto done;
+        break;
 #endif
     default:
 	{stat = REPORT(NC_ENOTBUILT,"nczmap_truncate"); goto done;}
