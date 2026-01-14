@@ -44,6 +44,7 @@ S3 SDK:  	        @WHICH_S3_SDK@
 
 NCZarr Support:		@HAS_NCZARR@
 NCZarr Zip Support:     @HAS_NCZARR_ZIP@
+NCZarr HTTP Support:    @HAS_NCZARR_HTTP@
 
 Diskless Support:	@HAS_DISKLESS@
 MMap Support:		@HAS_MMAP@
