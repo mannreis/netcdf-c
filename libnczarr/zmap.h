@@ -154,6 +154,7 @@ NCZM_UNDEF=0, /* In-memory implementation */
 NCZM_FILE=1,	/* File system directory-based implementation */
 NCZM_ZIP=2,	/* Zip-file based implementation */
 NCZM_S3=3,	/* Amazon S3 implementation */
+NCZM_HTTP=4, /* Any general HTTP server */
 } NCZM_IMPL;
 
 /* Define the default map implementation */
@@ -164,6 +165,7 @@ typedef size64_t NCZM_FEATURES;
 /* powers of 2 */
 #define NCZM_UNIMPLEMENTED 1 /* Unknown/ unimplemented */
 #define NCZM_WRITEONCE 2     /* Objects can only be written once */
+#define NCZM_UNLISTABLE 4     /* HTTP endpoints may not support listing operations */
 
 /*
 For each dataset, we create what amounts to a class
@@ -223,7 +225,9 @@ extern NCZMAP_DS_API zmap_zip;
 #ifdef NETCDF_ENABLE_S3
 extern NCZMAP_DS_API zmap_s3sdk;
 #endif
-
+#ifdef NETCDF_ENABLE_HTTP
+extern NCZMAP_DS_API zmap_http;
+#endif
 #ifdef __cplusplus
 extern "C" {
 #endif
