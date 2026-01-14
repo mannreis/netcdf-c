@@ -959,6 +959,7 @@ AC_MSG_RESULT([${have_sz}])
 
 if test "x$enable_nczarr" = xno ; then
    enable_nczarr_zip=no
+   enable_nczarr_http=no
 else
 
    # See if we have libzip for NCZarr
@@ -972,6 +973,23 @@ else
 
    if test "x$enable_nczarr_zip" = xyes ; then
    AC_DEFINE([NETCDF_ENABLE_NCZARR_ZIP], [1], [If true, then libzip found])
+   fi
+
+   # Check for enabling of HTTP support
+   AC_MSG_CHECKING([whether nczarr HTTP support should be enabled])
+   AC_ARG_ENABLE([http],
+               [AS_HELP_STRING([--enable-http],
+                                 [enable nczarr HTTP support (default off)])])
+   AC_MSG_RESULT($enable_http)
+
+   if  test "x$enable_http" = xyes ; then
+      if test "x$found_curl" = yes; then
+         AC_DEFINE([NETCDF_ENABLE_HTTP], [1], [If true, then libcurl found])
+         enable_nczarr_http=yes
+      else
+      AC_MSG_WARN([curl required and DAP support disabled.])
+         enable_nczarr_http=no
+      fi
    fi
 
    # Check for enabling of S3 support
@@ -2009,6 +2027,7 @@ AM_CONDITIONAL(NETCDF_ENABLE_NCZARR, [test "x$enable_nczarr" = xyes])
 AM_CONDITIONAL(NETCDF_ENABLE_S3_TESTPUB, [test "x$with_s3_testing" != xno]) # all => public
 AM_CONDITIONAL(NETCDF_ENABLE_S3_TESTALL, [test "x$with_s3_testing" = xyes])
 AM_CONDITIONAL(NETCDF_ENABLE_NCZARR_ZIP, [test "x$enable_nczarr_zip" = xyes])
+AM_CONDITIONAL(NETCDF_ENABLE_HTTP, [test "x$enable_nczarr_http" = xyes])
 AM_CONDITIONAL(HAVE_DEFLATE, [test "x$have_deflate" = xyes])
 AM_CONDITIONAL(HAVE_SZ, [test "x$have_sz" = xyes])
 AM_CONDITIONAL(HAVE_H5Z_SZIP, [test "x$enable_hdf5_szip" = xyes])
@@ -2119,6 +2138,7 @@ AC_SUBST(HAS_HDF5_ROS3,[$has_hdf5_ros3])
 AC_SUBST(HAS_NCZARR,[$enable_nczarr])
 AC_SUBST(NETCDF_ENABLE_S3_TESTING,[$with_s3_testing])
 AC_SUBST(HAS_NCZARR_ZIP,[$enable_nczarr_zip])
+AC_SUBST(HAS_NCZARR_HTTP,[$enable_http])
 AC_SUBST(HAS_PLUGINS, [$enable_plugins])
 AC_SUBST(HAS_QUANTIZE,[$enable_quantize])
 AC_SUBST(HAS_LOGGING,[$enable_logging])
