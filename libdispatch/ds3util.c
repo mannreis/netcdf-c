@@ -564,15 +564,13 @@ NC_aws_load_credentials(NCglobalstate* gstate)
   
     /* If there is no default credentials, then try to synthesize one
        from various environment variables */
-    {
-	size_t i;
+    if(gs->aws->access_key_id != NULL && gs->aws->secret_access_key != NULL) {
         struct AWSprofile* dfalt = NULL;
         struct AWSentry* entry = NULL;
         NCglobalstate* gs = NC_getglobalstate();
 	/* Verify that we can build a default */
-        if(gs->aws->access_key_id != NULL && gs->aws->secret_access_key != NULL) {
 	    /* Kill off any previous default profile */
-	    for(i=nclistlength(profiles)-1;i>=0;i--) {/* walk backward because we are removing entries */
+	    for(int i=nclistlength(profiles)-1;i>=0;i--) {/* walk backward because we are removing entries */
 		struct AWSprofile* prof = (struct AWSprofile*)nclistget(profiles,i);
 		if(strcasecmp(prof->name,"default")==0) {
 		    nclistremove(profiles,i);
@@ -599,7 +597,6 @@ NC_aws_load_credentials(NCglobalstate* gstate)
 		entry->value = strdup(gs->aws->session_token);
 		nclistpush(dfalt->entries,entry); entry = NULL;
 	    }
-	}
     }
 
     if(gstate->rcinfo->s3profiles)
