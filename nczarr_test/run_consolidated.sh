@@ -61,7 +61,7 @@ URL="https://localhost:${PORT}/${DIRECTORY}tmp_newformat.file"
 # ensure default is to verify hosts
 set +e
 > ${ISOPATH}/.ncrc
-NCZARR_CONSOLIDATED=TRUE ${NCDUMP} "${URL}#mode=zarr,s3"
+${NCDUMP} -h "${URL}#mode=zarr,s3,consolidated"
 if [ $? -eq 0 ]; then
   echo "Test failed! Success UNEXPECTED Host is not verified."
   set -e
@@ -71,7 +71,7 @@ set -e
 
 echo "[${URL}]HTTP.SSL.VERIFYPEER=0" >> $ISOPATH/.ncrc
 echo "[${URL}]HTTP.SSL.VERIFYHOST=0" >> $ISOPATH/.ncrc
-NCZARR_CONSOLIDATED=TRUE ${NCDUMP} "${URL}#mode=zarr,s3"
+${NCDUMP} -L10 -h "${URL}#mode=zarr,s3,consolidated"
 set +x
 }
 
