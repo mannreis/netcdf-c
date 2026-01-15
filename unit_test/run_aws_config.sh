@@ -68,6 +68,9 @@ AWS_PROFILE=uni \
 ${CMD} ${execdir}/aws_config key=value-overwritten region=somewhere-2 endpoint_url=https://example.com/bucket/prefix/2 extrakey=willbepropagated
 echo "Status: $?"
 
+AWS_ACCESS_KEY_ID='' AWS_SECRET_ACCESS_KEY='' \
+${CMD} ${execdir}/aws_config 2>&1 | grep -q 'Active profile:default'
+
 # Will use profile=no
 ${CMD} ${execdir}/aws_config 2>&1 | grep -q 'Active profile:no'
 echo "Status: $?"
