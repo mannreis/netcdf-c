@@ -185,6 +185,7 @@ IF(NETCDF_ENABLE_TESTS)
       add_sh_test(nczarr_test run_chunkcases)
     ENDIF()
 
+    add_sh_test(nczarr_test run_error_checks)
     add_sh_test(nczarr_test run_purezarr)
     add_sh_test(nczarr_test run_misc)
     add_sh_test(nczarr_test run_nczarr_fill)
