@@ -188,12 +188,17 @@ zs3parse_SOURCES = zs3parse.c
 if NETCDF_ENABLE_S3
 noinst_PROGRAMS += s3util 
 s3util_SOURCES = s3util.c
+if HAVE_SSL
+noinst_PROGRAMS += httpsserver
+httpsserver_SOURCES = httpsserver.c
+TESTS += run_consolidated.sh
+endif
 if NETCDF_ENABLE_S3_TESTALL
 if NETCDF_ENABLE_S3_AWS
 check_PROGRAMS += tst_pure_awssdk
 tst_pure_awssdk_SOURCES = tst_pure_awssdk.cpp
 AM_CXXFLAGS += -std=c++11
-endif 	
+endif
 endif
 endif
 

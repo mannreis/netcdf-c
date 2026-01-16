@@ -154,7 +154,7 @@ s3treesetup(void)
     printf("url=%s {url=%s bucket=%s region=%s profile=%s}\n",
                dumpoptions.url,newurl,s3info.bucket,s3info.region,activeprofile);
 #endif
-    if((s3client = NC_s3sdkcreateclient(&s3info))==NULL) {CHECK(NC_ES3);}
+    if((s3client = NC_s3sdkcreateclient(&s3info,NULL))==NULL) {CHECK(NC_ES3);}
 
     snprintf(key,sizeof(key),"%s/%s",dumpoptions.key,"x");
     CHECK(NC_s3sdkwriteobject(s3client, s3info.bucket, key, 0, NULL, NULL));
@@ -184,7 +184,7 @@ testbucketexists(void)
     printf("url=%s {url=%s bucket=%s region=%s profile=%s}\n",
                dumpoptions.url,newurl,s3info.bucket,s3info.region,activeprofile);
 #endif
-    if((s3client = NC_s3sdkcreateclient(&s3info))==NULL) {CHECK(NC_ES3);}
+    if((s3client = NC_s3sdkcreateclient(&s3info,NULL))==NULL) {CHECK(NC_ES3);}
     CHECK(NC_s3sdkbucketexists(s3client, s3info.bucket, &exists, NULL));
     printf("testbucketexists: exists=%d\n",exists);
     if(!exists) {stat = NC_EINVAL; goto done;}
@@ -208,7 +208,7 @@ testinfo(void)
     printf("url=%s => {url=%s bucket=%s region=%s profile=%s}\n",
                dumpoptions.url,newurl,s3info.bucket,s3info.region,activeprofile);
 #endif
-    if((s3client = NC_s3sdkcreateclient(&s3info))==NULL) {CHECK(NC_ES3);}
+    if((s3client = NC_s3sdkcreateclient(&s3info,NULL))==NULL) {CHECK(NC_ES3);}
     CHECK(NC_s3sdkinfo(s3client, s3info.bucket, buildkey(dumpoptions.key), &size, NULL));
     printf("testinfo: size=%llu\n",size);
 
@@ -232,7 +232,7 @@ testread(void)
     printf("url=%s {url=%s bucket=%s region=%s profile=%s}\n",
                dumpoptions.url,newurl,s3info.bucket,s3info.region,activeprofile);
 #endif
-    if((s3client = NC_s3sdkcreateclient(&s3info))==NULL) {CHECK(NC_ES3);}
+    if((s3client = NC_s3sdkcreateclient(&s3info,NULL))==NULL) {CHECK(NC_ES3);}
     CHECK(NC_s3sdkinfo(s3client, s3info.bucket, buildkey(dumpoptions.key), &size, NULL));
     printf("testread: size=%llu\n",size);
     content = calloc(1,size+1);
@@ -261,7 +261,7 @@ testwrite(void)
     printf("url=%s {url=%s bucket=%s region=%s profile=%s}\n",
                dumpoptions.url,newurl,s3info.bucket,s3info.region,activeprofile);
 #endif
-    if((s3client = NC_s3sdkcreateclient(&s3info))==NULL) {CHECK(NC_ES3);}
+    if((s3client = NC_s3sdkcreateclient(&s3info,NULL))==NULL) {CHECK(NC_ES3);}
     CHECK(NC_s3sdkwriteobject(s3client, s3info.bucket, buildkey(dumpoptions.key), strlen(uploaddata), uploaddata, NULL));
 
     /* Verify existence and size */
@@ -293,7 +293,7 @@ testlist(void)
 #ifdef DEBUG
     printf("url=%s => info=%s\n",dumpoptions.url,NC_s3dumps3info(&s3info));
 #endif
-    if((s3client = NC_s3sdkcreateclient(&s3info))==NULL) {CHECK(NC_ES3);}
+    if((s3client = NC_s3sdkcreateclient(&s3info,NULL))==NULL) {CHECK(NC_ES3);}
     CHECK(NC_s3sdklist(s3client, s3info.bucket, buildkey(dumpoptions.key), &nkeys, &keys, NULL));
     printf("testlist: nkeys=%u; keys:\n",(unsigned)nkeys);
     for(i=0;i<nkeys;i++) {
@@ -324,7 +324,7 @@ testlistlong(void)
 #ifdef DEBUG
     printf("url=%s => info=%s\n",dumpoptions.url,NC_s3dumps3info(&s3info));
 #endif
-    if((s3client = NC_s3sdkcreateclient(&s3info))==NULL) {CHECK(NC_ES3);}
+    if((s3client = NC_s3sdkcreateclient(&s3info,NULL))==NULL) {CHECK(NC_ES3);}
     for(i=0;i<LONGCOUNT;i++) { /* create many keys */
         newurl = ncuribuild(purl,NULL,NULL,NCURIALL);
 #ifdef DEBUG
@@ -394,7 +394,7 @@ testlistall(void)
 #ifdef DEBUG
     printf("url=%s => info=%s\n",dumpoptions.url,NC_s3dumps3info(&s3info));
 #endif
-    if((s3client = NC_s3sdkcreateclient(&s3info))==NULL) {CHECK(NC_ES3);}
+    if((s3client = NC_s3sdkcreateclient(&s3info,NULL))==NULL) {CHECK(NC_ES3);}
     CHECK(NC_s3sdklistall(s3client, s3info.bucket, buildkey(dumpoptions.key), &nkeys, &keys, NULL));
     printf("testlistall: nkeys=%u; keys:\n",(unsigned)nkeys);
     for(i=0;i<nkeys;i++) {
@@ -423,7 +423,7 @@ testdeletekey(void)
     printf("url=%s {url=%s bucket=%s region=%s profile=%s}\n",
                dumpoptions.url,newurl,s3info.bucket,s3info.region,activeprofile);
 #endif
-    if((s3client = NC_s3sdkcreateclient(&s3info))==NULL) {CHECK(NC_ES3);}
+    if((s3client = NC_s3sdkcreateclient(&s3info,NULL))==NULL) {CHECK(NC_ES3);}
     stat = NC_s3sdkdeletekey(s3client, s3info.bucket, buildkey(dumpoptions.key), NULL);
 
     printf("testdeletekey: url %s%s: ",newurl,buildkey(dumpoptions.key));

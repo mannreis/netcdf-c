@@ -21,6 +21,7 @@
 #include "netcdf.h"
 #include "ncrc.h"
 #include "ncutil.h"
+#include "ncauth.h"
 
 #include "ncs3sdk.h"
 #include "nch5s3comms.h"
@@ -181,7 +182,7 @@ makeerrmsg(const Aws::Client::AWSError<Aws::S3::S3Errors> err, const char* key="
 
 
 static Aws::Client::ClientConfiguration
-s3sdkcreateconfig(NCS3INFO* info)
+s3sdkcreateconfig(NCS3INFO* info, const NCauth * auth)
 {
     NCTRACE(11,"info=%s", dumps3info(info));
 
@@ -190,6 +191,9 @@ s3sdkcreateconfig(NCS3INFO* info)
     if(info->profile)
         config.profileName = info->profile;
     config.scheme = Aws::Http::Scheme::HTTPS;
+    if(auth && auth->ssl.verifypeer == 0 && auth->ssl.verifyhost == 0) {
+        config.verifySSL = false;
+    }
     //config.connectTimeoutMs = 1000;
     //config.requestTimeoutMs = 0;
     config.connectTimeoutMs = 300000;
@@ -235,11 +239,12 @@ buildclient(Aws::Client::ClientConfiguration* config, Aws::Auth::AWSCredentials*
 }
 
 /*EXTERNL*/ void*
-NC_s3sdkcreateclient(NCS3INFO* info)
+NC_s3sdkcreateclient(NCS3INFO* info, void * parameters)
 {
     NCTRACE(11,NULL);
 
-    Aws::Client::ClientConfiguration config = s3sdkcreateconfig(info);
+    const NCauth *auth = (NCauth*) parameters;
+    Aws::Client::ClientConfiguration config = s3sdkcreateconfig(info, auth);
     AWSS3CLIENT s3client;
 
     if(info->profile == NULL || strcmp(info->profile,"none")==0) {
@@ -867,16 +872,4 @@ mergekeysets(KeySet* keys1, KeySet* keys2, KeySet* merge)
     for(i=0;i<keys2->getnkeys();i++)
 	merge->push(keys2->extractithkey(i));
     return NC_NOERR;
-}
-
-/*
-Return a list of full keys  of legal objects below a specified key.
-Not necessarily sorted.
-Essentially same as getkeys, but with no delimiter.
-*/
-EXTERNL int
-NC_s3sdklistall(void* s3client0, const char* bucket, const char* prefixkey0, size_t* nkeysp, char*** keysp, char** errmsgp)
-{
-    NCTRACE(11,"bucket=%s prefixkey0=%s",bucket,prefixkey0);
-    return NCUNTRACE(getkeys(s3client0, bucket, prefixkey0, NULL, nkeysp, keysp, errmsgp));
 }

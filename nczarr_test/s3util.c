@@ -104,7 +104,7 @@ static int
 s3setup(void)
 {
     int stat = NC_NOERR;
-    s3sdk.s3client = NC_s3sdkcreateclient(&s3sdk.s3);
+    s3sdk.s3client = NC_s3sdkcreateclient(&s3sdk.s3, NULL);
     return stat;
 }
 
