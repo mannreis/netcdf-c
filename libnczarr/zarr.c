@@ -288,7 +288,11 @@ applycontrols(NCZ_FILE_INFO_T* zinfo)
 	else if(strcasecmp(p,"zip")==0) zinfo->controls.mapimpl = NCZM_ZIP;
 	else if(strcasecmp(p,"file")==0) zinfo->controls.mapimpl = NCZM_FILE;
 	else if(strcasecmp(p,"s3")==0) zinfo->controls.mapimpl = NCZM_S3;
-	else if(strcasecmp(p,"consolidated") == 0)
+	else if(strcasecmp(p,"http")==0) {
+        zinfo->controls.mapimpl = NCZM_HTTP;
+        zinfo->controls.flags |= FLAG_CONSOLIDATED;
+    }
+    else if(strcasecmp(p,"consolidated") == 0)
 	        zinfo->controls.flags |= FLAG_CONSOLIDATED;
     }
     /* Apply negative controls by turning off negative flags */
