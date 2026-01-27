@@ -281,7 +281,7 @@ setauthfield(NCauth* auth, const char* flag, const char* value)
     }
     if(strcmp(flag,"HTTP.SSL.VERIFYPEER")==0) {
 	int v;
-        if((v = atoi(value))) {
+        if((v = atoi(value)) || strncmp(value,"0",1) == 0) {
 	    auth->ssl.verifypeer = v;
 #ifdef DEBUG
                 nclog(NCLOGNOTE,"HTTP.SSL.VERIFYPEER: %d", v);
@@ -290,7 +290,7 @@ setauthfield(NCauth* auth, const char* flag, const char* value)
     }
     if(strcmp(flag,"HTTP.SSL.VERIFYHOST")==0) {
 	int v;
-        if((v = atoi(value))) {
+        if((v = atoi(value)) || strncmp(value,"0",1) == 0) {
 	    auth->ssl.verifyhost = v;
 #ifdef DEBUG
                 nclog(NCLOGNOTE,"HTTP.SSL.VERIFYHOST: %d", v);

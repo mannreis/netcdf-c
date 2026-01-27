@@ -167,6 +167,7 @@ jobs:
           -DCMAKE_INSTALL_PREFIX=/tmp \
           -DBUILD_SHARED_LIBS=ON \
           -DNETCDF_ENABLE_HDF5=ON \
+          -DNETCDF_ENABLE_LOGGING=ON \
           -DNETCDF_BUILD_UTILITIES=ON \
           -DNETCDF_ENABLE_TESTS=ON \
           -DNETCDF_ENABLE_HDF5=ON \

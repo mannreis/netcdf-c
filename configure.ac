@@ -951,6 +951,15 @@ fi
 AC_MSG_CHECKING([whether libsz library is available])
 AC_MSG_RESULT([${have_sz}])
 
+# See if we have SSL
+AC_CHECK_LIB([ssl], [SSL_new], [have_ssl=yes], [have_ssl=no])
+if test "x$have_ssl" = "xyes" ; then
+   AC_SEARCH_LIBS([SSL_new],[ssl ssl.dll libssl.dll], [], [])
+   AC_DEFINE([HAVE_SSL], [1], [if true, libssl is available])
+fi
+AC_MSG_CHECKING([whether libssl library is available])
+AC_MSG_RESULT([${have_ssl}])
+
 ##########
 
 ## 
@@ -2015,6 +2024,7 @@ AM_CONDITIONAL(HAVE_H5Z_SZIP, [test "x$enable_hdf5_szip" = xyes])
 AM_CONDITIONAL(HAVE_BLOSC, [test "x$have_blosc" = xyes])
 AM_CONDITIONAL(HAVE_BZ2, [test "x$have_bz2" = xyes])
 AM_CONDITIONAL(HAVE_ZSTD, [test "x$have_zstd" = xyes])
+AM_CONDITIONAL(HAVE_SSL, [test "x$have_ssl" = xyes])
 
 # If the machine doesn't have a long long, and we want netCDF-4, then
 # we've got problems!
