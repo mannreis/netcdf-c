@@ -102,16 +102,18 @@ IF(NETCDF_ENABLE_TESTS)
   build_bin_test_with_util_lib(ut_mapapi ut_util)
   build_bin_test_with_util_lib(ut_json ut_util)
 
-  #build_bin_test_with_util_lib(ut_consolidated ut_util)
   add_executable(ut_consolidated ut_consolidated.c ${CMAKE_CURRENT_SOURCE_DIR}/../libnczarr/zmetadata2.c ../libnczarr/zmetadata.c)
   IF(NETCDF_ENABLE_DLL)
-    message(WARN "WINDOWS!")
     target_compile_definitions(ut_consolidated PUBLIC -DDLL_EXPORT -DDLL_NETCDF)
   ENDIF(NETCDF_ENABLE_DLL)
-  target_include_directories(ut_consolidated PUBLIC ../libnczarr)
-  message(WARN "LINK! ${ALL_TLL_LIBS}")
+  target_include_directories(ut_consolidated PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../libnczarr)
   target_link_libraries(ut_consolidated PUBLIC netcdf ${ALL_TLL_LIBS})
-
+  set_target_properties(ut_consolidated PROPERTIES
+    RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+    RUNTIME_OUTPUT_DIRECTORY_DEBUG ${CMAKE_CURRENT_BINARY_DIR}
+    RUNTIME_OUTPUT_DIRECTORY_RELEASE ${CMAKE_CURRENT_BINARY_DIR}
+  )
+  add_test(ut_consolidated ${EXECUTABLE_OUTPUT_PATH}/nczarr_test_ut_consolidated)
 
   build_bin_test_with_util_lib(test_fillonlyz test_utils)
   build_bin_test_with_util_lib(test_quantize test_utils)
