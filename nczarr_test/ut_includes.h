@@ -21,6 +21,7 @@
 #include "ncpathmgr.h"
 
 #include "zincludes.h"
+#include "zmetadata.h"
 #include "ut_test.h"
 #include "ut_util.h"
 
