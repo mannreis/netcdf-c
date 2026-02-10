@@ -109,6 +109,12 @@ jobs:
             cd build
             cat libnetcdf.settings  
 
+        - name: DEBUG
+          shell: bash -el {0}
+          run: |
+            cd build
+            cmake --build . --config Release --target nczarr_test_ut_consolidated
+
         - name: Perform out-of-directory build - libnetcdf
           shell: bash -el {0}
           run: |

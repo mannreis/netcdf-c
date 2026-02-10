@@ -1,5 +1,7 @@
 #include "ut_includes.h"
-#include "zmetadata.h"
+
+EXTERNL const NCZ_Metadata* NCZ_metadata_handler2;
+EXTERNL const NCZ_Metadata* NCZ_csl_metadata_handler2;
 
 void showHandlers(const NCZ_Metadata *h1, const NCZ_Metadata *h2) {
 #define BOOLSTR(x) (x) ? "true" : "false"
@@ -83,12 +85,12 @@ NCZMAP *mockmap() {
   m->api = calloc(1, sizeof(NCZMAP_API));
   memset(m->api, 0, sizeof(NCZMAP_API));
   m->api->version = 0;
-  m->api->close = mockedunimplemented;
-  m->api->exists = mockedunimplemented;
+  m->api->close = (int (*)(NCZMAP*, int)) mockedunimplemented;
+  m->api->exists = (int (*)(NCZMAP*, const char *)) mockedunimplemented;
   m->api->len = mockedlen;
   m->api->read = mockedread;
-  m->api->write = mockedunimplemented;
-  m->api->search = mockedunimplemented;
+  m->api->write = (int (*)(NCZMAP*, const char*, size64_t, const void *))mockedunimplemented;
+  m->api->search = (int (*)(NCZMAP*, const char*, struct NClist*))mockedunimplemented;
 
   return m;
 }
@@ -122,7 +124,11 @@ int test_consolidated_handler_selection_env() {
   NCZMD_set_metadata_handler(&zinfo);
   freemockmap(zinfo.map);
   if (consolidated_env == NULL) {
+#if _WIN32
+    _putenv_s(NCZARR_CONSOLIDATED_ENV, "");
+#else
     unsetenv(NCZARR_CONSOLIDATED_ENV);
+#endif
   } else {
     char buf[256] = {0};
     memcpy(&buf, NCZARR_CONSOLIDATED_ENV "=", sizeof(NCZARR_CONSOLIDATED_ENV));
@@ -157,7 +163,7 @@ int test_consolidated_handler_selection_fallback() {
   NCZ_FILE_INFO_T zinfo = {0};
   memset(&zinfo, 0, sizeof(NCZ_FILE_INFO_T));
   zinfo.map = mockmap();
-  zinfo.map->api->read = mockedunimplemented;
+  zinfo.map->api->read = (int (*)(NCZMAP*, const char*, size64_t, size64_t, void *))mockedunimplemented;
   zinfo.controls.flags = FLAG_CONSOLIDATED;
   NCZMD_set_metadata_handler(&zinfo);
   freemockmap(zinfo.map);
