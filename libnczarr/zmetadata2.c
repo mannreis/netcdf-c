@@ -110,7 +110,7 @@ static const NCZ_Metadata NCZ_md2_table = {
     .validate_consolidated = validate_consolidated_json_noop_v2,
 };
 
-EXTERNL const NCZ_Metadata *NCZ_metadata_handler2 = &NCZ_md2_table;
+const NCZ_Metadata *NCZ_metadata_handler2 = &NCZ_md2_table;
 
 static const NCZ_Metadata NCZ_csl_md2_table = {
 	ZARRFORMAT2,
@@ -127,7 +127,7 @@ static const NCZ_Metadata NCZ_csl_md2_table = {
     .validate_consolidated = validate_consolidated_json_v2,
 };
 
-EXTERNL const NCZ_Metadata *NCZ_csl_metadata_handler2 = &NCZ_csl_md2_table;
+const NCZ_Metadata *NCZ_csl_metadata_handler2 = &NCZ_csl_md2_table;
 
 int NCZMD_v2_list_nodes(NCZ_FILE_INFO_T *zfile, const char * key, NClist *groups, NClist *variables)
 {
