@@ -113,7 +113,7 @@ jobs:
           shell: bash -el {0}
           run: |
             cd build
-            cmake --build . --config Release --target ut_consolidated
+            cmake --build . --config Release --target nczarr_test_ut_consolidated
 
         - name: Perform out-of-directory build - libnetcdf
           shell: bash -el {0}
