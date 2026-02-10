@@ -190,6 +190,9 @@ endmacro()
 
 # Build a test and add it to the test list.
 macro(add_bin_test prefix F)
+  if (${F} STREQUAL "ut_consolidated")
+    message(WARNING, "ARGN! ${ARGN}")
+  endif()
   add_executable(${prefix}_${F} ${F}.c ${ARGN})
   target_link_libraries(${prefix}_${F}
     ${ALL_TLL_LIBS}
