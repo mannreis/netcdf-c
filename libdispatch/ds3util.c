@@ -243,8 +243,8 @@ NC_s3urlrebuild(NCURI* url, NCS3INFO* s3, NCURI** newurlp)
     /* clone the url so we can modify it*/
     if((newurl=ncuriclone(url))==NULL) {stat = NC_ENOMEM; goto done;}
 
-    /* Modify the URL to canonical form */
-    ncurisetprotocol(newurl,"https");
+    /* Modify the URL to canonical form but keep http only*/
+    ncurisetprotocol(newurl,(0==strncmp(url->uri,"http://",7)?"http":"https"));
     assert(host != NULL);
     ncurisethost(newurl,host);
     assert(path != NULL);
@@ -309,13 +309,24 @@ NC_s3urlprocess(NCURI* url, NCS3INFO* s3, NCURI** newurlp)
 
     /* Rebuild the URL to path format and get a usable region and optional bucket*/
     if((stat = NC_s3urlrebuild(url,s3,&url2))) goto done;
-    if(url2->port){
-	char hostport[8192];
-	snprintf(hostport,sizeof(hostport),"%s:%s",url2->host,url2->port);
-	s3->host = strdup(hostport);
-    }else{
-        s3->host = strdup(url2->host);
+
+    // Set s3->host to proto://hostname:port format
+    {
+        int is_http = (strncmp("http", url2->protocol, 4) == 0);
+        const char *proto = is_http ? url2->protocol : "https";
+        int has_port = (url2->port != NULL && url2->port[0] != '\0');
+        const char *port = has_port ? url2->port : "";
+
+        size_t total_len =
+            strlen(proto) + 3 +                 // "://"
+            strlen(url2->host) +
+            (has_port ? 1 : 0) +                // ":"
+            strlen(port);
+
+        s3->host = calloc(total_len + 1, sizeof(char));
+        snprintf(s3->host, total_len + 1, "%s://%s%s%s", proto, url2->host, has_port ? ":" : "", port);
     }
+
     /* construct the rootkey minus the leading bucket */
     pathsegments = nclistnew();
     if((stat = NC_split_delim(url2->path,'/',pathsegments))) goto done;

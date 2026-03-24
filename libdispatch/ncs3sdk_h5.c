@@ -547,7 +547,9 @@ makes3rooturl(NCS3INFO* info)
     NCbytes* buf = ncbytesnew();
     char* result = NULL;
     
-    ncbytescat(buf,"https://");
+    if (strncmp("http",info->host, 4) != 0 ){
+        ncbytescat(buf,"https://");
+    }
     ncbytescat(buf,info->host);
     result = ncbytesextract(buf);
     ncbytesfree(buf);
