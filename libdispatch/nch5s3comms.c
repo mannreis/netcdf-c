@@ -95,7 +95,7 @@
 #include "ncutil.h"
 #include "netcdf_vutils.h"
 #include "nclog.h"
-
+#include "ncauth.h"
 /*****************/
 
 #include "ncs3sdk.h"
@@ -295,6 +295,7 @@ static const char* verbtext(HTTPVerb verb);
 static int trace(CURL* curl, int onoff);
 static int sortheaders(VList* headers);
 static void hrb_node_free(hrb_node_t *node);
+static CURLcode ncauth_curl_setopt(CURL *handle, const NCauth *auth);
 
 #if S3COMMS_DEBUG_HRB
 static void dumphrbnodes(VList* nodes);
@@ -1058,7 +1059,7 @@ done:
  *----------------------------------------------------------------------------
  */
 s3r_t *
-NCH5_s3comms_s3r_open(const char* root, NCS3SVC svc, const char *region, const char *access_id, const char* access_key)
+NCH5_s3comms_s3r_open(const char* root, NCS3SVC svc, const char *region, const char *access_id, const char* access_key, NCauth* auth)
 {
     int ret_value = SUCCEED;
     size_t         tmplen    = 0;
@@ -1168,6 +1169,11 @@ NCH5_s3comms_s3r_open(const char* root, NCS3SVC svc, const char *region, const c
 
     if (CURLE_OK != curl_easy_setopt(curlh, CURLOPT_FAILONERROR, 1L))
         HGOTO_ERROR(H5E_ARGS, NC_EINVAL, NULL, "error while setting CURL option (CURLOPT_FAILONERROR).");
+
+    if (CURLE_OK != ncauth_curl_setopt(curlh, auth)){
+        nclog(NCLOGERR, "Unable to initialize CURL handle with authentication parameters");
+        HGOTO_ERROR(H5E_ARGS, NC_ECURL, NULL, "error while setting CURL option (CURLOPT_FAILONERROR).");
+    }
 
     handle->curlhandle = curlh;
 
@@ -2939,3 +2945,96 @@ done:
     return (stat);
 }
 
+static CURLcode ncauth_curl_setopt(CURL *handle, const NCauth *auth) {
+  CURLcode stat = CURLE_OK;
+#define SET_OPT_LOG_ERR(handle, flag, value)                                   \
+  do {                                                                         \
+    CURLcode stat;                                                             \
+    if (CURLE_OK != (stat = curl_easy_setopt(handle, flag, value))) {          \
+      nclog(NCLOGWARN, "error while setting CURL option (%s)", #value);        \
+      return stat;                                                             \
+    }                                                                          \
+  } while (0)
+
+  if (auth == NULL) {
+    return stat;
+  }
+
+  if (auth->creds.user != NULL && auth->creds.pwd != NULL) {
+    SET_OPT_LOG_ERR(handle, CURLOPT_USERNAME, auth->creds.user);
+    SET_OPT_LOG_ERR(handle, CURLOPT_PASSWORD, auth->creds.pwd);
+    SET_OPT_LOG_ERR(handle, CURLOPT_HTTPAUTH, CURLAUTH_ANY);
+  }
+
+  if (auth->curlflags.cookiejar) {
+    /* Assume we will read and write cookies to same place */
+    SET_OPT_LOG_ERR(handle, CURLOPT_COOKIEJAR, auth->curlflags.cookiejar);
+    SET_OPT_LOG_ERR(handle, CURLOPT_COOKIEFILE, auth->curlflags.cookiejar);
+  }
+  if (auth->curlflags.netrc) {
+    SET_OPT_LOG_ERR(handle, CURLOPT_NETRC, CURL_NETRC_OPTIONAL);
+    /* IF HTTP.NETRC is set with "", then assume the default .netrc file (which
+     * is apparently CWD) */
+    if (strlen(auth->curlflags.netrc) > 0)
+      SET_OPT_LOG_ERR(handle, CURLOPT_NETRC_FILE, auth->curlflags.netrc);
+  }
+  if (auth->curlflags.verbose)
+    SET_OPT_LOG_ERR(handle, CURLOPT_VERBOSE, 1L);
+  if (auth->curlflags.timeout)
+    SET_OPT_LOG_ERR(handle, CURLOPT_TIMEOUT, ((long)auth->curlflags.timeout));
+  if (auth->curlflags.connecttimeout) {
+    SET_OPT_LOG_ERR(handle, CURLOPT_CONNECTTIMEOUT,
+                    (long)auth->curlflags.connecttimeout);
+  }
+
+  if (auth->curlflags.useragent)
+    SET_OPT_LOG_ERR(handle, CURLOPT_USERAGENT, auth->curlflags.useragent);
+
+  SET_OPT_LOG_ERR(handle, CURLOPT_FOLLOWLOCATION, 1L);
+  if (auth->curlflags.maxredirs)
+    SET_OPT_LOG_ERR(handle, CURLOPT_MAXREDIRS, auth->curlflags.maxredirs);
+
+  if (auth->curlflags.encode) {
+    SET_OPT_LOG_ERR(handle, CURLOPT_ACCEPT_ENCODING,
+                    ""); /* Accept all available encodings */
+  } else {
+    SET_OPT_LOG_ERR(handle, CURLOPT_ACCEPT_ENCODING, NULL);
+  }
+  if (auth->proxy.host != NULL) {
+    SET_OPT_LOG_ERR(handle, CURLOPT_PROXY, auth->proxy.host);
+    SET_OPT_LOG_ERR(handle, CURLOPT_PROXYPORT, (long)auth->proxy.port);
+    if (auth->proxy.user != NULL && auth->proxy.pwd != NULL) {
+      SET_OPT_LOG_ERR(handle, CURLOPT_PROXYUSERNAME, auth->proxy.user);
+      SET_OPT_LOG_ERR(handle, CURLOPT_PROXYPASSWORD, auth->proxy.pwd);
+#ifdef CURLOPT_PROXYAUTH
+      SET_OPT_LOG_ERR(handle, CURLOPT_PROXYAUTH, (long)CURLAUTH_ANY);
+#endif
+    }
+  }
+  /* VERIFYPEER == 0 => VERIFYHOST == 0 */
+  /* We need to have 2 states: default and a set value */
+  /* So -1 => default >= 0 => use value */
+  if (auth->ssl.verifypeer >= 0) {
+    SET_OPT_LOG_ERR(handle, CURLOPT_SSL_VERIFYPEER, auth->ssl.verifypeer);
+  }
+#ifdef HAVE_LIBCURL_766
+  if (auth->ssl.verifyhost >= 0) {
+    SET_OPT_LOG_ERR(handle, CURLOPT_SSL_VERIFYHOST, auth->ssl.verifyhost);
+  }
+#endif
+  if (auth->ssl.certificate)
+    SET_OPT_LOG_ERR(handle, CURLOPT_SSLCERT, auth->ssl.certificate);
+  if (auth->ssl.key)
+    SET_OPT_LOG_ERR(handle, CURLOPT_SSLKEY, auth->ssl.key);
+  if (auth->ssl.keypasswd)
+    SET_OPT_LOG_ERR(handle, CURLOPT_SSLKEYPASSWD, auth->ssl.keypasswd);
+  /* libcurl prior to 7.16.4 used 'CURLOPT_SSLKEYPASSWD' */
+  if (auth->ssl.cainfo)
+    SET_OPT_LOG_ERR(handle, CURLOPT_CAINFO, auth->ssl.cainfo);
+  if (auth->ssl.capath)
+    SET_OPT_LOG_ERR(handle, CURLOPT_CAPATH, auth->ssl.capath);
+
+done:
+  return stat;
+#undef SET_OPT_LOG_ERR
+}

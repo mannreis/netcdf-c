@@ -189,7 +189,7 @@ NC_s3sdkcreateclient(NCS3INFO* info, NCauth* auth)
     if(s3client == NULL) goto done;
     NC_s3getcredentials(info->profile, NULL, &accessid, &accesskey);
     if((s3client->rooturl = makes3rooturl(info))==NULL) {stat = NC_ENOMEM; goto done;}
-    s3client->h5s3client = NCH5_s3comms_s3r_open(s3client->rooturl,info->svc,info->region,accessid,accesskey);
+    s3client->h5s3client = NCH5_s3comms_s3r_open(s3client->rooturl,info->svc,info->region,accessid,accesskey, auth);
     if(s3client->h5s3client == NULL) {stat = NC_ES3; goto done;}
 
     // Establish connection and report any errors!
