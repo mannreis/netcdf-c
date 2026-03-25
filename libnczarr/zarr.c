@@ -76,7 +76,7 @@ ncz_create_dataset(NC_FILE_INFO_T* file, NC_GRP_INFO_T* root, NClist* controls)
     }
 
     /* initialize map handle*/
-    if((stat = nczmap_create(zinfo->controls.mapimpl,nc->path,nc->mode,zinfo->controls.flags,NULL,&zinfo->map)))
+    if((stat = nczmap_create(zinfo->controls.mapimpl,nc->path,nc->mode,zinfo->controls.flags,zinfo->auth,&zinfo->map)))
 	goto done;
 
     if((stat = NCZMD_set_metadata_handler(zinfo))){
@@ -151,7 +151,7 @@ ncz_open_dataset(NC_FILE_INFO_T* file, NClist* controls)
     }
 
     /* initialize map handle*/
-    if((stat = nczmap_open(zinfo->controls.mapimpl,nc->path,mode,zinfo->controls.flags,NULL,&zinfo->map)))
+    if((stat = nczmap_open(zinfo->controls.mapimpl,nc->path,mode,zinfo->controls.flags,zinfo->auth,&zinfo->map)))
 	goto done;
 
     if((stat = NCZMD_set_metadata_handler(zinfo))) {

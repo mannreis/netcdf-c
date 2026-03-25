@@ -15,6 +15,7 @@
 #include "ncrc.h"
 #include "ncxml.h"
 #include "ncutil.h"
+#include "ncauth.h"
 
 #include "ncs3sdk.h"
 #include "nch5s3comms.h"
@@ -174,7 +175,7 @@ dumps3client(void* s3client0, const char* tag)
 /**************************************************/
 
 /*EXTERNL*/ void*
-NC_s3sdkcreateclient(NCS3INFO* info)
+NC_s3sdkcreateclient(NCS3INFO* info, NCauth* auth)
 {
     int stat = NC_NOERR;
     const char* accessid = NULL;

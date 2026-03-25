@@ -79,6 +79,7 @@ struct AWSprofile {
 /* Opaque Types */
 struct NClist;
 struct NCglobalstate;
+struct NCauth;
 
 #ifndef DECLSPEC
 #ifdef DLL_NETCDF
@@ -99,7 +100,7 @@ extern "C" {
 /* API for ncs3sdk_XXX.[c|cpp] */
 DECLSPEC int NC_s3sdkinitialize(void);
 DECLSPEC int NC_s3sdkfinalize(void);
-DECLSPEC void* NC_s3sdkcreateclient(NCS3INFO* context);
+DECLSPEC void* NC_s3sdkcreateclient(NCS3INFO* context, struct NCauth *auth);
 DECLSPEC int NC_s3sdkbucketexists(void* s3client, const char* bucket, int* existsp, char** errmsgp);
 DECLSPEC int NC_s3sdkbucketcreate(void* s3client, const char* region, const char* bucket, char** errmsgp);
 DECLSPEC int NC_s3sdkbucketdelete(void* s3client, NCS3INFO* info, char** errmsgp);

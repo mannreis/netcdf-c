@@ -235,7 +235,7 @@ buildclient(Aws::Client::ClientConfiguration* config, Aws::Auth::AWSCredentials*
 }
 
 /*EXTERNL*/ void*
-NC_s3sdkcreateclient(NCS3INFO* info)
+NC_s3sdkcreateclient(NCS3INFO* info, NCauth * auth)
 {
     NCTRACE(11,NULL);
 
