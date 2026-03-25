@@ -280,28 +280,28 @@ setauthfield(NCauth* auth, const char* flag, const char* value)
 #endif
     }
     if(strcmp(flag,"HTTP.SSL.VERIFYPEER")==0) {
-	int v;
-        if((v = atoi(value))) {
-	    auth->ssl.verifypeer = v;
+	    auth->ssl.verifypeer = atoi(value);
 #ifdef DEBUG
                 nclog(NCLOGNOTE,"HTTP.SSL.VERIFYPEER: %d", v);
 #endif
-	}
     }
     if(strcmp(flag,"HTTP.SSL.VERIFYHOST")==0) {
-	int v;
-        if((v = atoi(value))) {
-	    auth->ssl.verifyhost = v;
+	    auth->ssl.verifyhost = atoi(value);
 #ifdef DEBUG
                 nclog(NCLOGNOTE,"HTTP.SSL.VERIFYHOST: %d", v);
 #endif
-	}
     }
     if(strcmp(flag,"HTTP.SSL.VALIDATE")==0) {
-        if(atoi(value)) {
-	    auth->ssl.verifypeer = 1;
-	    auth->ssl.verifyhost = 2;
-	}
+        switch (atoi(value)) {
+            case 0:
+                auth->ssl.verifyhost = 0;
+                auth->ssl.verifyhost = 0;
+                break;
+            default:
+                auth->ssl.verifypeer = 1;
+                auth->ssl.verifyhost = 2;
+                break;
+        }
     }
 
     if(strcmp(flag,"HTTP.SSL.CERTIFICATE")==0) {
