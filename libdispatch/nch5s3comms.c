@@ -1249,6 +1249,11 @@ int NCH5_s3comms_s3r_connect(s3r_t *handle, const char *url, const char **err) {
     }
     nclog(NCLOGERR, "CURL error (%d) while connecting: %s (%s)", result,
           basic_err, errbuf);
+    if (result == CURLE_PEER_FAILED_VERIFICATION){
+        nclog(NCLOGWARN, "Consider setting any/all HTTP.VERIFYPEER, HTTP.VERIFYHOST and HTTP.VALIDATE to 0 in .ncrc");
+    }else if( result == CURLE_SSL_CONNECT_ERROR && (strncmp("https://", url, 7) == 0) ) {
+        nclog(NCLOGWARN, "Likely connecting to a non secure http server, consider http:/%s...", url+7);
+    }
     HGOTO_ERROR(H5E_ARGS, NC_ECURL, NULL, "error while perfoming connect.");
   }
 done:
